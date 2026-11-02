@@ -1,0 +1,9 @@
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\TechnoArtSupportTicketFrontEnd.exe
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\appsettings.Development.json
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\appsettings.json
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\dotnet-tools.json
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\TechnoArtSupportTicketFrontEnd.dll
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\TechnoArtSupportTicketFrontEnd.runtimeconfig.json
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\TechnoArtSupportTicketFrontEnd.pdb
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\MudBlazor.dll
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\obj\Release\net10.0\PubTmp\Out\TechnoArtSupportTicketFrontEnd.deps.json

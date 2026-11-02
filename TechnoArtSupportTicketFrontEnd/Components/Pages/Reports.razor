@@ -1,0 +1,263 @@
+@page "/admin/reports"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
+@attribute [Authorize(Roles = "SuperAdmin,MD")]
+@inject ApiService BackendApi
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Executive Reports - SupportHub</PageTitle>
+
+<div class="custom-card p-4 h-100">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <h5 class="fw-bold m-0"><i class="bi bi-bar-chart text-primary me-2"></i> Executive SLA & Performance Reports</h5>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm fw-semibold shadow-sm" @onclick="LoadReports">
+                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center p-5"><div class="spinner-border text-primary"></div></div>
+    }
+    else
+    {
+        <div class="row g-4 mb-4">
+            <!-- Key Metric Cards -->
+            <div class="col-md-3">
+                <div class="card border-0 bg-light p-3 shadow-sm border-start border-4 border-primary">
+                    <div class="text-muted small fw-semibold">Total Clients</div>
+                    <div class="fs-2 fw-bold text-primary">@totalClients</div>
+                    <div class="small text-muted"><i class="bi bi-building me-1"></i>Active Tenants</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-light p-3 shadow-sm border-start border-4 border-info">
+                    <div class="text-muted small fw-semibold">Total Projects</div>
+                    <div class="fs-2 fw-bold text-info">@totalProjects</div>
+                    <div class="small text-muted"><i class="bi bi-kanban me-1"></i>System Projects</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-light p-3 shadow-sm border-start border-4 border-warning">
+                    <div class="text-muted small fw-semibold">Total Tickets</div>
+                    <div class="fs-2 fw-bold text-warning">@totalTickets</div>
+                    <div class="small text-muted"><i class="bi bi-ticket me-1"></i>All Time Raised</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-light p-3 shadow-sm border-start border-4 border-success">
+                    <div class="text-muted small fw-semibold">Resolved / Closed</div>
+                    <div class="fs-2 fw-bold text-success">@resolvedTickets</div>
+                    <div class="small text-muted"><i class="bi bi-check-circle me-1"></i>Successfully Fixed</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <!-- SLA Compliance Rate -->
+            <div class="col-md-6">
+                <div class="card border-0 bg-light p-4 shadow-sm h-100">
+                    <h6 class="fw-bold text-muted mb-3"><i class="bi bi-shield-check text-success me-2"></i>Overall SLA Compliance Rate</h6>
+                    <div class="d-flex align-items-end gap-3 mb-2">
+                        <h1 class="display-4 fw-bold text-success m-0">@slaRate%</h1>
+                        <span class="text-muted mb-2">Target > 95%</span>
+                    </div>
+                    <div class="progress" style="height: 12px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: @(slaRate)%" aria-valuenow="@slaRate" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="mt-3 small text-muted">
+                        Calculated across all critical, high, medium, and low priority tickets.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Priority Breakdown -->
+            <div class="col-md-6">
+                <div class="card border-0 bg-light p-4 shadow-sm h-100">
+                    <h6 class="fw-bold text-muted mb-3"><i class="bi bi-pie-chart text-primary me-2"></i>Ticket Distribution by Priority</h6>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-semibold text-danger"><i class="bi bi-circle-fill me-1"></i>Critical</span>
+                        <span class="badge bg-danger rounded-pill">@critCount</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-semibold text-warning"><i class="bi bi-circle-fill me-1"></i>High</span>
+                        <span class="badge bg-warning text-dark rounded-pill">@highCount</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-semibold text-primary"><i class="bi bi-circle-fill me-1"></i>Medium</span>
+                        <span class="badge bg-primary rounded-pill">@medCount</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-semibold text-secondary"><i class="bi bi-circle-fill me-1"></i>Low</span>
+                        <span class="badge bg-secondary rounded-pill">@lowCount</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client Breakdown Table -->
+        <div class="card border-0 bg-light p-4 shadow-sm mb-4">
+            <h6 class="fw-bold text-muted mb-3"><i class="bi bi-building text-primary me-2"></i>Client Support Performance Overview</h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle bg-white rounded">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="fw-semibold text-muted small">Client / Tenant</th>
+                            <th class="fw-semibold text-muted small">Code</th>
+                            <th class="fw-semibold text-muted small">Active Projects</th>
+                            <th class="fw-semibold text-muted small">Total Tickets</th>
+                            <th class="fw-semibold text-muted small">Open Tickets</th>
+                            <th class="fw-semibold text-muted small">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (clientSummaries.Count > 0)
+                        {
+                            @foreach (var c in clientSummaries)
+                            {
+                                var open = c.TryGetProperty("open_tickets", out var op) ? op.GetInt32() : 0;
+                                <tr>
+                                    <td class="fw-bold">@c.GetProperty("tenant_name").GetString()</td>
+                                    <td><span class="badge bg-light text-dark border">@c.GetProperty("tenant_code").GetString()</span></td>
+                                    <td>@c.GetProperty("project_count").GetInt32()</td>
+                                    <td class="fw-semibold">@c.GetProperty("total_tickets").GetInt32()</td>
+                                    <td>
+                                        <span class="badge bg-@(open > 0 ? "warning" : "success")">@open</span>
+                                    </td>
+                                    <td><span class="dot dot-green me-1"></span> Active</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="6" class="text-center text-muted p-3">No client records found.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Team Member Performance Table -->
+        <div class="card border-0 bg-light p-4 shadow-sm">
+            <h6 class="fw-bold text-muted mb-3"><i class="bi bi-person-lines-fill text-primary me-2"></i>Internal Team Performance (Tasks Solved)</h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle bg-white rounded">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="fw-semibold text-muted small">Member Name</th>
+                            <th class="fw-semibold text-muted small text-center">Tasks Assigned</th>
+                            <th class="fw-semibold text-muted small text-center">Tasks Completed</th>
+                            <th class="fw-semibold text-muted small">Completion Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (teamPerformances.Count > 0)
+                        {
+                            @foreach (var p in teamPerformances)
+                            {
+                                var assigned = p.TryGetProperty("tasks_assigned", out var a) ? a.GetInt32() : 0;
+                                var completed = p.TryGetProperty("tasks_completed", out var c) ? c.GetInt32() : 0;
+                                var pct = assigned == 0 ? 0 : Math.Round(((double)completed / assigned) * 100);
+                                <tr>
+                                    <td class="fw-bold"><i class="bi bi-person-circle me-2 text-secondary"></i>@p.GetProperty("full_name").GetString()</td>
+                                    <td class="text-center fw-semibold text-primary">@assigned</td>
+                                    <td class="text-center fw-semibold text-success">@completed</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height: 6px;">
+                                                <div class="progress-bar bg-success" style="width: @pct%"></div>
+                                            </div>
+                                            <span class="small text-muted fw-semibold" style="width: 40px">@pct%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="4" class="text-center text-muted p-3">No team performance records found.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private int totalClients = 0;
+    private int totalProjects = 0;
+    private int totalTickets = 0;
+    private int resolvedTickets = 0;
+    private double slaRate = 95.0;
+
+    private int critCount = 0;
+    private int highCount = 0;
+    private int medCount = 0;
+    private int lowCount = 0;
+
+    private List<JsonElement> clientSummaries = new();
+    private List<JsonElement> teamPerformances = new();
+
+    protected override async Task OnInitializedAsync() => await LoadReports();
+
+    private async Task LoadReports()
+    {
+        isLoading = true;
+        clientSummaries.Clear();
+        teamPerformances.Clear();
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            var tenantId = user.FindFirst("TenantId")?.Value ?? "";
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+            var payload = new APIDataAccParms
+            {
+                ComCod = tenantId,
+                ProcID = "GET_REPORTS",
+                parm04 = userId,
+                parm05 = role
+            };
+
+            var result = await BackendApi.FetchDataAsync(payload);
+            if (result.HasValue)
+            {
+                var val = result.Value;
+                totalClients = val.TryGetProperty("total_clients", out var tc) ? tc.GetInt32() : 0;
+                totalProjects = val.TryGetProperty("total_projects", out var tp) ? tp.GetInt32() : 0;
+                totalTickets = val.TryGetProperty("total_tickets", out var ttk) ? ttk.GetInt32() : 0;
+                resolvedTickets = val.TryGetProperty("resolved_tickets", out var rt) ? rt.GetInt32() : 0;
+                slaRate = val.TryGetProperty("sla_compliance_rate", out var sr) ? sr.GetDouble() : 95.0;
+
+                if (val.TryGetProperty("tickets_by_priority", out var priObj) && priObj.ValueKind == JsonValueKind.Object)
+                {
+                    critCount = priObj.TryGetProperty("CRITICAL", out var c) ? c.GetInt32() : 0;
+                    highCount = priObj.TryGetProperty("HIGH", out var h) ? h.GetInt32() : 0;
+                    medCount = priObj.TryGetProperty("MEDIUM", out var m) ? m.GetInt32() : 0;
+                    lowCount = priObj.TryGetProperty("LOW", out var l) ? l.GetInt32() : 0;
+                }
+
+                if (val.TryGetProperty("client_summary", out var csArr) && csArr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var c in csArr.EnumerateArray()) clientSummaries.Add(c);
+                }
+                
+                if (val.TryGetProperty("team_performance", out var perfArr) && perfArr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var p in perfArr.EnumerateArray()) teamPerformances.Add(p);
+                }
+            }
+        }
+        isLoading = false;
+    }
+}

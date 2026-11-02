@@ -1,0 +1,240 @@
+@page "/my-tasks"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
+@inject ApiService BackendApi
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>My Tasks - SupportHub</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h5 class="fw-bold m-0"><i class="bi bi-list-task text-primary me-2"></i>My Assigned Tasks</h5>
+        <small class="text-muted">Work on tasks assigned by your Project Manager. Completing tasks automatically advances the ticket progress.</small>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="LoadTasks"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center p-5"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    <div class="row g-4 pt-2">
+        <!-- To Do Column -->
+        <div class="col-md-4">
+            <div class="bg-light-surface border rounded-3 p-3 h-100 shadow-sm bg-light">
+                <h6 class="fw-bold mb-3 text-secondary d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-circle me-2"></i>To Do</span>
+                    <span class="badge bg-secondary rounded-pill">@todoTasks.Count</span>
+                </h6>
+                
+                @if (todoTasks.Count == 0)
+                {
+                    <div class="text-muted small text-center py-4">No tasks to do.</div>
+                }
+
+                @foreach (var task in todoTasks)
+                {
+                    var taskId = task.TryGetProperty("task_id", out var tip) ? tip.GetString() ?? "" : "";
+                    var tName = task.TryGetProperty("name", out var tnp) ? tnp.GetString() ?? "" : "";
+                    var tNum = task.TryGetProperty("ticket_number", out var tnum) ? tnum.GetString() ?? "" : "";
+                    var asgn = task.TryGetProperty("assigned_to", out var asp) ? asp.GetString() ?? "" : "";
+                    var initials = asgn.Length >= 2 ? asgn[..2].ToUpper() : "ME";
+
+                    <div class="card shadow-sm border-0 mb-3 border-start border-4 border-secondary task-card">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-light text-dark border">@taskId</span>
+                                <button class="btn btn-sm btn-outline-primary py-0 px-2 fw-semibold" style="font-size:0.75rem;" @onclick:stopPropagation="true" @onclick='() => QuickUpdateStatus(taskId, "IN_PROGRESS")'>
+                                    <i class="bi bi-play-fill me-1"></i>Start
+                                </button>
+                            </div>
+                            <h6 class="fw-semibold mb-2" style="cursor: pointer;" @onclick='() => NavigationManager.NavigateTo($"/task/{taskId}")'>@tName</h6>
+                            <div class="d-flex align-items-center justify-content-between mt-3 text-muted" style="font-size:0.75rem;">
+                                <span><i class="bi bi-ticket me-1"></i> @tNum</span>
+                                <div class="avatar-circle bg-secondary text-white" style="width:24px;height:24px;font-size:0.65rem;">@initials</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- In Progress Column -->
+        <div class="col-md-4">
+            <div class="bg-light-surface border rounded-3 p-3 h-100 shadow-sm bg-light">
+                <h6 class="fw-bold mb-3 text-primary d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-play-circle-fill me-2"></i>In Progress</span>
+                    <span class="badge bg-primary rounded-pill">@inProgressTasks.Count</span>
+                </h6>
+                
+                @if (inProgressTasks.Count == 0)
+                {
+                    <div class="text-muted small text-center py-4">No tasks in progress.</div>
+                }
+
+                @foreach (var task in inProgressTasks)
+                {
+                    var taskId = task.TryGetProperty("task_id", out var tip) ? tip.GetString() ?? "" : "";
+                    var tName = task.TryGetProperty("name", out var tnp) ? tnp.GetString() ?? "" : "";
+                    var tNum = task.TryGetProperty("ticket_number", out var tnum) ? tnum.GetString() ?? "" : "";
+                    var asgn = task.TryGetProperty("assigned_to", out var asp) ? asp.GetString() ?? "" : "";
+                    var initials = asgn.Length >= 2 ? asgn[..2].ToUpper() : "ME";
+
+                    <div class="card shadow-sm border-0 mb-3 border-start border-4 border-primary task-card">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-light text-dark border">@taskId</span>
+                                <button class="btn btn-sm btn-success py-0 px-2 fw-semibold text-white" style="font-size:0.75rem;" @onclick:stopPropagation="true" @onclick='() => QuickUpdateStatus(taskId, "COMPLETED")'>
+                                    <i class="bi bi-check me-1"></i>Done
+                                </button>
+                            </div>
+                            <h6 class="fw-semibold mb-2" style="cursor: pointer;" @onclick='() => NavigationManager.NavigateTo($"/task/{taskId}")'>@tName</h6>
+                            <div class="d-flex align-items-center justify-content-between mt-3 text-muted" style="font-size:0.75rem;">
+                                <span><i class="bi bi-ticket me-1"></i> @tNum</span>
+                                <div class="avatar-circle bg-primary text-white" style="width:24px;height:24px;font-size:0.65rem;">@initials</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Done Column -->
+        <div class="col-md-4">
+            <div class="bg-light-surface border rounded-3 p-3 h-100 shadow-sm bg-light">
+                <h6 class="fw-bold mb-3 text-success d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-check-circle-fill me-2"></i>Completed</span>
+                    <span class="badge bg-success rounded-pill">@doneTasks.Count</span>
+                </h6>
+                
+                @if (doneTasks.Count == 0)
+                {
+                    <div class="text-muted small text-center py-4">No completed tasks yet.</div>
+                }
+
+                @foreach (var task in doneTasks)
+                {
+                    var taskId = task.TryGetProperty("task_id", out var tip) ? tip.GetString() ?? "" : "";
+                    var tName = task.TryGetProperty("name", out var tnp) ? tnp.GetString() ?? "" : "";
+                    var tNum = task.TryGetProperty("ticket_number", out var tnum) ? tnum.GetString() ?? "" : "";
+
+                    <div class="card border-0 mb-3 bg-white opacity-85 shadow-sm task-card">
+                        <div class="card-body p-3 text-muted">
+                            <span class="badge bg-light text-secondary border mb-2">@taskId</span>
+                            <h6 class="fw-semibold text-decoration-line-through mb-2" style="cursor: pointer;" @onclick='() => NavigationManager.NavigateTo($"/task/{taskId}")'>@tName</h6>
+                            <div class="d-flex align-items-center justify-content-between mt-3 text-muted" style="font-size:0.75rem;">
+                                <span><i class="bi bi-ticket me-1"></i> @tNum</span>
+                                <span class="badge bg-success bg-opacity-25 text-success">Completed</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .task-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .task-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    }
+</style>
+
+@code {
+    private List<JsonElement> todoTasks = new();
+    private List<JsonElement> inProgressTasks = new();
+    private List<JsonElement> doneTasks = new();
+    private bool isLoading = true;
+
+    private string tenantId = "";
+    private string userId = "";
+    private string role = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            tenantId = user.FindFirst("TenantId")?.Value ?? "";
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+            await LoadTasks();
+        }
+        else
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadTasks()
+    {
+        isLoading = true;
+        todoTasks.Clear();
+        inProgressTasks.Clear();
+        doneTasks.Clear();
+
+        var payload = new APIDataAccParms 
+        { 
+            ComCod = tenantId,
+            ProcID = "GET_TASKS",
+            parm04 = userId,
+            parm05 = role
+        };
+        
+        var result = await BackendApi.FetchDataAsync(payload);
+
+        if (result.HasValue)
+        {
+            try {
+                List<JsonElement> allTasks = new();
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in result.Value.EnumerateArray()) allTasks.Add(el);
+                }
+                else if (result.Value.TryGetProperty("task_id", out _))
+                {
+                    allTasks.Add(result.Value);
+                }
+
+                foreach(var task in allTasks)
+                {
+                    var status = task.TryGetProperty("status", out var sp) ? sp.GetString() ?? "TODO" : "TODO";
+                    if (status == "TODO" || status == "REJECTED") todoTasks.Add(task);
+                    else if (status == "IN_PROGRESS") inProgressTasks.Add(task);
+                    else doneTasks.Add(task);
+                }
+            } catch { } 
+        }
+        
+        isLoading = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task QuickUpdateStatus(string taskId, string newStatus)
+    {
+        if (string.IsNullOrEmpty(taskId)) return;
+        var payload = new APIDataAccParms
+        {
+            ComCod = tenantId,
+            ProcID = "UPDATE_TASK_STATUS",
+            parm04 = userId,
+            parm05 = role,
+            parm01 = taskId,
+            parm02 = newStatus
+        };
+        await BackendApi.FetchDataAsync(payload);
+        await LoadTasks();
+    }
+}

@@ -1,0 +1,400 @@
+@page "/raise-ticket"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
+@inject ApiService BackendApi
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Raise New Ticket - SupportHub</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9 col-xl-8">
+            <!-- Modern Header -->
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h3 class="fw-bold text-dark mb-1">Raise a Support Ticket</h3>
+                    <p class="text-muted mb-0">Submit a new issue or request for our software engineering & support teams.</p>
+                </div>
+                <div class="icon-badge p-3 rounded-circle d-none d-sm-block">
+                    <i class="bi bi-ticket-plus fs-3"></i>
+                </div>
+            </div>
+
+            <div class="card glass-card rounded-4 overflow-hidden mb-5">
+                <div class="card-body p-4 p-md-5">
+                    
+                    @if (isSuccess)
+                    {
+                        <div class="alert alert-success d-flex align-items-sm-center flex-column flex-sm-row p-4 mb-4 border-0 rounded-3 bg-success bg-opacity-10">
+                            <i class="bi bi-check-circle-fill fs-1 text-success me-sm-4 mb-3 mb-sm-0"></i>
+                            <div>
+                                <h5 class="alert-heading fw-bold text-success mb-1">Ticket Created Successfully!</h5>
+                                <p class="mb-0 text-success opacity-75">Your ticket number is <strong class="badge bg-success fs-6 ms-1">@generatedTicketNum</strong></p>
+                                <hr class="border-success opacity-25 my-2">
+                                <p class="mb-0 small text-success opacity-75">The Project Manager and dedicated module team have received your ticket and are tracking it. You can monitor progress on your dashboard.</p>
+                            </div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger d-flex align-items-center p-3 mb-4 rounded-3 border-0 bg-danger bg-opacity-10 text-danger">
+                            <i class="bi bi-exclamation-octagon-fill fs-4 me-3"></i>
+                            <div>
+                                <span class="fw-semibold">Error:</span> @errorMessage
+                            </div>
+                        </div>
+                    }
+
+                    <form @onsubmit="SubmitTicket">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold text-dark small mb-2">Project <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-lg bg-light border-0" value="@ticketModel.ProjectId" @onchange="OnProjectSelected" required>
+                                    <option value="" disabled selected>-- Select a Project --</option>
+                                    @foreach(var project in projects)
+                                    {
+                                        var pId = project.TryGetProperty("project_id", out var pidp) ? pidp.GetString() ?? "" : "";
+                                        var pNm = project.TryGetProperty("name", out var pnmp) ? pnmp.GetString() ?? "" : "";
+                                        var pCd = project.TryGetProperty("code", out var pcdp) ? pcdp.GetString() ?? "" : "";
+                                        <option value="@pId">@pNm (@pCd)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-dark small mb-2">
+                                    <i class="bi bi-diagram-3 text-primary me-1"></i> Module / Department
+                                </label>
+                                <select class="form-select form-select-lg bg-light border-0" @bind="ticketModel.ModuleId">
+                                    <option value="">-- General / Whole Project --</option>
+                                    @foreach(var mod in projectModules)
+                                    {
+                                        var mId = mod.TryGetProperty("module_id", out var midp) ? midp.GetString() ?? "" : "";
+                                        var mNm = mod.TryGetProperty("name", out var mnmp) ? mnmp.GetString() ?? "" : "";
+                                        var mCd = mod.TryGetProperty("code", out var mcdp) ? mcdp.GetString() ?? "" : "";
+                                        <option value="@mId">@mNm (@mCd)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark small mb-2">Priority <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-lg bg-light border-0" @bind="ticketModel.Priority" required>
+                                    <option value="LOW">🔵 Low</option>
+                                    <option value="MEDIUM">🟢 Medium</option>
+                                    <option value="HIGH">🟠 High</option>
+                                    <option value="CRITICAL">🔴 Critical</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark small mb-2">Subject / Issue Summary <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg bg-light border-0" placeholder="Briefly describe the problem..." @bind="ticketModel.Subject" required />
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold text-dark small mb-0">Detailed Description <span class="text-danger">*</span></label>
+                                <span class="small text-muted">@(ticketModel.Description?.Length ?? 0) characters</span>
+                            </div>
+                            <textarea class="form-control form-control-lg bg-light border-0" rows="6" placeholder="Please provide detailed steps to reproduce, errors, expected behavior..." @bind="ticketModel.Description" @bind:event="oninput" required></textarea>
+                            <div class="form-text mt-1 text-muted small"><i class="bi bi-info-circle me-1"></i>Specific error messages and reproduction steps help the team resolve tickets faster.</div>
+                        </div>
+                        
+                        <div class="mb-5">
+                            <label class="form-label fw-bold text-dark small mb-2"><i class="bi bi-image me-1"></i> Screenshot (Optional)</label>
+                            <InputFile class="form-control form-control-lg bg-light border-0" OnChange="HandleFileSelected" accept="image/*" />
+                            <div class="form-text mt-2"><small>Max size: 5MB</small></div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between pt-3 border-top">
+                            <button type="button" class="btn btn-link text-muted text-decoration-none fw-semibold" @onclick='() => NavigationManager.NavigateTo("/")'>
+                                <i class="bi bi-arrow-left me-1"></i> Cancel
+                            </button>
+                            <button type="submit" class="btn btn-primary btn-lg rounded-pill px-5 fw-bold shadow-sm" disabled="@isSubmitting">
+                                @if(isSubmitting) { 
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> 
+                                    <span>Submitting...</span>
+                                } else {
+                                    <span>Submit Ticket <i class="bi bi-send ms-2"></i></span>
+                                }
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+    .container-fluid {
+        font-family: 'Outfit', sans-serif;
+    }
+    
+    .glass-card {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+    }
+
+    .icon-badge {
+        background-color: #eff6ff;
+        color: #2563eb;
+    }
+
+    .form-control:focus, .form-select:focus {
+        background-color: #fff !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15) !important;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        border: none;
+        transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35) !important;
+    }
+</style>
+
+@code {
+    private TicketCreateModel ticketModel = new() { Priority = "MEDIUM" };
+    private List<JsonElement> projects = new();
+    private List<JsonElement> projectModules = new();
+    private bool isSubmitting = false;
+    private bool isSuccess = false;
+    private string errorMessage = "";
+    private string generatedTicketNum = "";
+
+    private IBrowserFile? selectedFile;
+    private string base64File = "";
+    private string fileName = "";
+    private string mimeType = "";
+
+    private string tenantId = "";
+    private string userId = "";
+    private string role = "";
+
+    public class TicketCreateModel
+    {
+        public string ProjectId { get; set; } = "";
+        public string ModuleId { get; set; } = "";
+        public string Subject { get; set; } = "";
+        public string Priority { get; set; } = "";
+        public string Description { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            tenantId = user.FindFirst("TenantId")?.Value ?? "";
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+            var payload = new APIDataAccParms 
+            { 
+                ComCod = tenantId,
+                ProcID = "GET_PROJECTS",
+                parm04 = userId,
+                parm05 = role
+            };
+            
+            var result = await BackendApi.FetchDataAsync(payload);
+            if (result.HasValue)
+            {
+                try {
+                    if (result.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var el in result.Value.EnumerateArray()) projects.Add(el);
+                    }
+                    else if (result.Value.TryGetProperty("project_id", out _))
+                    {
+                        projects.Add(result.Value);
+                    }
+                } catch { } 
+                
+                if (projects.Count > 0 && string.IsNullOrEmpty(ticketModel.ProjectId))
+                {
+                    ticketModel.ProjectId = projects[0].TryGetProperty("project_id", out var pid) ? pid.GetString() ?? "" : "";
+                    if (!string.IsNullOrEmpty(ticketModel.ProjectId))
+                    {
+                        await LoadProjectModules(ticketModel.ProjectId);
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task OnProjectSelected(ChangeEventArgs e)
+    {
+        ticketModel.ProjectId = e.Value?.ToString() ?? "";
+        ticketModel.ModuleId = "";
+        await LoadProjectModules(ticketModel.ProjectId);
+    }
+
+    private async Task LoadProjectModules(string projId)
+    {
+        projectModules.Clear();
+        if (string.IsNullOrEmpty(projId)) return;
+
+        var payload = new APIDataAccParms
+        {
+            ProcID = "GET_PROJECT_MODULES",
+            parm01 = projId,
+            parm04 = userId,
+            parm05 = role
+        };
+
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue)
+        {
+            try {
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in result.Value.EnumerateArray()) projectModules.Add(el);
+                }
+                else if (result.Value.TryGetProperty("module_id", out _))
+                {
+                    projectModules.Add(result.Value);
+                }
+            } catch { }
+
+            // Check if user is pre-assigned to a specific module in this project
+            await TryPreselectUserModule();
+        }
+    }
+
+    private async Task TryPreselectUserModule()
+    {
+        if (projectModules.Count == 0) return;
+
+        try {
+            var payload = new APIDataAccParms { ProcID = "GET_USERS", ComCod = tenantId, parm05 = role };
+            var res = await BackendApi.FetchDataAsync(payload);
+            if (res.HasValue && res.Value.ValueKind == JsonValueKind.Array)
+            {
+                foreach(var u in res.Value.EnumerateArray())
+                {
+                    if (u.TryGetProperty("user_id", out var uid) && uid.GetString() == userId)
+                    {
+                        if (u.TryGetProperty("module_id", out var mid) && mid.ValueKind == JsonValueKind.String)
+                        {
+                            var userModId = mid.GetString();
+                            if (!string.IsNullOrEmpty(userModId) && projectModules.Any(m => m.TryGetProperty("module_id", out var pmid) && pmid.GetString() == userModId))
+                            {
+                                ticketModel.ModuleId = userModId;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        } catch { }
+    }
+
+    private async Task SubmitTicket()
+    {
+        if (string.IsNullOrWhiteSpace(ticketModel.ProjectId))
+        {
+            errorMessage = "Please select a project before submitting.";
+            return;
+        }
+
+        isSubmitting = true;
+        errorMessage = "";
+        isSuccess = false;
+
+        try
+        {
+            var jsonbExtendedData = JsonSerializer.Serialize(new
+            {
+                detailed_description = ticketModel.Description,
+                module_id = ticketModel.ModuleId,
+                environment = "Dynamic Client UI",
+                submitted_from = "SupportHub Client Portal"
+            });
+
+            var param = new APIDataAccParms
+            {
+                ComCod = tenantId,
+                ProcID = "CREATE_TICKET",            
+                parmJson1 = jsonbExtendedData,       
+                parm01 = ticketModel.ProjectId,      
+                parm02 = ticketModel.Subject,        
+                parm03 = ticketModel.Priority,       
+                parm04 = userId,
+                parm05 = role,
+                parm06 = ticketModel.Description,
+                parm07 = ticketModel.ModuleId
+            };
+
+            var result = await BackendApi.FetchDataAsync(param);
+
+            if (result != null && result.Value.TryGetProperty("success", out var successEl) && successEl.GetBoolean())
+            {
+                generatedTicketNum = result.Value.TryGetProperty("ticket_number", out var numEl) ? numEl.GetString() ?? "Unknown" : "N/A";
+                
+                // Upload Attachment if exists
+                if (selectedFile != null && !string.IsNullOrEmpty(base64File))
+                {
+                    try {
+                        var filePayload = new APIDataAccParms
+                        {
+                            ComCod = tenantId, ProcID = "UPLOAD_FILE", ProcName = "support.sp_ticket_files", 
+                            parmJson1 = base64File, parm01 = generatedTicketNum, parm02 = fileName, parm03 = mimeType,
+                            parm04 = userId, parm05 = role
+                        };
+                        await BackendApi.FetchDataAsync(filePayload);
+                    } catch { /* Silent fail if attachment errors */ }
+                }
+
+                isSuccess = true;
+                ticketModel = new() { Priority = "MEDIUM", ProjectId = "", ModuleId = "", Subject = "", Description = "" };
+                selectedFile = null;
+                base64File = "";
+            }
+            else
+            {
+                var serverError = result != null && result.Value.TryGetProperty("error", out var e) ? e.GetString() : "API rejected the operation.";
+                errorMessage = "Failed to create the ticket. " + serverError;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "A connection error occurred: " + ex.Message;
+        }
+
+        isSubmitting = false;
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null && file.Size <= 1024 * 1024 * 5) // 5MB limit
+        {
+            selectedFile = file;
+            fileName = file.Name;
+            mimeType = file.ContentType;
+            
+            using var stream = file.OpenReadStream(1024 * 1024 * 5);
+            using var ms = new System.IO.MemoryStream();
+            await stream.CopyToAsync(ms);
+            base64File = Convert.ToBase64String(ms.ToArray());
+        }
+    }
+}

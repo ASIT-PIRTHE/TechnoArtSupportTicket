@@ -1,0 +1,11 @@
+wwwroot\app.css
+wwwroot\bootstrap\bootstrap.min.css
+wwwroot\bootstrap\bootstrap.min.css.map
+wwwroot\favicon.png
+C:\Users\Administrator\.nuget\packages\microsoft.aspnetcore.app.internal.assets\10.0.8\build\..\_framework\blazor.web.js
+C:\Users\Administrator\.nuget\packages\microsoft.aspnetcore.app.internal.assets\10.0.8\build\..\_framework\blazor.server.js
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\wwwroot\app.css
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\wwwroot\bootstrap\bootstrap.min.css
+D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\wwwroot\bootstrap\bootstrap.min.css.map
+C:\Users\Administrator\.nuget\packages\microsoft.aspnetcore.app.internal.assets\10.0.8\_framework\blazor.web.js
+C:\Users\Administrator\.nuget\packages\microsoft.aspnetcore.app.internal.assets\10.0.8\_framework\blazor.server.js

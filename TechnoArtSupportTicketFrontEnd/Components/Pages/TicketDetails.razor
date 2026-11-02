@@ -1,0 +1,503 @@
+@page "/ticket/{TicketNumber}"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
+@inject ApiService BackendApi
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Ticket @TicketNumber - SupportHub</PageTitle>
+
+@if (isLoading)
+{
+    <div class="text-center p-5"><div class="spinner-border text-primary"></div></div>
+}
+else if (ticketData == null)
+{
+    <div class="alert alert-danger m-4">Ticket not found or you do not have permission to view it.</div>
+}
+else
+{
+    var status = ticketData?.GetProperty("status").GetString() ?? "NEW";
+    var priority = ticketData?.GetProperty("priority").GetString() ?? "MEDIUM";
+    var pClass = priority == "CRITICAL" ? "badge-urgent" : priority == "HIGH" ? "badge-high" : priority == "MEDIUM" ? "badge-medium" : "badge-low";
+
+    <div class="row g-4">
+        <!-- Main Content: Ticket Details & Conversation -->
+        <div class="col-lg-8">
+            <div class="custom-card border-0 mb-4">
+                <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            <span class="badge border border-secondary text-dark bg-light px-2 py-1">@status</span>
+                            <span class="priority-badge @pClass">@priority</span>
+                            <span class="text-muted small fw-semibold ms-2">@TicketNumber</span>
+                            @{
+                                var headerMod = ticketData?.TryGetProperty("module_name", out var hmn) == true ? hmn.GetString() : null;
+                                if (!string.IsNullOrEmpty(headerMod))
+                                {
+                                    <span class="badge bg-primary-subtle text-primary border"><i class="bi bi-diagram-3 me-1"></i>@headerMod</span>
+                                }
+                            }
+                        </div>
+                        <h4 class="fw-bold mb-1">@ticketData?.GetProperty("subject").GetString()</h4>
+                        <div class="text-muted small">
+                            Opened on @ticketData?.GetProperty("created_at").GetString()
+                        </div>
+                    </div>
+                    <AuthorizeView Roles="SuperAdmin,SupportManager,ProjectManager">
+                        <Authorized>
+                            <div class="d-flex gap-2 flex-wrap">
+                                @if (status == "NEW" || status == "ASSIGNED")
+                                {
+                                    <button class="btn btn-outline-primary btn-sm fw-semibold" @onclick='() => ChangeStatus("IN_PROGRESS")'>
+                                        <i class="bi bi-play-circle me-1"></i> Start Progress
+                                    </button>
+                                }
+                                @if (status == "IN_PROGRESS" || status == "RESOLVED")
+                                {
+                                    <button class="btn btn-success btn-sm fw-semibold text-white" @onclick='() => ChangeStatus("RESOLVED")'>
+                                        <i class="bi bi-check-circle me-1"></i> Mark Resolved
+                                    </button>
+                                }
+                                @if (status == "RESOLVED")
+                                {
+                                    <button class="btn btn-outline-secondary btn-sm fw-semibold" @onclick='() => ChangeStatus("CLOSED")'>
+                                        <i class="bi bi-lock me-1"></i> Close Ticket
+                                    </button>
+                                }
+                            </div>
+                        </Authorized>
+                    </AuthorizeView>
+                </div>
+                <div class="card-body p-4">
+                    <h6 class="fw-bold text-muted text-uppercase small mb-3">Original Description</h6>
+                    <p class="text-dark" style="white-space: pre-wrap; line-height: 1.6;">@(ticketData.HasValue && ticketData.Value.TryGetProperty("description", out var description) ? description.GetString() ?? "" : "")</p>
+                    
+                    @if (classAttachments.Count > 0)
+                    {
+                        <div class="mt-4 pt-3 border-top">
+                            <h6 class="fw-bold text-muted small mb-3"><i class="bi bi-paperclip me-2"></i>Attachments (@classAttachments.Count)</h6>
+                            <div class="d-flex flex-wrap gap-3">
+                                @foreach(var file in classAttachments)
+                                {
+                                    <div class="card p-2 text-center shadow-sm" style="width: 160px; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#imageModal-@file.fileId">
+                                        <div style="height: 110px; overflow: hidden;" class="rounded mb-2 bg-light d-flex align-items-center justify-content-center">
+                                            <img src="data:@file.mimeType;base64,@file.base64Data" class="img-fluid" style="object-fit: cover; max-height: 100%;" alt="@file.fileName" />
+                                        </div>
+                                        <small class="text-truncate d-block fw-semibold" title="@file.fileName">@file.fileName</small>
+                                    </div>
+
+                                    <!-- Image Modal -->
+                                    <div class="modal fade" id="imageModal-@file.fileId" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-xl modal-dialog-centered">
+                                            <div class="modal-content glass-card">
+                                                <div class="modal-header border-0 pb-0">
+                                                    <h5 class="modal-title">@file.fileName</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body text-center p-4">
+                                                    <img src="data:@file.mimeType;base64,@file.base64Data" class="img-fluid rounded shadow-lg" style="max-height: 80vh;" alt="@file.fileName" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="custom-card border-0 p-4">
+                <h6 class="fw-bold border-bottom pb-3 mb-4"><i class="bi bi-chat-left-text text-primary me-2"></i>Conversation</h6>
+                
+                <!-- Comment thread -->
+                @if (ticketData?.TryGetProperty("comments", out var commentsElement) == true && commentsElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var comment in commentsElement.EnumerateArray())
+                    {
+                        var userName = comment.TryGetProperty("user_name", out var un) ? un.GetString() : "User";
+                        <div class="d-flex gap-3 mb-4">
+                            <div class="avatar-circle bg-primary text-white mt-1">@userName?[..2]</div>
+                            <div class="flex-grow-1 bg-light p-3 rounded-3 border">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-bold small">@userName</span>
+                                    <span class="text-muted small">@comment.GetProperty("created_at").GetString()</span>
+                                </div>
+                                <p class="mb-0 small text-dark" style="white-space: pre-wrap;">
+                                    @comment.GetProperty("comment_text").GetString()
+                                </p>
+                            </div>
+                        </div>
+                    }
+                }
+
+                <!-- Add Comment Form -->
+                <div class="mt-4 border-top pt-4">
+                    <textarea class="form-control bg-light mb-3" rows="4" placeholder="Reply to this ticket..." @bind="newComment"></textarea>
+                    <div class="d-flex justify-content-end">
+                        <button class="btn btn-primary fw-semibold px-4" @onclick="PostComment">Post Reply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar: Metadata & Tasks -->
+        <div class="col-lg-4">
+            <div class="custom-card border-0 p-4 mb-4">
+                <h6 class="fw-bold border-bottom pb-2 mb-3">Ticket Information</h6>
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-muted fw-semibold">Status</span>
+                    <span class="fw-bold">@status</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-muted fw-semibold">Priority</span>
+                    <span class="priority-badge @pClass">@priority</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-muted fw-semibold">Project</span>
+                    <span class="fw-bold">@(ticketData?.TryGetProperty("project_name", out var pn) == true ? pn.GetString() : "—")</span>
+                </div>
+                @{
+                    var tMod = ticketData?.TryGetProperty("module_name", out var mn) == true ? mn.GetString() : null;
+                    if (!string.IsNullOrEmpty(tMod))
+                    {
+                        <div class="d-flex justify-content-between mb-2 small">
+                            <span class="text-muted fw-semibold">Module / Dept</span>
+                            <span class="badge bg-light text-primary border"><i class="bi bi-diagram-3 me-1"></i>@tMod</span>
+                        </div>
+                    }
+                }
+                <div class="d-flex justify-content-between align-items-center mb-2 small">
+                    <span class="text-muted fw-semibold">Assigned PM</span>
+                    <div class="d-flex align-items-center gap-1">
+                        <span class="fw-bold text-primary">@(ticketData?.TryGetProperty("assigned_to_name", out var atn) == true ? atn.GetString() : "Unassigned")</span>
+                        <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager">
+                            <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted" @onclick="() => showReassignPm = !showReassignPm" title="Reassign PM">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                        </AuthorizeView>
+                    </div>
+                </div>
+
+                @if (showReassignPm)
+                {
+                    <div class="card bg-light border p-2 mb-3 shadow-sm">
+                        <label class="form-label small fw-semibold text-muted mb-1">Reassign PM</label>
+                        <div class="d-flex gap-1">
+                            <select class="form-select form-select-sm" @bind="selectedNewPmId">
+                                <option value="">-- Choose Member --</option>
+                                @foreach (var m in teamMembers)
+                                {
+                                    var uid = m.TryGetProperty("user_id", out var up) ? up.GetString() : "";
+                                    var unm = m.TryGetProperty("full_name", out var unp) ? unp.GetString() : "";
+                                    var urole = m.TryGetProperty("role", out var urp) ? urp.GetString() : "";
+                                    <option value="@uid">@unm (@urole)</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary btn-sm fw-semibold text-nowrap" @onclick="ReassignTicketPm" disabled="@isReassigningPm">
+                                @if (isReassigningPm) { <span class="spinner-border spinner-border-sm me-1"></span> } Assign
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-muted fw-semibold">Reporter</span>
+                    <span class="fw-bold">@(ticketData?.TryGetProperty("created_by_name", out var cbn) == true ? cbn.GetString() : "—")</span>
+                </div>
+                @{
+                    var prog = ticketData?.TryGetProperty("progress_percent", out var prg) == true ? (prg.ValueKind == JsonValueKind.Number ? prg.GetDecimal() : 0) : 0;
+                }
+                <div class="mt-3 pt-2 border-top">
+                    <div class="d-flex justify-content-between align-items-center mb-1 small">
+                        <span class="text-muted fw-semibold">Resolution Progress</span>
+                        <span class="fw-bold text-dark">@prog%</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar @(prog == 100 ? "bg-success" : "bg-primary")" role="progressbar" style="width: @(prog)%;" aria-valuenow="@prog" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                @{
+                    var slaDue = ticketData?.TryGetProperty("sla_due_at", out var slaEl) == true ? slaEl.GetString() : null;
+                    bool slaBreached = !string.IsNullOrEmpty(slaDue) && DateTime.TryParse(slaDue, out var slaDate) && slaDate < DateTime.Now;
+                }
+                @if (!string.IsNullOrEmpty(slaDue))
+                {
+                    <div class="d-flex justify-content-between mt-3 mb-2 small border-top pt-2">
+                        <span class="text-muted fw-semibold">SLA Due</span>
+                        <span class="fw-bold @(slaBreached ? "text-danger" : "text-success")"><i class="bi bi-alarm me-1"></i>@slaDue</span>
+                    </div>
+                }
+            </div>
+
+            <div class="custom-card border-0 p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h6 class="fw-bold mb-0">Linked Tasks</h6>
+                    <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager">
+                        <Authorized>
+                            <button class="btn btn-sm btn-light border text-primary" @onclick="ToggleTaskForm"><i class="bi @(isAssignTaskMode ? "bi-x-lg" : "bi-plus")"></i></button>
+                        </Authorized>
+                    </AuthorizeView>
+                </div>
+
+                @if (isAssignTaskMode)
+                {
+                    <div class="card bg-light border-primary mb-3 shadow-sm border-0">
+                        <div class="card-body p-3">
+                            <h6 class="fw-bold text-primary small mb-3">Assign New Task</h6>
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold text-muted">Task Name</label>
+                                <input type="text" class="form-control form-control-sm" @bind="newTaskName" placeholder="What needs to be done?" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-muted">Assign To</label>
+                                <select class="form-select form-select-sm" @bind="newTaskAssignee">
+                                    <option value="">-- Select Member --</option>
+                                    @foreach(var member in teamMembers)
+                                    {
+                                        var mRole = member.TryGetProperty("role", out var mr) ? mr.GetString() : "";
+                                        <option value="@member.GetProperty("user_id").GetString()">@member.GetProperty("full_name").GetString() (@mRole)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="d-flex justify-content-end">
+                                <button class="btn btn-primary btn-sm fw-semibold w-100" @onclick="CreateTask" disabled="@isSubmittingTask">
+                                    @if(isSubmittingTask) { <span class="spinner-border spinner-border-sm me-1"></span> } Assign Task
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                
+                @if (ticketData?.TryGetProperty("tasks", out var tasksElement) == true && tasksElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var task in tasksElement.EnumerateArray())
+                    {
+                        var tStat = task.TryGetProperty("status", out var tsp) ? tsp.GetString() : "TODO";
+                        var tAssignee = task.TryGetProperty("assigned_to_name", out var tap) ? tap.GetString() : "Unassigned";
+                        var statColor = tStat is "COMPLETED" or "APPROVED" ? "bg-success" : tStat == "IN_PROGRESS" ? "bg-primary" : "bg-secondary";
+
+                        <div class="card shadow-sm border-0 mb-3 border-start border-4 @(tStat == "COMPLETED" ? "border-success" : "border-primary") bg-light">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge bg-white text-dark border small">@task.GetProperty("task_id").GetString()</span>
+                                    <span class="badge @statColor rounded-pill small">@tStat</span>
+                                </div>
+                                <a href="/task/@task.GetProperty("task_id").GetString()" class="text-decoration-none fw-semibold text-dark small d-block mb-1">@task.GetProperty("name").GetString()</a>
+                                <div class="small text-muted" style="font-size:0.75rem;"><i class="bi bi-person me-1"></i>@tAssignee</div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string TicketNumber { get; set; } = "";
+
+    private JsonElement? ticketData;
+    private List<JsonElement> teamMembers = new();
+    private List<JsonElement> attachments = new();
+    private List<AttachmentModel> classAttachments = new();
+
+    public class AttachmentModel { 
+        public string fileId {get;set;}=""; 
+        public string fileName {get;set;}=""; 
+        public string base64Data {get;set;}=""; 
+        public string mimeType {get;set;}=""; 
+    }
+
+    private bool isLoading = true;
+    private string newComment = "";
+
+    private bool isAssignTaskMode = false;
+    private bool isSubmittingTask = false;
+    private string newTaskName = "";
+    private string newTaskAssignee = "";
+
+    private bool showReassignPm = false;
+    private string selectedNewPmId = "";
+    private bool isReassigningPm = false;
+
+    private string tenantId = "";
+    private string userId = "";
+    private string role = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await LoadTeamMembers();
+    }
+
+    private void ToggleTaskForm() => isAssignTaskMode = !isAssignTaskMode;
+
+    private async Task LoadTeamMembers()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true && (role == "SuperAdmin" || role == "MD" || role == "SupportManager" || role == "ProjectManager"))
+        {
+            var payload = new APIDataAccParms { ComCod = tenantId, ProcID = "GET_TEAM_MEMBERS", parm04 = userId, parm05 = role };
+            var result = await BackendApi.FetchDataAsync(payload);
+            
+            if (result.HasValue)
+            {
+                try {
+                    teamMembers.Clear();
+                    if (result.Value.ValueKind == JsonValueKind.Array)
+                        foreach (var el in result.Value.EnumerateArray()) teamMembers.Add(el);
+                    else if(result.Value.TryGetProperty("user_id", out _)) teamMembers.Add(result.Value);
+                } catch { }
+            }
+        }
+    }
+
+    private async Task ReassignTicketPm()
+    {
+        if (string.IsNullOrEmpty(selectedNewPmId)) return;
+        isReassigningPm = true;
+        var payload = new APIDataAccParms
+        {
+            ComCod = tenantId,
+            ProcID = "ASSIGN_TICKET_PM",
+            parm01 = TicketNumber,
+            parm02 = selectedNewPmId,
+            parm04 = userId,
+            parm05 = role
+        };
+        await BackendApi.FetchDataAsync(payload);
+        showReassignPm = false;
+        isReassigningPm = false;
+        await LoadData();
+    }
+
+    private async Task CreateTask()
+    {
+        if (string.IsNullOrWhiteSpace(newTaskName) || string.IsNullOrWhiteSpace(newTaskAssignee)) return;
+        isSubmittingTask = true;
+
+        var payload = new APIDataAccParms 
+        { 
+            ComCod = tenantId,
+            ProcID = "CREATE_TASK",
+            parm04 = userId,
+            parm05 = role,
+            parm01 = TicketNumber,
+            parm02 = newTaskName,
+            parm03 = newTaskAssignee
+        };
+        
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue && result.Value.TryGetProperty("success", out var success) && success.GetBoolean())
+        {
+            newTaskName = "";
+            newTaskAssignee = "";
+            isAssignTaskMode = false;
+            await LoadData(); // Reload tasks safely
+        }
+        isSubmittingTask = false;
+    }
+
+    private async Task LoadData()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            tenantId = user.FindFirst("TenantId")?.Value ?? "";
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+            var payload = new APIDataAccParms 
+            { 
+                ComCod = tenantId,
+                ProcID = "GET_TICKET_DETAILS",
+                parm04 = userId,
+                parm05 = role,
+                parm01 = TicketNumber
+            };
+            
+            var result = await BackendApi.FetchDataAsync(payload);
+            
+            if (result.HasValue && result.Value.TryGetProperty("ticket_number", out _))
+            {
+                ticketData = result.Value;
+            }
+
+            // Load Attachments Safely
+            try {
+                var fp = new APIDataAccParms { ComCod = tenantId, ProcID = "GET_FILES", ProcName="support.sp_ticket_files", parm04 = userId, parm05 = role, parm01 = TicketNumber };
+                var r = await BackendApi.FetchDataAsync(fp);
+                attachments.Clear();
+                classAttachments.Clear();
+                if (r.HasValue) {
+                    if (r.Value.ValueKind == JsonValueKind.Array) {
+                        foreach(var el in r.Value.EnumerateArray()) {
+                            classAttachments.Add(new AttachmentModel{
+                                fileId = el.TryGetProperty("file_id", out var a)?a.GetString()??"" : "",
+                                fileName = el.TryGetProperty("file_name", out var bn)?bn.GetString()??"" : "",
+                                mimeType = el.TryGetProperty("mime_type", out var cn)?cn.GetString()??"" : "",
+                                base64Data = el.TryGetProperty("base64_data", out var dn)?dn.GetString()??"" : ""
+                            });
+                            attachments.Add(el);
+                        }
+                    } else if (r.Value.TryGetProperty("file_id", out var fpId)) {
+                        classAttachments.Add(new AttachmentModel{
+                                fileId = fpId.GetString()??"",
+                                fileName = r.Value.TryGetProperty("file_name", out var bn)?bn.GetString()??"" : "",
+                                mimeType = r.Value.TryGetProperty("mime_type", out var cn)?cn.GetString()??"" : "",
+                                base64Data = r.Value.TryGetProperty("base64_data", out var dn)?dn.GetString()??"" : ""
+                            });
+                        attachments.Add(r.Value);
+                    }
+                }
+            } catch {}
+        }
+        
+        isLoading = false;
+    }
+
+    private async Task PostComment()
+    {
+        if (string.IsNullOrWhiteSpace(newComment)) return;
+
+        var payload = new APIDataAccParms 
+        { 
+            ComCod = tenantId,
+            ProcID = "ADD_COMMENT",
+            parm04 = userId,
+            parm05 = role,
+            parm01 = TicketNumber,
+            parm02 = newComment
+        };
+        
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue && result.Value.TryGetProperty("success", out var success) && success.GetBoolean())
+        {
+            newComment = "";
+            await LoadData();
+        }
+    }
+
+    private async Task ChangeStatus(string newStatus)
+    {
+        var payload = new APIDataAccParms 
+        { 
+            ComCod = tenantId,
+            ProcID = "UPDATE_TICKET_STATUS",
+            parm04 = userId,
+            parm05 = role,
+            parm01 = TicketNumber,
+            parm02 = newStatus
+        };
+        await BackendApi.FetchDataAsync(payload);
+        await LoadData();
+    }
+}

@@ -1,0 +1,206 @@
+@page "/all-tickets"
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@attribute [Authorize(Roles = "SuperAdmin,MD,SupportManager,ProjectManager")]
+@inject ApiService BackendApi
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Ticket Queue</PageTitle>
+
+<div class="custom-card p-4 h-100">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 flex-wrap gap-2">
+        <h5 class="fw-bold m-0"><i class="bi bi-inboxes text-primary me-2"></i> Queue Master — All Tickets</h5>
+        <div class="d-flex align-items-center gap-2">
+            <div class="input-group input-group-sm" style="width: 260px;">
+                <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control" placeholder="Filter tickets..." @bind="filterText" @bind:event="oninput" />
+                @if (!string.IsNullOrEmpty(filterText))
+                {
+                    <button class="btn btn-outline-secondary" type="button" @onclick="() => filterText = string.Empty"><i class="bi bi-x"></i></button>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center p-5"><div class="spinner-border text-primary"></div></div>
+    }
+    else
+    {
+        var displayList = FilteredTickets;
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ticket</th>
+                        <th>Subject</th>
+                        <th>Project</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Progress</th>
+                        <th>Date</th>
+                        <th>Reporter</th>
+                        <th>Assigned PM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (displayList.Count > 0)
+                    {
+                        foreach (var t in displayList)
+                        {
+                            var priority = GetStringSafe(t, "priority", "MEDIUM");
+                            var pClass = priority == "CRITICAL" ? "bg-danger" : priority == "HIGH" ? "bg-warning text-dark" : "bg-primary";
+                            
+                            var status = GetStringSafe(t, "status", "NEW");
+                            var sClass = status == "NEW" ? "badge bg-info text-dark" : status == "OPEN" ? "badge bg-primary" : status == "IN_PROGRESS" ? "badge bg-warning text-dark" : status == "CLOSED" ? "badge bg-success" : "badge bg-secondary";
+
+                            var progress = GetDecimalSafe(t, "progress_percent", 0);
+                            var pmName = GetStringSafe(t, "assigned_to_name", "Unassigned");
+
+                            var dateStr = GetStringSafe(t, "created_at");
+                            var formattedDate = DateTime.TryParse(dateStr, out var d) ? d.ToString("yyyy-MMM-dd") : "";
+                            
+                            var createdByName = GetStringSafe(t, "created_by_name", "U");
+                            var initials = createdByName.Length > 0 ? createdByName.Substring(0, 1).ToUpper() : "U";
+
+                            <tr style="cursor: pointer" @onclick='() => NavigationManager.NavigateTo($"/ticket/{GetStringSafe(t, "ticket_number")}")'>
+                                <td class="fw-semibold text-muted">@GetStringSafe(t, "ticket_number", "N/A")</td>
+                                <td class="fw-bold">@GetStringSafe(t, "subject", "No Subject")</td>
+                                <td>
+                                    <div class="fw-semibold">@GetStringSafe(t, "project_name", "Internal")</div>
+                                    @{
+                                        var modName = GetStringSafe(t, "module_name", "");
+                                        if (!string.IsNullOrEmpty(modName))
+                                        {
+                                            <span class="badge bg-light text-primary border" style="font-size: 0.72rem;"><i class="bi bi-diagram-3 me-1"></i>@modName</span>
+                                        }
+                                    }
+                                </td>
+                                <td><span class="badge @pClass">@priority</span></td>
+                                <td><span class="@sClass">@status</span></td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2" style="min-width: 100px;">
+                                        <div class="progress flex-grow-1" style="height: 6px;">
+                                            <div class="progress-bar @(progress >= 100 ? "bg-success" : "bg-primary")" role="progressbar" style="width: @(progress)%"></div>
+                                        </div>
+                                        <span class="small text-muted fw-bold">@(((int)progress))%</span>
+                                    </div>
+                                </td>
+                                <td class="small text-muted">@formattedDate</td>
+                                <td><div class="avatar-circle" style="width:30px;height:30px;font-size:0.7rem;">@initials</div></td>
+                                <td>
+                                    <span class="badge @(pmName == "Unassigned" ? "bg-light text-muted border" : "bg-info text-dark")">
+                                        <i class="bi bi-person me-1"></i>@pmName
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="9" class="text-center text-muted p-4">No matching tickets found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? QueryParam { get; set; }
+
+    private List<JsonElement> ticketList = new();
+    private bool isLoading = true;
+    private string filterText = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(QueryParam))
+        {
+            filterText = QueryParam;
+        }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            var tenantId = user.FindFirst("TenantId")?.Value ?? "";
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+            var payload = new APIDataAccParms 
+            { 
+                ProcID = "GET_TICKETS",
+                ComCod = tenantId,
+                parm04 = userId,
+                parm05 = role
+            };
+            
+            var result = await BackendApi.FetchDataAsync(payload);
+            if (result.HasValue)
+            {
+                try {
+                    if (result.Value.ValueKind == JsonValueKind.Array)
+                        foreach (var el in result.Value.EnumerateArray()) ticketList.Add(el);
+                    else if(!result.Value.TryGetProperty("error", out _)) ticketList.Add(result.Value);
+                } catch {}
+            }
+        }
+        isLoading = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(QueryParam) && string.IsNullOrEmpty(filterText))
+        {
+            filterText = QueryParam;
+        }
+    }
+
+    private List<JsonElement> FilteredTickets
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(filterText)) return ticketList;
+            var term = filterText.Trim();
+            return ticketList.Where(t =>
+                GetStringSafe(t, "ticket_number").Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                GetStringSafe(t, "subject").Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                GetStringSafe(t, "project_name").Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                GetStringSafe(t, "assigned_to_name").Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                GetStringSafe(t, "status").Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                GetStringSafe(t, "priority").Contains(term, StringComparison.OrdinalIgnoreCase)
+            ).ToList();
+        }
+    }
+
+    private string GetStringSafe(JsonElement el, string propName, string defaultValue = "")
+    {
+        if (el.TryGetProperty(propName, out var p) && p.ValueKind != JsonValueKind.Null && p.ValueKind != JsonValueKind.Undefined)
+        {
+            if (p.ValueKind == JsonValueKind.String)
+                return p.GetString() ?? defaultValue;
+            return p.GetRawText();
+        }
+        return defaultValue;
+    }
+
+    private decimal GetDecimalSafe(JsonElement el, string propName, decimal defaultValue = 0)
+    {
+        if (el.TryGetProperty(propName, out var p) && p.ValueKind != JsonValueKind.Null && p.ValueKind != JsonValueKind.Undefined)
+        {
+            if (p.ValueKind == JsonValueKind.Number && p.TryGetDecimal(out var d))
+                return d;
+            if (decimal.TryParse(p.GetString(), out var parsed))
+                return parsed;
+        }
+        return defaultValue;
+    }
+}

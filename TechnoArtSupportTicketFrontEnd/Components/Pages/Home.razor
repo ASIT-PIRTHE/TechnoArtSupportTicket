@@ -1,0 +1,412 @@
+@page "/"
+@page "/dashboard"
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+@inject ApiService BackendApi
+
+<PageTitle>Command Center - Pirthe Support</PageTitle>
+
+<AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,TeamMember">
+    <Authorized>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else
+        {
+        <!-- Precision Dark Banner -->
+        <div class="dash-banner position-relative shadow-sm text-white overflow-hidden mb-4 rounded-4" style="background-color: #1a1c23;">
+            <div class="position-absolute w-100 h-100" style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); z-index: -1;"></div>
+            
+            <div class="d-flex flex-column flex-xl-row justify-content-between align-items-center p-4 gap-4">
+                <div class="d-flex align-items-center gap-3" style="min-width: 200px;">
+                    <div style="width:10px; height:10px; background-color:#10b981; border-radius:50%; box-shadow: 0 0 10px #10b981;"></div>
+                    <div>
+                        <h5 class="mb-1 fw-semibold text-white tracking-wide">Support Live</h5>
+                            <span class="badge border border-secondary text-light fw-normal rounded-pill px-2 py-1"
+                                  style="background-color: rgba(255,255,255,0.1); font-size: 0.65rem;">
+                                @((dashboardData.HasValue &&
+                                                            dashboardData.Value.TryGetProperty("uptime", out var uptime)
+                                                            && uptime.ValueKind == System.Text.Json.JsonValueKind.Number
+                                                            ? uptime.GetDouble()
+                                                            : 100))% uptime
+                            </span>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-4 gap-md-5 pe-0 pe-xl-4 flex-grow-1 justify-content-center w-100">
+                    <div class="text-center">
+                        <div class="text-secondary fw-semibold mb-2" style="font-size: 0.65rem; letter-spacing: 0.05em; text-transform: uppercase;">Active Conversations</div>
+                        <div class="fs-1 fw-bold lh-1 text-white">@(dashboardData?.GetProperty("active_conversations").GetInt32() ?? 0)</div>
+                        <svg width="70" height="20" class="mt-2"><polyline points="0,15 20,5 30,18 50,0 70,8" fill="none" stroke="#4b5563" stroke-width="2" /></svg>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-secondary fw-semibold mb-2" style="font-size: 0.65rem; letter-spacing: 0.05em; text-transform: uppercase;">Queue Wait Time</div>
+                        <div class="fs-1 fw-bold lh-1 text-white">@(dashboardData?.GetProperty("wait_time").GetString() ?? "0m")</div>
+                        <svg width="70" height="20" class="mt-2"><polyline points="0,5 20,15 40,8 60,18 70,12" fill="none" stroke="#4b5563" stroke-width="2" /></svg>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-secondary fw-semibold mb-2" style="font-size: 0.65rem; letter-spacing: 0.05em; text-transform: uppercase;">Agents Online</div>
+                        <div class="fs-1 fw-bold lh-1 text-white">@(dashboardData?.GetProperty("agents_online").GetInt32() ?? 0)</div>
+                        <svg width="70" height="20" class="mt-2"><polyline points="0,18 20,10 40,15 60,0 70,5" fill="none" stroke="#4b5563" stroke-width="2" /></svg>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-secondary fw-semibold mb-2" style="font-size: 0.65rem; letter-spacing: 0.05em; text-transform: uppercase;">SLA Health</div>
+                        <div class="fs-1 fw-bold lh-1 text-white">@(dashboardData?.GetProperty("sla_health").GetDouble() ?? 100)<span style="font-size: 1.25rem;">%</span></div>
+                        <svg width="70" height="20" class="mt-2"><polyline points="0,10 20,15 40,5 60,12 70,8" fill="none" stroke="#4b5563" stroke-width="2" /></svg>
+                    </div>
+                </div>
+
+                <div class="text-end text-secondary d-flex align-items-center gap-2" style="min-width: 150px; font-size:0.75rem;">
+                    <i class="bi bi-clock"></i>
+                    <div>Day Shift — 11 agents</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Pulse Master Card -->
+        <div class="custom-card p-4 pb-0 mb-4 rounded-4 shadow-sm bg-white" style="border: 1px solid #f3f4f6;">
+            <h6 class="fw-semibold text-dark mb-4" style="font-size:0.95rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                Ticket Pulse — Last 24 Hours
+            </h6>
+            
+            <!-- SVG Area Chart -->
+            <div class="w-100" style="height: 100px;">
+                <svg viewBox="0 0 1000 100" preserveAspectRatio="none" style="width:100%; height:100%;">
+                    <defs>
+                        <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.25"></stop>
+                            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.01"></stop>
+                        </linearGradient>
+                    </defs>
+                    <path d="M0,80 Q100,85 200,80 T400,60 T500,40 T600,45 T700,65 T800,55 T900,60 L1000,65 L1000,100 L0,100 Z" fill="url(#areaGradient)"/>
+                    <path d="M0,80 Q100,85 200,80 T400,60 T500,40 T600,45 T700,65 T800,55 T900,60 L1000,65" fill="none" stroke="#3b82f6" stroke-width="2.5"/>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="d-flex flex-wrap w-100 gap-3 mb-4">
+            <div class="bg-white rounded-3 p-3 flex-fill shadow-sm border border-light" style="min-width: 150px; border-left: 4px solid #3b82f6 !important;">
+                <div class="fs-4 fw-bold text-dark lh-1 mb-1">@(dashboardData?.GetProperty("new_tickets").GetInt32() ?? 0)</div>
+                <div class="text-muted" style="font-size:0.75rem;">New</div>
+            </div>
+            <div class="bg-white rounded-3 p-3 flex-fill shadow-sm border border-light" style="min-width: 150px; border-left: 4px solid #8b5cf6 !important;">
+                <div class="fs-4 fw-bold text-dark lh-1 mb-1">@(dashboardData?.GetProperty("in_progress").GetInt32() ?? 0)</div>
+                <div class="text-muted" style="font-size:0.75rem;">In Progress</div>
+            </div>
+            <div class="bg-white rounded-3 p-3 flex-fill shadow-sm border border-light" style="min-width: 150px; border-left: 4px solid #f59e0b !important;">
+                <div class="fs-4 fw-bold text-dark lh-1 mb-1">@(dashboardData?.GetProperty("pending").GetInt32() ?? 0)</div>
+                <div class="text-muted" style="font-size:0.75rem;">Pending</div>
+            </div>
+            <div class="bg-white rounded-3 p-3 flex-fill shadow-sm border border-light" style="min-width: 150px; border-left: 4px solid #10b981 !important;">
+                <div class="fs-4 fw-bold text-dark lh-1 mb-1">@(dashboardData?.GetProperty("resolved").GetInt32() ?? 0)</div>
+                <div class="text-muted" style="font-size:0.75rem;">Resolved Today</div>
+            </div>
+            <div class="bg-white rounded-3 p-3 flex-fill shadow-sm border border-light" style="min-width: 150px; border-left: 4px solid #ef4444 !important;">
+                <div class="fs-4 fw-bold text-dark lh-1 mb-1">@(dashboardData?.GetProperty("breached").GetInt32() ?? 0)</div>
+                <div class="text-muted" style="font-size:0.75rem;">Breached SLAs</div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <!-- Ticket Distribution -->
+            <div class="col-lg-5">
+                <div class="bg-white p-4 h-100 shadow-sm rounded-4 border border-light">
+                    <h6 class="fw-semibold mb-4 text-dark" style="font-size:0.95rem;">Ticket Distribution</h6>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded-4 h-100" style="border-radius: 12px !important;">
+                                <div style="border-left: 3px solid #ef4444; padding-left: 12px; height: 100%;">
+                                        <div class="fs-4 fw-bold lh-1 mb-2" style="color: #ef4444;">
+                                            @(dashboardData.HasValue &&
+                                                                                    dashboardData.Value.TryGetProperty("urgent", out var urgent) &&
+                                                                                    urgent.ValueKind == System.Text.Json.JsonValueKind.Number
+                                                                                    ? urgent.GetInt32()
+                                                                                    : 0)
+                                        </div>
+                                    <div class="text-muted" style="font-size:0.75rem;">Urgent</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded-4 h-100" style="border-radius: 12px !important;">
+                                <div style="border-left: 3px solid #f59e0b; padding-left: 12px; height: 100%;">
+                                        <div class="fs-4 fw-bold text-dark lh-1 mb-2">
+                                            @(dashboardData.HasValue &&
+                                                                                    dashboardData.Value.TryGetProperty("high", out var high) &&
+                                                                                    high.ValueKind == System.Text.Json.JsonValueKind.Number
+                                                                                    ? high.GetInt32()
+                                                                                    : 0)
+                                        </div>
+                                    <div class="text-muted" style="font-size:0.75rem;">High</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded-4 h-100" style="border-radius: 12px !important;">
+                                <div style="border-left: 3px solid #3b82f6; padding-left: 12px; height: 100%;">
+                                        <div class="fs-4 fw-bold text-dark lh-1 mb-2">
+                                            @(dashboardData.HasValue &&
+                                                                                    dashboardData.Value.TryGetProperty("low", out var low) &&
+                                                                                    low.ValueKind == System.Text.Json.JsonValueKind.Number
+                                                                                    ? low.GetInt32()
+                                                                                    : 0)
+                                        </div>
+                                    <div class="text-muted" style="font-size:0.75rem;">Low</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded-4 h-100" style="border-radius: 12px !important;">
+                                <div style="border-left: 3px solid #6b7280; padding-left: 12px; height: 100%;">
+                                        <div class="fs-4 fw-bold text-dark lh-1 mb-2">
+                                            @(dashboardData.HasValue &&
+                                                                                    dashboardData.Value.TryGetProperty("medium", out var medium) &&
+                                                                                    medium.ValueKind == System.Text.Json.JsonValueKind.Number
+                                                                                    ? medium.GetInt32()
+                                                                                    : 0)
+                                        </div>
+                                    <div class="text-muted" style="font-size:0.75rem;">Medium</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Channel Mix Donut -->
+            <div class="col-lg-3">
+                <div class="bg-white p-4 h-100 shadow-sm rounded-4 border border-light position-relative">
+                    <h6 class="fw-semibold mb-3 text-dark" style="font-size:0.95rem;">Channel Mix</h6>
+                    <div class="d-flex align-items-center mb-3">
+                        <div style="width: 130px; height: 130px; border-radius: 50%; background: conic-gradient(#6366f1 0% 45%, #0ea5e9 45% 73%, #10b981 73% 85%, #84cc16 85% 95%, #eab308 95% 100%); display: flex; align-items: center; justify-content: center;">
+                            <div style="width: 90px; height: 90px; background: white; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                <span class="fs-4 fw-bold text-dark lh-1">100</span>
+                                <span class="text-muted mt-1" style="font-size:0.65rem; text-transform: uppercase;">Total</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="w-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                             <div class="text-muted" style="font-size:0.75rem;"><span class="dot me-2" style="background-color:#6366f1;"></span>Email</div>
+                             <div class="fw-semibold text-dark" style="font-size:0.75rem;">45%</div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                             <div class="text-muted" style="font-size:0.75rem;"><span class="dot me-2" style="background-color:#0ea5e9;"></span>Chat</div>
+                             <div class="fw-semibold text-dark" style="font-size:0.75rem;">28%</div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                             <div class="text-muted" style="font-size:0.75rem;"><span class="dot me-2" style="background-color:#10b981;"></span>Phone</div>
+                             <div class="fw-semibold text-dark" style="font-size:0.75rem;">12%</div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                             <div class="text-muted" style="font-size:0.75rem;"><span class="dot me-2" style="background-color:#84cc16;"></span>Portal</div>
+                             <div class="fw-semibold text-dark" style="font-size:0.75rem;">10%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Status Array -->
+            <div class="col-lg-4">
+                <div class="bg-white p-4 h-100 shadow-sm rounded-4 border border-light">
+                    <h6 class="fw-semibold mb-3 text-dark border-bottom pb-2" style="font-size:0.95rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2 text-muted"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        Team Status
+                    </h6>
+                    <div class="row g-2 mt-2">
+                        @if(dashboardData != null && dashboardData.Value.TryGetProperty("team_status", out var teamArr) && teamArr.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach(var member in teamArr.EnumerateArray())
+                            {
+                                <div class="col-6">
+                                    <div class="d-flex align-items-center bg-light p-2 rounded-3 h-100">
+                                        <div class="avatar-circle border text-dark fw-bold me-2" style="background: #fdfdfd; width: 32px; height: 32px; font-size:0.7rem;">@member.GetProperty("name").GetString()?[..2].ToUpper()</div>
+                                        <div class="overflow-hidden">
+                                            <div class="fw-bold text-dark text-truncate" style="font-size:0.75rem;">@member.GetProperty("name").GetString()</div>
+                                            <div class="d-flex align-items-center mt-1">
+                                                <span class="dot dot-green me-1" style="width:6px; height:6px;"></span>
+                                                <span style="font-size:0.65rem; color:#6b7280;">@member.GetProperty("tickets").GetInt32() tickets</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row -->
+        <div class="bg-white p-4 mb-5 shadow-sm rounded-4 border border-light">
+            <h6 class="fw-semibold mb-4 text-dark border-bottom pb-3" style="font-size:0.95rem;">
+                My Queue 
+                <span class="ms-2 d-inline-flex align-items-center justify-content-center bg-warning text-dark rounded-circle fw-bold" style="width:20px; height:20px; font-size:0.7rem;">
+                    @(tasksData.HasValue && tasksData.Value.ValueKind == JsonValueKind.Array
+                                        ? tasksData.Value.GetArrayLength()
+                                        : 0)
+                    </span>
+            </h6>
+            
+            <div class="table-responsive">
+                <table class="table table-borderless align-middle mb-0">
+                    <tbody>
+                        @if (tasksData != null && tasksData.Value.ValueKind == JsonValueKind.Array && tasksData.Value.GetArrayLength() > 0)
+                        {
+                            foreach (var task in tasksData.Value.EnumerateArray())
+                            {
+                                var status = task.GetProperty("status").GetString() ?? "TODO";
+                                var isHigh = status != "TODO";
+                                <tr>
+                                    <td style="width:10%">
+                                        <div class="d-inline-flex align-items-center rounded-1 border" style="padding: 2px 8px; font-size:0.7rem; font-weight:600; background-color: @(isHigh ? "#fffbeb" : "#f1f5f9"); color: @(isHigh ? "#d97706" : "#475569"); border-color: @(isHigh ? "#fde68a" : "#cbd5e1") !important;">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M12 19V6M5 12l7-7 7 7"/></svg>
+                                            @status
+                                        </div>
+                                    </td>
+                                    <td class="text-muted" style="width:15%;font-size:0.85rem;">@task.GetProperty("task_id").GetString()</td>
+                                    <td  class="width:50%;fw-semibold text-dark">@task.GetProperty("name").GetString()</td>
+                                    <td><div class="width:10%;avatar-circle border fw-bold text-muted bg-white" style="width:28px;height:28px;font-size:0.7rem;">OM</div></td>
+                                    <td  class="width:15%; text-end text-muted" style="font-size:0.75rem;">May 28</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="5" class="text-muted text-center py-4" style="font-size:0.85rem;">No tasks in your queue.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        }
+    </Authorized>
+</AuthorizeView>
+
+
+<AuthorizeView Roles="ClientAdmin,ClientUser">
+    <Authorized>
+        <div class="alert alert-info shadow-sm bg-white border-primary border-start border-4 rounded-3 p-4 mx-2 mb-4">
+            <h4 class="text-primary fw-bold"><i class="bi bi-emoji-smile"></i> Welcome Client!</h4>
+            <p class="text-muted mb-4">Use the side menu to view your open support tickets or raise a new issue.</p>
+            <a class="btn btn-primary fw-semibold shadow-sm px-4" href="raise-ticket"><i class="bi bi-ticket-plus me-2"></i> Raise New Ticket</a>
+        </div>
+        
+        <div class="custom-card p-4 mx-2">
+            <h6 class="fw-semibold mb-3 border-bottom pb-2">Your Recent Tickets</h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <tbody>
+                        @if (clientTickets != null && clientTickets.Value.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var ct in clientTickets.Value.EnumerateArray())
+                            {
+                                var status = ct.GetProperty("status").GetString() ?? "NEW";
+                                var prio = ct.GetProperty("priority").GetString() ?? "LOW";
+                                <tr>
+                                    <td style="width:20%" class="fw-bold font-monospace small">@ct.GetProperty("ticket_number").GetString()</td>
+                                    <td style="width:50%" class="fw-semibold text-muted">@ct.GetProperty("subject").GetString()</td>
+                                    <td style="width:10%"><span class="badge bg-secondary">@prio</span></td>
+                                    <td style="width:10%"><span class="badge bg-@(status == "RESOLVED" ? "success" : "info")">@status</span></td>
+                                    <td style="width:10%" class="text-end"><a href="/ticket/@ct.GetProperty("ticket_number").GetString()">Open</a></td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="5" class="text-muted text-center p-4">No active tickets found.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private JsonElement? dashboardData;
+    private JsonElement? tasksData;
+    private JsonElement? clientTickets;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        var role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            var tenantId = user.FindFirst("TenantId")?.Value ?? "";
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+            
+            // Allow UI to render initially
+            await Task.Yield();
+            
+            var payload = new APIDataAccParms
+            {
+                ComCod = tenantId,
+                ProcID = "GET_DASHBOARD",
+                parm04 = userId,
+                parm05 = role
+            };
+            
+            var taskPayload = new APIDataAccParms
+            {
+                ComCod = tenantId,
+                ProcID = "GET_TASKS",
+                parm04 = userId,
+                parm05 = role
+            };
+            
+            var tDashboard = BackendApi.FetchDataAsync(payload);
+            var tTasks = BackendApi.FetchDataAsync(taskPayload);
+            Task<JsonElement?>? tClient = null;
+
+            if (role == "ClientUser" || role == "ClientAdmin")
+            {
+                var cliPayload = new APIDataAccParms { ComCod = tenantId, ProcID = "GET_MY_TICKETS", parm04 = userId, parm05 = role };
+                tClient = BackendApi.FetchDataAsync(cliPayload);
+            }
+
+            await Task.WhenAll(tClient != null ? new[] { tDashboard, tTasks, tClient } : new[] { tDashboard, tTasks });
+            
+            dashboardData = tDashboard.Result;
+            tasksData = tTasks.Result;
+            
+            // Adjust single object return to array for tasks if needed
+            if (tasksData != null && tasksData.Value.ValueKind == JsonValueKind.Object && tasksData.Value.TryGetProperty("task_id", out _))
+            {
+                var arrStr = "[" + tasksData.Value.GetRawText() + "]";
+                tasksData = JsonDocument.Parse(arrStr).RootElement;
+            }
+
+            if (tClient != null)
+            {
+                clientTickets = tClient.Result;
+                if (clientTickets != null && clientTickets.Value.ValueKind == JsonValueKind.Object && clientTickets.Value.TryGetProperty("ticket_number", out _))
+                {
+                    var arrStr = "[" + clientTickets.Value.GetRawText() + "]";
+                    clientTickets = JsonDocument.Parse(arrStr).RootElement;
+                }
+            }
+            
+        isLoading = false;
+        await InvokeAsync(StateHasChanged);
+    }
+}

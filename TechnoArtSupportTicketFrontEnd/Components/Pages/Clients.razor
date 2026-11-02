@@ -1,0 +1,289 @@
+@page "/admin/clients"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@attribute [Authorize(Roles = "SuperAdmin,MD")]
+@inject ApiService BackendApi
+
+<PageTitle>Client & Tenant Management</PageTitle>
+
+<div class="custom-card p-4 h-100">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <h5 class="fw-bold m-0"><i class="bi bi-building text-primary me-2"></i> Client / Tenant Directory</h5>
+        <AuthorizeView Roles="SuperAdmin">
+            <button class="btn btn-primary btn-sm fw-semibold shadow-sm" @onclick="ToggleAddMode">
+                <i class="bi @(isAddMode ? "bi-x-lg" : "bi-plus-lg") me-1"></i> @(isAddMode ? "Cancel" : "Add New Client")
+            </button>
+        </AuthorizeView>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-@statusClass alert-dismissible fade show mb-3" role="alert">
+            <i class="bi @(statusClass == "success" ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i>@statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    @if (isAddMode)
+    {
+        <div class="card bg-light border-primary mb-4 shadow-sm border-0 border-start border-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3 text-primary">@(string.IsNullOrEmpty(editClientId) ? "Register New Tenant Company" : "Edit Tenant Company")</h6>
+                <form @onsubmit="CreateClient">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Company Full Name</label>
+                            <input type="text" class="form-control" @bind="newClientName" required placeholder="e.g. Pirthe Limited" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Tenant Code</label>
+                            <input type="text" class="form-control" @bind="newClientCode" required placeholder="e.g. C-1004" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Logo URL</label>
+                            <input type="text" class="form-control" @bind="newClientLogo" placeholder="e.g. https://pirthe.com/logo.png" />
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button type="button" class="btn btn-light border" @onclick="ToggleAddMode">Cancel</button>
+                        <button type="submit" class="btn btn-success fw-semibold" disabled="@isSubmitting">
+                            @if(isSubmitting) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            @(string.IsNullOrEmpty(editClientId) ? "Save Client" : "Update Client")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="bg-light text-muted small text-uppercase">
+                <tr>
+                    <th>Logo</th>
+                    <th>Tenant ID</th>
+                    <th>Client Name</th>
+                    <th>Tenant Code</th>
+                    <th>Status</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (isLoading)
+                {
+                    <tr><td colspan="6" class="text-center p-4"><div class="spinner-border text-primary"></div></td></tr>
+                }
+                else if (clientList != null && clientList.Count > 0)
+                {
+                    foreach (var client in clientList)
+                    {
+                        var logo = client.TryGetProperty("logo_url", out var l) && l.ValueKind == JsonValueKind.String ? l.GetString() : null;
+                        var cId = client.TryGetProperty("tenant_id", out var cidp) ? cidp.GetString() ?? "" : "";
+                        var cName = client.TryGetProperty("name", out var cnmp) ? cnmp.GetString() ?? "" : "";
+                        var cCode = client.TryGetProperty("code", out var ccdp) ? ccdp.GetString() ?? "" : "";
+                        var isDefaultTenant = cId == "00000000-0000-0000-0000-000000000000";
+                        <tr>
+                            <td>
+                                @if (!string.IsNullOrEmpty(logo))
+                                {
+                                    <img src="@logo" alt="Logo" style="height:30px;max-width:100px;object-fit:contain;" />
+                                }
+                                else
+                                {
+                                    <div class="avatar-circle bg-secondary text-white" style="width:30px;height:30px;font-size:0.8rem;">@(string.IsNullOrEmpty(cName) ? "?" : cName[..1])</div>
+                                }
+                            </td>
+                            <td class="small text-muted font-monospace">@cId</td>
+                            <td class="fw-bold">@cName</td>
+                            <td><span class="badge bg-light text-dark border">@cCode</span></td>
+                            <td><span class="dot dot-green me-1"></span> Active</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary" @onclick='() => StartEditClient(cId, cCode, cName, logo)' title="Edit Client"><i class="bi bi-pencil"></i></button>
+                                @if (!isDefaultTenant)
+                                {
+                                    <AuthorizeView Roles="SuperAdmin">
+                                        <button class="btn btn-sm btn-outline-danger ms-1" @onclick='() => ConfirmDelete(cId, cName)' title="Delete Client"><i class="bi bi-trash"></i></button>
+                                    </AuthorizeView>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr><td colspan="6" class="text-center text-muted p-4">No clients registered yet.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (showDeleteModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Delete Client</h5>
+                    <button type="button" class="btn-close" @onclick="() => showDeleteModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p>Are you sure you want to delete client <strong>@deleteClientName</strong>?</p>
+                    <p class="text-muted small">Note: Clients with open tickets or associated active records cannot be deleted until those tickets are resolved.</p>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-light" @onclick="() => showDeleteModal = false">Cancel</button>
+                    <button type="button" class="btn btn-danger fw-semibold" @onclick="ExecuteDeleteClient" disabled="@isSubmitting">
+                        @if (isSubmitting) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Delete Permanently
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<JsonElement> clientList = new();
+    private bool isLoading = true;
+    private bool isAddMode = false;
+    private bool isSubmitting = false;
+
+    private string newClientName = "";
+    private string newClientCode = "";
+    private string newClientLogo = "";
+    
+    private string? editClientId = null;
+    private string? statusMessage = null;
+    private string statusClass = "success";
+
+    private bool showDeleteModal = false;
+    private string deleteClientId = "";
+    private string deleteClientName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Yield();
+        await LoadClients();
+    }
+
+    private async Task LoadClients()
+    {
+        isLoading = true;
+        clientList.Clear();
+        var payload = new APIDataAccParms { ProcID = "GET_TENANTS" };
+        var result = await BackendApi.FetchDataAsync(payload);
+        
+        if (result.HasValue)
+        {
+            try {
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in result.Value.EnumerateArray())
+                    {
+                        if (el.TryGetProperty("tenant_id", out _) || el.TryGetProperty("name", out _))
+                            clientList.Add(el);
+                    }
+                }
+                else if (result.Value.ValueKind == JsonValueKind.Object && 
+                        (result.Value.TryGetProperty("tenant_id", out _) || result.Value.TryGetProperty("name", out _)))
+                {
+                    clientList.Add(result.Value);
+                }
+            } catch {}
+        }
+        isLoading = false;
+    }
+
+    private void ToggleAddMode() {
+        isAddMode = !isAddMode;
+        if(isAddMode) {
+            editClientId = null;
+            newClientCode = "";
+            newClientName = "";
+            newClientLogo = "";
+        }
+    }
+    
+    private void StartEditClient(string? id, string? code, string? name, string? logo)
+    {
+        editClientId = id;
+        newClientCode = code ?? "";
+        newClientName = name ?? "";
+        newClientLogo = logo ?? "";
+        isAddMode = true;
+    }
+
+    private void ConfirmDelete(string id, string name)
+    {
+        deleteClientId = id;
+        deleteClientName = name;
+        showDeleteModal = true;
+    }
+
+    private async Task ExecuteDeleteClient()
+    {
+        if (string.IsNullOrEmpty(deleteClientId)) return;
+        isSubmitting = true;
+        statusMessage = null;
+
+        var payload = new APIDataAccParms
+        {
+            ProcID = "DELETE_TENANT",
+            parm01 = deleteClientId
+        };
+
+        var result = await BackendApi.FetchDataAsync(payload);
+        showDeleteModal = false;
+        isSubmitting = false;
+
+        if (result.HasValue && result.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+        {
+            statusMessage = err.GetString();
+            statusClass = "danger";
+        }
+        else
+        {
+            statusMessage = $"Client '{deleteClientName}' deleted successfully.";
+            statusClass = "success";
+            await LoadClients();
+        }
+    }
+
+    private async Task CreateClient()
+    {
+        isSubmitting = true;
+        statusMessage = null;
+        var payload = new APIDataAccParms 
+        { 
+            ProcID = string.IsNullOrEmpty(editClientId) ? "CREATE_TENANT" : "UPDATE_TENANT",
+            parm01 = string.IsNullOrEmpty(editClientId) ? newClientCode : editClientId,
+            parm02 = string.IsNullOrEmpty(editClientId) ? newClientName : newClientCode,
+            parm03 = string.IsNullOrEmpty(editClientId) ? newClientLogo : newClientName,
+            parm04 = newClientLogo
+        };
+
+        var res = await BackendApi.FetchDataAsync(payload);
+        
+        if (res.HasValue && res.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+        {
+            statusMessage = err.GetString();
+            statusClass = "danger";
+            isSubmitting = false;
+            return;
+        }
+
+        statusMessage = string.IsNullOrEmpty(editClientId) ? "Client registered successfully!" : "Client updated successfully!";
+        statusClass = "success";
+
+        // Reset form and reload
+        isAddMode = false;
+        newClientName = "";
+        newClientCode = "";
+        newClientLogo = "";
+        editClientId = null;
+        isSubmitting = false;
+        await LoadClients();
+    }
+}

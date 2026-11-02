@@ -1,0 +1,1022 @@
+@page "/projects"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
+@attribute [Authorize(Roles = "SuperAdmin,MD,SupportManager,ProjectManager,ClientAdmin,ClientUser")]
+@inject ApiService BackendApi
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Project Management - SupportHub</PageTitle>
+
+<div class="custom-card p-4 h-100">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold m-0"><i class="bi bi-kanban text-primary me-2"></i> Project Management & Modules</h5>
+            <small class="text-muted">Manage projects, software modules (HRM, Payroll, Inventory, CPF), and cross-functional teams.</small>
+        </div>
+        <div class="d-flex gap-2">
+            <AuthorizeView Roles="SuperAdmin,SupportManager,ProjectManager">
+                <button class="btn btn-outline-primary btn-sm fw-semibold shadow-sm" @onclick="OpenTaskModal">
+                    <i class="bi bi-plus-circle me-1"></i> Quick Assign Task
+                </button>
+            </AuthorizeView>
+            <AuthorizeView Roles="SuperAdmin">
+                <button class="btn btn-primary btn-sm fw-semibold shadow-sm" @onclick="ToggleAddMode">
+                    <i class="bi @(isAddMode ? "bi-x-lg" : "bi-plus-lg") me-1"></i> @(isAddMode ? "Cancel" : "Create Project")
+                </button>
+            </AuthorizeView>
+        </div>
+    </div>
+
+    @if (isAddMode)
+    {
+        <div class="card bg-light border-success mb-4 shadow-sm border-0 border-start border-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3 text-success">@(string.IsNullOrEmpty(editProjectId) ? "Initialize New Software Project" : "Edit Software Project")</h6>
+                @if (!string.IsNullOrEmpty(projectErrorMessage))
+                {
+                    <div class="alert alert-danger py-2 small mb-3">@projectErrorMessage</div>
+                }
+                <form @onsubmit="CreateProject">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Project Name</label>
+                            <input type="text" class="form-control" @bind="newProjectName" required placeholder="e.g. Enterprise ERP Upgrade" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Project Code (Alias)</label>
+                            <input type="text" class="form-control" @bind="newProjectCode" required placeholder="e.g. PRJ-ERP" />
+                        </div>
+
+                        @if(isAdmin)
+                        {
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Client / Company</label>
+                                <select class="form-select" @bind="newTenantId" required>
+                                    <option value="">-- Select Company --</option>
+                                    @foreach (var tenant in tenantList)
+                                    {
+                                        var tid = tenant.TryGetProperty("tenant_id", out var tip) ? tip.GetString() : "";
+                                        var tname = tenant.TryGetProperty("name", out var tnp) ? tnp.GetString() : "";
+                                        <option value="@tid">@tname</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button type="button" class="btn btn-light border" @onclick="ToggleAddMode">Cancel</button>
+                        <button type="submit" class="btn btn-success fw-semibold" disabled="@isSubmitting">
+                            @if(isSubmitting) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            @(string.IsNullOrEmpty(editProjectId) ? "Initialize Project" : "Update Project")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
+    <div class="row g-4 pt-2">
+        @if (isLoading)
+        {
+            <div class="col-12 text-center p-5"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (projectList != null && projectList.Count > 0)
+        {
+            foreach (var proj in projectList)
+            {
+                var projectId = proj.TryGetProperty("project_id", out var pid) ? pid.GetString() ?? "" : "";
+                var pCode = proj.TryGetProperty("code", out var pcd) ? pcd.GetString() ?? "" : "";
+                var pName = proj.TryGetProperty("name", out var pnm) ? pnm.GetString() ?? "" : "";
+                var projTenantId = proj.TryGetProperty("tenant_id", out var ptid) ? ptid.GetString() ?? "" : "";
+                var tenantName = proj.TryGetProperty("tenant_name", out var tn) ? tn.GetString() : "Internal";
+                var pmName = proj.TryGetProperty("pm_name", out var pmp) ? pmp.GetString() : null;
+                
+                var ticketCount = proj.TryGetProperty("ticket_count", out var tc) ? (tc.ValueKind == JsonValueKind.Number ? tc.GetInt64() : 0) : 0;
+                var taskCount = proj.TryGetProperty("task_count", out var tsk) ? (tsk.ValueKind == JsonValueKind.Number ? tsk.GetInt64() : 0) : 0;
+                var progress = proj.TryGetProperty("progress_percent", out var prg) ? (prg.ValueKind == JsonValueKind.Number ? prg.GetDecimal() : 0) : 0;
+
+                <div class="col-md-6 col-xl-4">
+                    <div class="card shadow-sm border-0 h-100 border-top border-4 border-primary">
+                        <div class="card-body p-4 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-light text-primary border mb-2">@pCode</span>
+                                        <span class="badge bg-success ms-1">Active</span>
+                                    </div>
+                                    <AuthorizeView Roles="SuperAdmin">
+                                        <button class="btn btn-sm btn-light border" @onclick='() => StartEditProject(projectId, pCode, pName, projTenantId)' title="Edit Project"><i class="bi bi-pencil"></i></button>
+                                    </AuthorizeView>
+                                </div>
+                                <h5 class="fw-bold mt-2 mb-1">@pName</h5>
+                                <div class="text-muted small mb-1"><i class="bi bi-building me-1"></i> @tenantName</div>
+                                <div class="text-muted small mb-3"><i class="bi bi-person-badge text-primary me-1"></i> PM: <strong class="text-dark">@(string.IsNullOrEmpty(pmName) ? "Unassigned" : pmName)</strong></div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mt-3 mb-1 small text-muted">
+                                    <span>Task Completion</span>
+                                    <span class="fw-bold text-dark">@progress%</span>
+                                </div>
+                                <div class="progress mb-3" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: @(progress)%;" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="border-top pt-3 mt-2">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="text-center">
+                                        <h6 class="mb-0 fw-bold text-primary">@ticketCount</h6>
+                                        <small class="text-muted" style="font-size:0.75rem;">Tickets</small>
+                                    </div>
+                                    <div class="text-center">
+                                        <h6 class="mb-0 fw-bold text-info">@taskCount</h6>
+                                        <small class="text-muted" style="font-size:0.75rem;">Tasks</small>
+                                    </div>
+                                    <div class="text-center">
+                                        <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-layers me-1 text-primary"></i>Modules</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-secondary w-50 fw-semibold" @onclick="() => OpenModulesModal(projectId, pName)">
+                                        <i class="bi bi-diagram-3 me-1"></i> Modules
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary w-50 fw-semibold" @onclick="() => OpenTeamModal(projectId, pName)">
+                                        <i class="bi bi-people me-1"></i> Team
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="col-12 text-center text-muted p-5 bg-light rounded">No active projects found.</div>
+        }
+    </div>
+</div>
+
+<!-- Modules Management Modal -->
+@if (showModulesModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold"><i class="bi bi-diagram-3-fill me-2 text-primary"></i>Project Modules & Departments</h5>
+                        <small class="text-muted">Project: <strong class="text-dark">@selectedProjectName</strong></small>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseModulesModal"></button>
+                </div>
+                <div class="modal-body p-4 bg-light">
+                    <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,ClientAdmin">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body p-3">
+                                <h6 class="fw-bold small text-primary mb-3"><i class="bi bi-plus-circle me-1"></i> Add Project Module / Department</h6>
+                                @if (!string.IsNullOrEmpty(moduleErrorMessage))
+                                {
+                                    <div class="alert alert-danger py-2 small mb-3">@moduleErrorMessage</div>
+                                }
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-semibold text-muted">Module Name <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control form-control-sm" placeholder="e.g. HRM / Human Resources" @bind="newModuleName" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Module Code <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control form-control-sm" placeholder="e.g. HRM" @bind="newModuleCode" />
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label small fw-semibold text-muted">Description / Notes</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control form-control-sm" placeholder="Department / Module scope..." @bind="newModuleDesc" />
+                                            <button class="btn btn-primary fw-semibold" @onclick="CreateModule" disabled="@isSubmittingModule">
+                                                @if(isSubmittingModule) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                                Add Module
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </AuthorizeView>
+
+                    <h6 class="fw-bold mb-3"><i class="bi bi-list-task me-1 text-primary"></i>Configured Modules</h6>
+                    @if (projectModulesList.Count > 0)
+                    {
+                        <div class="table-responsive bg-white rounded shadow-sm">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th>Module Code</th>
+                                        <th>Module Name</th>
+                                        <th>Description</th>
+                                        <th class="text-center">Assigned Users</th>
+                                        <th class="text-center">Tickets</th>
+                                        <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,ClientAdmin">
+                                            <th class="text-end">Action</th>
+                                        </AuthorizeView>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var mod in projectModulesList)
+                                    {
+                                        var modId = mod.TryGetProperty("module_id", out var mId) ? mId.GetString() ?? "" : "";
+                                        var mCode = mod.TryGetProperty("code", out var mc) ? mc.GetString() ?? "" : "";
+                                        var mName = mod.TryGetProperty("name", out var mn) ? mn.GetString() ?? "" : "";
+                                        var mDesc = mod.TryGetProperty("description", out var md) ? md.GetString() ?? "—" : "—";
+                                        var userCount = mod.TryGetProperty("assigned_users_count", out var uc) ? uc.GetInt32() : 0;
+                                        var ticketCount = mod.TryGetProperty("tickets_count", out var tc) ? tc.GetInt32() : 0;
+
+                                        <tr>
+                                            <td><span class="badge bg-light text-primary border font-monospace">@mCode</span></td>
+                                            <td class="fw-bold text-dark">@mName</td>
+                                            <td class="small text-muted">@mDesc</td>
+                                            <td class="text-center"><span class="badge bg-info text-dark">@userCount users</span></td>
+                                            <td class="text-center"><span class="badge bg-secondary">@ticketCount tickets</span></td>
+                                            <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,ClientAdmin">
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-outline-danger border-0" @onclick="() => DeleteModule(modId)" title="Deactivate Module">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </AuthorizeView>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted small p-4 text-center bg-white rounded border">
+                            <i class="bi bi-diagram-3 fs-3 d-block mb-2 text-muted opacity-50"></i>
+                            No specific modules configured yet for this project. Issues raised will default to the general project queue.
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer border-top bg-white">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseModulesModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Team Modal (Internal Team & Client Team with Assigned Modules) -->
+@if (showTeamModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold"><i class="bi bi-people-fill me-2 text-primary"></i>Project Team & Client Assignees</h5>
+                        <small class="text-muted">Project: <strong class="text-dark">@selectedProjectName</strong></small>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseTeamModal"></button>
+                </div>
+                <div class="modal-body bg-light rounded-bottom p-4">
+                    <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,ClientAdmin">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body p-3">
+                                <h6 class="fw-semibold small text-muted mb-2">Assign Member or Designate Project Manager</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-5">
+                                        <select class="form-select form-select-sm" @bind="selectedUserId">
+                                            <option value="">-- Select User --</option>
+                                            @foreach(var u in userList)
+                                            {
+                                                var uId = u.TryGetProperty("user_id", out var uidp) ? uidp.GetString() : "";
+                                                var uName = u.TryGetProperty("full_name", out var unmp) ? unmp.GetString() : "";
+                                                var uRole = u.TryGetProperty("role", out var urlp) ? urlp.GetString() : "";
+                                                <option value="@uId">@uName (@uRole)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <select class="form-select form-select-sm" @bind="selectedModuleForAssign">
+                                            <option value="">-- General / No Module --</option>
+                                            @foreach(var mod in projectModulesList)
+                                            {
+                                                var mId = mod.TryGetProperty("module_id", out var mp) ? mp.GetString() : "";
+                                                var mNm = mod.TryGetProperty("name", out var mnp) ? mnp.GetString() : "";
+                                                var mCd = mod.TryGetProperty("code", out var mcp) ? mcp.GetString() : "";
+                                                <option value="@mId">@mNm (@mCd)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 d-flex gap-1">
+                                        <button class="btn btn-success btn-sm fw-semibold flex-grow-1" @onclick="AssignTeamMember">Assign</button>
+                                        <button class="btn btn-primary btn-sm fw-semibold flex-grow-1" @onclick="AssignProjectManager" title="Assign as Designated PM">Set PM</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </AuthorizeView>
+
+                    <!-- Section 1: Internal Support & Engineering Team -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-shield-check text-primary me-2"></i>Internal Engineering & Support Team</h6>
+                            <span class="badge bg-primary">@InternalMembers.Count Members</span>
+                        </div>
+                        @if (InternalMembers.Count > 0)
+                        {
+                            <ul class="list-group list-group-flush shadow-sm rounded">
+                                @foreach (var member in InternalMembers)
+                                {
+                                    var mUserId = member.TryGetProperty("user_id", out var muId) ? muId.GetString() : "";
+                                    var mFullName = member.TryGetProperty("full_name", out var mfName) ? mfName.GetString() : "";
+                                    var mUsername = member.TryGetProperty("username", out var mun) ? mun.GetString() : "";
+                                    var mRole = member.TryGetProperty("role", out var mrProp) ? mrProp.GetString() : "";
+                                    var mRoleDisplay = member.TryGetProperty("project_role_display", out var prd) ? prd.GetString() : mRole;
+                                    var isPm = mRole == "PROJECT_MANAGER" || mRole == "ProjectManager";
+
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                                        <div>
+                                            <div class="fw-semibold">
+                                                @mFullName
+                                                <span class="text-muted small fw-normal ms-1 font-monospace">(@mUsername)</span>
+                                                @if (isPm)
+                                                {
+                                                    <span class="badge bg-primary ms-2"><i class="bi bi-star-fill me-1"></i>Designated PM</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-light text-secondary border ms-2">Developer / Support</span>
+                                                }
+                                            </div>
+                                            <div class="small text-muted">@mRoleDisplay</div>
+                                        </div>
+                                        <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager">
+                                            <button class="btn btn-sm btn-outline-danger border-0" @onclick="() => RemoveTeamMember(mUserId)" title="Remove Member"><i class="bi bi-trash"></i></button>
+                                        </AuthorizeView>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <div class="text-muted small p-3 text-center bg-white rounded border">No internal engineers assigned yet.</div>
+                        }
+                    </div>
+
+                    <!-- Section 2: Client Organization Team & Assigned Modules -->
+                    <div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-building text-success me-2"></i>Client Organization Representatives & Module Operators</h6>
+                            <span class="badge bg-success">@ClientMembers.Count Members</span>
+                        </div>
+                        @if (ClientMembers.Count > 0)
+                        {
+                            <ul class="list-group list-group-flush shadow-sm rounded">
+                                @foreach (var member in ClientMembers)
+                                {
+                                    var mUserId = member.TryGetProperty("user_id", out var muId) ? muId.GetString() : "";
+                                    var mFullName = member.TryGetProperty("full_name", out var mfName) ? mfName.GetString() : "";
+                                    var mUsername = member.TryGetProperty("username", out var mun) ? mun.GetString() : "";
+                                    var mSystemRole = member.TryGetProperty("system_role", out var msr) ? msr.GetString() : "ClientUser";
+                                    var mModule = member.TryGetProperty("module_name", out var mmn) ? mmn.GetString() : null;
+
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                                        <div>
+                                            <div class="fw-semibold">
+                                                @mFullName
+                                                <span class="text-muted small fw-normal ms-1 font-monospace">(@mUsername)</span>
+                                                <span class="badge @(mSystemRole == "ClientAdmin" ? "bg-dark" : "bg-light text-dark border") ms-1">@mSystemRole</span>
+                                            </div>
+                                            <div class="small mt-1">
+                                                @if (!string.IsNullOrEmpty(mModule))
+                                                {
+                                                    <span class="badge bg-primary-subtle text-primary border">
+                                                        <i class="bi bi-diagram-3 me-1"></i>Module: <strong>@mModule</strong>
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-light text-muted border">
+                                                        <i class="bi bi-diagram-3 me-1"></i>General / Whole Project
+                                                    </span>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,ClientAdmin">
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        Assign Module
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                                                        @foreach (var mod in projectModulesList)
+                                                        {
+                                                            var modId = mod.TryGetProperty("module_id", out var mId) ? mId.GetString() ?? "" : "";
+                                                            var modName = mod.TryGetProperty("name", out var mn) ? mn.GetString() ?? "" : "";
+                                                            <li>
+                                                                <button class="dropdown-item small" type="button" @onclick="() => AssignUserToModuleDirect(mUserId, modId)">
+                                                                    <i class="bi bi-check-circle me-1"></i> @modName
+                                                                </button>
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </div>
+                                                <button class="btn btn-sm btn-outline-danger border-0" @onclick="() => RemoveTeamMember(mUserId)" title="Remove Member"><i class="bi bi-trash"></i></button>
+                                            </AuthorizeView>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <div class="text-muted small p-3 text-center bg-white rounded border">No client users assigned to this project yet. Register client users in User Directory to view them here.</div>
+                        }
+                    </div>
+
+                </div>
+                <div class="modal-footer border-top bg-white">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseTeamModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Quick Task Modal -->
+@if (showTaskModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Quick Assign Task to Ticket</h5>
+                    <button type="button" class="btn-close" @onclick="CloseTaskModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted">Select Ticket</label>
+                        <select class="form-select" @bind="taskTicketNumber">
+                            <option value="">-- Choose Ticket --</option>
+                            @foreach (var t in allTickets)
+                            {
+                                var tNum = t.TryGetProperty("ticket_number", out var tnp) ? tnp.GetString() : "";
+                                var tSub = t.TryGetProperty("subject", out var tsp) ? tsp.GetString() : "";
+                                <option value="@tNum">@tNum - @tSub</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted">Task Name / Title</label>
+                        <input type="text" class="form-control" placeholder="Describe task requirement..." @bind="newTaskTitle" />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold text-muted">Assign To Developer / Team Member</label>
+                        <select class="form-select" @bind="newTaskAssigneeId">
+                            <option value="">-- Choose Member --</option>
+                            @foreach (var u in userList)
+                            {
+                                var uId = u.TryGetProperty("user_id", out var uidp) ? uidp.GetString() : "";
+                                var uName = u.TryGetProperty("full_name", out var unmp) ? unmp.GetString() : "";
+                                var uRole = u.TryGetProperty("role", out var urlp) ? urlp.GetString() : "";
+                                <option value="@uId">@uName (@uRole)</option>
+                            }
+                        </select>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(taskModalMessage))
+                    {
+                        <div class="alert alert-info py-2 small mb-3">@taskModalMessage</div>
+                    }
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <button class="btn btn-light border" @onclick="CloseTaskModal">Cancel</button>
+                        <button class="btn btn-primary fw-semibold" @onclick="SubmitTask" disabled="@isSubmittingTask">
+                            @if(isSubmittingTask) { <span class="spinner-border spinner-border-sm me-1"></span> } Assign Task
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<JsonElement> projectList = new();
+    private List<JsonElement> tenantList = new();
+    private List<JsonElement> userList = new();
+    private List<JsonElement> projectMembers = new();
+    private List<JsonElement> projectModulesList = new();
+    private List<JsonElement> allTickets = new();
+    
+    private bool isLoading = true;
+    private bool isAddMode = false;
+    private bool isSubmitting = false;
+    private bool isAdmin = false;
+
+    private bool showTeamModal = false;
+    private bool showModulesModal = false;
+    private bool isSubmittingModule = false;
+
+    private bool showTaskModal = false;
+    private bool isSubmittingTask = false;
+    private string taskTicketNumber = "";
+    private string newTaskTitle = "";
+    private string newTaskAssigneeId = "";
+    private string taskModalMessage = "";
+
+    private string newProjectName = "";
+    private string newProjectCode = "";
+    private string newTenantId = "";
+    private string? editProjectId = null;
+    private string projectErrorMessage = "";
+    
+    private string? selectedProjectId;
+    private string selectedProjectName = "";
+    private string selectedUserId = "";
+    private string selectedModuleForAssign = "";
+
+    private string newModuleName = "";
+    private string newModuleCode = "";
+    private string newModuleDesc = "";
+    private string moduleErrorMessage = "";
+
+    private string tenantId = "";
+    private string userId = "";
+    private string role = "";
+
+    private List<JsonElement> InternalMembers => projectMembers.Where(m => 
+    {
+        if (m.TryGetProperty("is_client_user", out var icu) && icu.ValueKind == JsonValueKind.Number)
+        {
+            return icu.GetInt32() == 0;
+        }
+        if (m.TryGetProperty("system_role", out var sr))
+        {
+            var s = sr.GetString() ?? "";
+            return s != "ClientAdmin" && s != "ClientUser";
+        }
+        return true;
+    }).ToList();
+
+    private List<JsonElement> ClientMembers => projectMembers.Where(m => 
+    {
+        if (m.TryGetProperty("is_client_user", out var icu) && icu.ValueKind == JsonValueKind.Number)
+        {
+            return icu.GetInt32() == 1;
+        }
+        if (m.TryGetProperty("system_role", out var sr))
+        {
+            var s = sr.GetString() ?? "";
+            return s == "ClientAdmin" || s == "ClientUser";
+        }
+        return false;
+    }).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+        tenantId = user.FindFirst("TenantId")?.Value ?? "";
+        userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+        isAdmin = role == "SuperAdmin" || role == "MD";
+
+        await LoadTenants();
+        await LoadProjects();
+        await LoadUsers();
+    }
+
+    private async Task LoadTenants()
+    {
+        if (!isAdmin) return;
+        tenantList.Clear();
+        var payload = new APIDataAccParms { ProcID = "GET_TENANTS", parm04 = userId, parm05 = role };
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue)
+        {
+            try {
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in result.Value.EnumerateArray())
+                    {
+                        if (el.TryGetProperty("tenant_id", out _) || el.TryGetProperty("name", out _))
+                            tenantList.Add(el);
+                    }
+                }
+                else if (result.Value.ValueKind == JsonValueKind.Object && 
+                        (result.Value.TryGetProperty("tenant_id", out _) || result.Value.TryGetProperty("name", out _)))
+                {
+                    tenantList.Add(result.Value);
+                }
+            } catch {}
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        userList.Clear();
+        var payload = new APIDataAccParms { ProcID = "GET_TEAM_MEMBERS", parm04 = userId, parm05 = role };
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue)
+        {
+            try {
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in result.Value.EnumerateArray())
+                    {
+                        if (el.TryGetProperty("user_id", out _) || el.TryGetProperty("full_name", out _))
+                            userList.Add(el);
+                    }
+                }
+                else if (result.Value.ValueKind == JsonValueKind.Object && 
+                        (result.Value.TryGetProperty("user_id", out _) || result.Value.TryGetProperty("full_name", out _)))
+                {
+                    userList.Add(result.Value);
+                }
+            } catch {}
+        }
+    }
+
+    private async Task LoadProjects()
+    {
+        isLoading = true;
+        projectList.Clear();
+        var payload = new APIDataAccParms { ProcID = "GET_PROJECTS", parm04 = userId, parm05 = role, ComCod = tenantId };
+        var result = await BackendApi.FetchDataAsync(payload);
+        
+        if (result.HasValue)
+        {
+            try {
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in result.Value.EnumerateArray())
+                    {
+                        if (el.TryGetProperty("project_id", out _) || el.TryGetProperty("code", out _))
+                            projectList.Add(el);
+                    }
+                }
+                else if (result.Value.ValueKind == JsonValueKind.Object && 
+                        (result.Value.TryGetProperty("project_id", out _) || result.Value.TryGetProperty("code", out _)))
+                {
+                    projectList.Add(result.Value);
+                }
+            } catch {}
+        }
+        isLoading = false;
+    }
+
+    private void ToggleAddMode() 
+    {
+        isAddMode = !isAddMode;
+        projectErrorMessage = "";
+        if(isAddMode) {
+            editProjectId = null;
+            newProjectCode = "";
+            newProjectName = "";
+            newTenantId = "";
+        }
+    }
+    
+    private void StartEditProject(string? id, string? code, string? name, string? tId = null)
+    {
+        editProjectId = id;
+        newProjectCode = code ?? "";
+        newProjectName = name ?? "";
+        newTenantId = tId ?? "";
+        projectErrorMessage = "";
+        isAddMode = true;
+    }
+
+    private async Task CreateProject()
+    {
+        isSubmitting = true;
+        projectErrorMessage = "";
+        
+        string targetTenant = isAdmin 
+            ? (string.IsNullOrEmpty(newTenantId) ? "00000000-0000-0000-0000-000000000000" : newTenantId) 
+            : (string.IsNullOrEmpty(tenantId) ? "00000000-0000-0000-0000-000000000000" : tenantId);
+
+        var payload = new APIDataAccParms 
+        { 
+            ProcID = string.IsNullOrEmpty(editProjectId) ? "CREATE_PROJECT" : "UPDATE_PROJECT",
+            ComCod = targetTenant,
+            parm01 = string.IsNullOrEmpty(editProjectId) ? newProjectCode : editProjectId,
+            parm02 = string.IsNullOrEmpty(editProjectId) ? newProjectName : newProjectCode,
+            parm03 = string.IsNullOrEmpty(editProjectId) ? "" : newProjectName,
+            parm04 = targetTenant,
+            parm05 = role
+        };
+
+        var result = await BackendApi.FetchDataAsync(payload);
+        
+        if (result.HasValue && result.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+        {
+            projectErrorMessage = err.GetString()!;
+            isSubmitting = false;
+            return;
+        }
+
+        isAddMode = false;
+        newProjectName = "";
+        newProjectCode = "";
+        newTenantId = "";
+        editProjectId = null;
+        isSubmitting = false;
+        await LoadProjects();
+    }
+    
+    private async Task OpenTeamModal(string projectId, string projName)
+    {
+        selectedProjectId = projectId;
+        selectedProjectName = projName;
+        selectedUserId = "";
+        selectedModuleForAssign = "";
+        showTeamModal = true;
+        await LoadProjectModules(projectId);
+        await LoadProjectMembers(projectId);
+    }
+    
+    private void CloseTeamModal()
+    {
+        showTeamModal = false;
+        selectedProjectId = null;
+    }
+
+    private async Task OpenModulesModal(string projectId, string projName)
+    {
+        selectedProjectId = projectId;
+        selectedProjectName = projName;
+        newModuleName = "";
+        newModuleCode = "";
+        newModuleDesc = "";
+        moduleErrorMessage = "";
+        showModulesModal = true;
+        await LoadProjectModules(projectId);
+    }
+
+    private void CloseModulesModal()
+    {
+        showModulesModal = false;
+        selectedProjectId = null;
+    }
+
+    private async Task LoadProjectModules(string projectId)
+    {
+        projectModulesList.Clear();
+        var payload = new APIDataAccParms 
+        { 
+            ProcID = "GET_PROJECT_MODULES",
+            parm01 = projectId,
+            parm04 = userId,
+            parm05 = role
+        };
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue)
+        {
+            try {
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in result.Value.EnumerateArray()) projectModulesList.Add(el);
+                }
+                else if (result.Value.TryGetProperty("module_id", out _))
+                {
+                    projectModulesList.Add(result.Value);
+                }
+            } catch {}
+        }
+    }
+
+    private async Task CreateModule()
+    {
+        if (string.IsNullOrWhiteSpace(newModuleName) || string.IsNullOrWhiteSpace(newModuleCode))
+        {
+            moduleErrorMessage = "Module Name and Code are required.";
+            return;
+        }
+
+        isSubmittingModule = true;
+        moduleErrorMessage = "";
+
+        var payload = new APIDataAccParms
+        {
+            ProcID = "CREATE_PROJECT_MODULE",
+            parm01 = selectedProjectId,
+            parm02 = newModuleName.Trim(),
+            parm03 = newModuleCode.Trim().ToUpper(),
+            parm04 = newModuleDesc.Trim(),
+            parm05 = role
+        };
+
+        var result = await BackendApi.FetchDataAsync(payload);
+        isSubmittingModule = false;
+
+        if (result.HasValue && result.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+        {
+            moduleErrorMessage = err.GetString()!;
+            return;
+        }
+
+        newModuleName = "";
+        newModuleCode = "";
+        newModuleDesc = "";
+        if (!string.IsNullOrEmpty(selectedProjectId))
+        {
+            await LoadProjectModules(selectedProjectId);
+        }
+    }
+
+    private async Task DeleteModule(string moduleId)
+    {
+        if (string.IsNullOrEmpty(moduleId)) return;
+
+        var payload = new APIDataAccParms
+        {
+            ProcID = "DELETE_PROJECT_MODULE",
+            parm01 = moduleId,
+            parm04 = userId,
+            parm05 = role
+        };
+
+        await BackendApi.FetchDataAsync(payload);
+        if (!string.IsNullOrEmpty(selectedProjectId))
+        {
+            await LoadProjectModules(selectedProjectId);
+            await LoadProjectMembers(selectedProjectId);
+        }
+    }
+
+    private async Task AssignUserToModuleDirect(string targetUserId, string targetModId)
+    {
+        if (string.IsNullOrEmpty(targetUserId) || string.IsNullOrEmpty(targetModId) || string.IsNullOrEmpty(selectedProjectId)) return;
+
+        var payload = new APIDataAccParms
+        {
+            ProcID = "ASSIGN_USER_MODULE",
+            parm01 = targetUserId,
+            parm02 = targetModId,
+            parm03 = selectedProjectId,
+            parm04 = userId,
+            parm05 = role
+        };
+
+        await BackendApi.FetchDataAsync(payload);
+        await LoadProjectMembers(selectedProjectId);
+        await LoadProjectModules(selectedProjectId);
+    }
+
+    private async Task LoadProjectMembers(string projectId)
+    {
+        projectMembers.Clear();
+        var payload = new APIDataAccParms 
+        { 
+            ProcID = "GET_PROJECT_MEMBERS",
+            parm01 = projectId,
+            parm04 = userId,
+            parm05 = role
+        };
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue)
+        {
+            try {
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in result.Value.EnumerateArray())
+                    {
+                        if (el.TryGetProperty("user_id", out _) || el.TryGetProperty("full_name", out _))
+                            projectMembers.Add(el);
+                    }
+                }
+                else if (result.Value.ValueKind == JsonValueKind.Object && 
+                        (result.Value.TryGetProperty("user_id", out _) || result.Value.TryGetProperty("full_name", out _)))
+                {
+                    projectMembers.Add(result.Value);
+                }
+            } catch {}
+        }
+    }
+
+    private async Task AssignTeamMember()
+    {
+        if (string.IsNullOrEmpty(selectedProjectId) || string.IsNullOrEmpty(selectedUserId)) return;
+        
+        var payload = new APIDataAccParms 
+        { 
+            ProcID = "ASSIGN_TEAM_MEMBER",
+            parm01 = selectedProjectId,
+            parm02 = selectedUserId,
+            parm04 = userId,
+            parm05 = role
+        };
+        await BackendApi.FetchDataAsync(payload);
+
+        // Also assign module if selected
+        if (!string.IsNullOrEmpty(selectedModuleForAssign))
+        {
+            await AssignUserToModuleDirect(selectedUserId, selectedModuleForAssign);
+        }
+        
+        selectedUserId = "";
+        selectedModuleForAssign = "";
+        await LoadProjectMembers(selectedProjectId);
+        await LoadProjects();
+    }
+
+    private async Task AssignProjectManager()
+    {
+        if (string.IsNullOrEmpty(selectedProjectId) || string.IsNullOrEmpty(selectedUserId)) return;
+        
+        var payload = new APIDataAccParms 
+        { 
+            ProcID = "ASSIGN_PM",
+            parm01 = selectedProjectId,
+            parm02 = selectedUserId,
+            parm04 = userId,
+            parm05 = role
+        };
+        await BackendApi.FetchDataAsync(payload);
+        
+        selectedUserId = "";
+        selectedModuleForAssign = "";
+        await LoadProjectMembers(selectedProjectId);
+        await LoadProjects();
+    }
+
+    private async Task RemoveTeamMember(string? memberUserId)
+    {
+        if (string.IsNullOrEmpty(selectedProjectId) || string.IsNullOrEmpty(memberUserId)) return;
+
+        var payload = new APIDataAccParms
+        {
+            ProcID = "REMOVE_PROJECT_MEMBER",
+            parm01 = selectedProjectId,
+            parm02 = memberUserId,
+            parm04 = userId,
+            parm05 = role
+        };
+        await BackendApi.FetchDataAsync(payload);
+        await LoadProjectMembers(selectedProjectId);
+        await LoadProjects();
+    }
+
+    private async Task OpenTaskModal()
+    {
+        showTaskModal = true;
+        taskModalMessage = "";
+        allTickets.Clear();
+        var payload = new APIDataAccParms { ProcID = "GET_TICKETS", parm04 = userId, parm05 = role, ComCod = tenantId };
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue)
+        {
+            try {
+                if (result.Value.ValueKind == JsonValueKind.Array)
+                    foreach (var el in result.Value.EnumerateArray()) allTickets.Add(el);
+                else if (result.Value.TryGetProperty("ticket_number", out _)) allTickets.Add(result.Value);
+            } catch {}
+        }
+    }
+
+    private void CloseTaskModal() => showTaskModal = false;
+
+    private async Task SubmitTask()
+    {
+        if (string.IsNullOrWhiteSpace(taskTicketNumber) || string.IsNullOrWhiteSpace(newTaskTitle) || string.IsNullOrWhiteSpace(newTaskAssigneeId))
+        {
+            taskModalMessage = "Please complete all task fields.";
+            return;
+        }
+
+        isSubmittingTask = true;
+        var payload = new APIDataAccParms
+        {
+            ComCod = tenantId,
+            ProcID = "CREATE_TASK",
+            parm01 = taskTicketNumber,
+            parm02 = newTaskTitle,
+            parm03 = newTaskAssigneeId,
+            parm04 = userId,
+            parm05 = role
+        };
+        var res = await BackendApi.FetchDataAsync(payload);
+        isSubmittingTask = false;
+
+        if (res.HasValue && res.Value.TryGetProperty("success", out var s) && s.GetBoolean())
+        {
+            showTaskModal = false;
+            newTaskTitle = "";
+            taskTicketNumber = "";
+            newTaskAssigneeId = "";
+            await LoadProjects(); // refresh dynamic task counts
+        }
+        else
+        {
+            taskModalMessage = "Failed to assign task.";
+        }
+    }
+}

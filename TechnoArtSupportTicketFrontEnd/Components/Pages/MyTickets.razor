@@ -1,0 +1,196 @@
+@page "/my-tickets"
+@page "/client/my-tickets"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
+@attribute [Authorize(Roles = "ClientAdmin,ClientUser,TeamMember,ProjectManager,SupportManager,SuperAdmin,MD")]
+@inject ApiService BackendApi
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>My Tickets - SupportHub</PageTitle>
+
+<div class="custom-card p-4 h-100">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <h5 class="fw-bold m-0"><i class="bi bi-ticket text-primary me-2"></i> My Support Tickets</h5>
+        <a href="/raise-ticket" class="btn btn-primary btn-sm fw-semibold shadow-sm">
+            <i class="bi bi-plus-lg me-1"></i> Raise New Ticket
+        </a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center p-5"><div class="spinner-border text-primary"></div></div>
+    }
+    else if (tickets.Count == 0)
+    {
+        <div class="text-center text-muted p-5 bg-light rounded">
+            <i class="bi bi-ticket fs-1 d-block mb-3 opacity-50"></i>
+            No tickets found. <a href="/raise-ticket" class="text-primary fw-bold">Raise your first ticket</a>.
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="fw-semibold text-muted small">Ticket #</th>
+                        <th class="fw-semibold text-muted small">Subject</th>
+                        <th class="fw-semibold text-muted small">Project</th>
+                        <th class="fw-semibold text-muted small">Priority</th>
+                        <th class="fw-semibold text-muted small">Status</th>
+                        <th class="fw-semibold text-muted small">Progress</th>
+                        <th class="fw-semibold text-muted small">Assigned PM</th>
+                        <th class="fw-semibold text-muted small">SLA Due</th>
+                        <th class="fw-semibold text-muted small">Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in tickets)
+                    {
+                        var tNum = GetStringSafe(t, "ticket_number", "N/A");
+                        var pri = GetStringSafe(t, "priority", "MEDIUM");
+                        var stat = GetStringSafe(t, "status", "NEW");
+                        var progress = GetDecimalSafe(t, "progress_percent", 0);
+                        var pmName = GetStringSafe(t, "assigned_to_name", "Unassigned");
+                        var slaDue = t.TryGetProperty("sla_due_at", out var sla) && sla.ValueKind != JsonValueKind.Null ? sla.GetString() : null;
+                        var slaBreached = !string.IsNullOrEmpty(slaDue) && DateTime.TryParse(slaDue, out var sd) && sd < DateTime.Now;
+                        var priClass = pri == "CRITICAL" ? "badge-urgent" : pri == "HIGH" ? "badge-high" : pri == "MEDIUM" ? "badge-medium" : "badge-low";
+                        var statColor = stat is "CLOSED" or "RESOLVED" ? "success" : stat == "IN_PROGRESS" ? "warning text-dark" : stat == "NEW" ? "info text-dark" : "primary";
+
+                        <tr>
+                            <td class="fw-bold font-monospace small">@tNum</td>
+                            <td class="fw-semibold" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@GetStringSafe(t, "subject", "No Subject")</td>
+                            <td>
+                                <div class="small fw-semibold text-dark">@GetStringSafe(t, "project_name", "—")</div>
+                                @{
+                                    var modName = GetStringSafe(t, "module_name", "");
+                                    if (!string.IsNullOrEmpty(modName))
+                                    {
+                                        <span class="badge bg-light text-primary border" style="font-size: 0.72rem;"><i class="bi bi-diagram-3 me-1"></i>@modName</span>
+                                    }
+                                }
+                            </td>
+                            <td><span class="priority-badge @priClass">@pri</span></td>
+                            <td><span class="badge bg-@statColor">@stat</span></td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2" style="min-width: 90px;">
+                                    <div class="progress flex-grow-1" style="height: 6px;">
+                                        <div class="progress-bar @(progress >= 100 ? "bg-success" : "bg-primary")" role="progressbar" style="width: @(progress)%"></div>
+                                    </div>
+                                    <span class="small text-muted fw-bold">@(((int)progress))%</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge @(pmName == "Unassigned" ? "bg-light text-muted border" : "bg-info text-dark")">
+                                    <i class="bi bi-person me-1"></i>@pmName
+                                </span>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(slaDue))
+                                {
+                                    <span class="small fw-semibold @(slaBreached ? "text-danger" : "text-success")">
+                                        <i class="bi bi-alarm me-1"></i>@slaDue
+                                    </span>
+                                }
+                                else { <span class="text-muted small">—</span> }
+                            </td>
+                            <td class="small text-muted">@GetStringSafe(t, "created_at")</td>
+                            <td>
+                                <a href="/ticket/@tNum" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                @if (stat == "RESOLVED")
+                                {
+                                    <button class="btn btn-sm btn-success ms-1" @onclick="() => CloseTicket(tNum)"><i class="bi bi-check-all"></i> Close</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<JsonElement> tickets = new();
+    private bool isLoading = true;
+    private string tenantId = "";
+    private string userId = "";
+    private string role = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            tenantId = user.FindFirst("TenantId")?.Value ?? "";
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+            await Task.Yield();
+
+            var payload = new APIDataAccParms
+            {
+                ComCod = tenantId,
+                ProcID = "GET_MY_TICKETS",
+                parm04 = userId,
+                parm05 = role
+            };
+
+            var result = await BackendApi.FetchDataAsync(payload);
+            if (result.HasValue)
+            {
+                try {
+                    if (result.Value.ValueKind == JsonValueKind.Array)
+                        foreach (var el in result.Value.EnumerateArray()) tickets.Add(el);
+                    else if (result.Value.TryGetProperty("ticket_number", out _))
+                        tickets.Add(result.Value);
+                } catch { }
+            }
+        }
+        isLoading = false;
+    }
+
+    private async Task CloseTicket(string? ticketNumber)
+    {
+        if (string.IsNullOrEmpty(ticketNumber)) return;
+        var payload = new APIDataAccParms
+        {
+            ComCod = tenantId,
+            ProcID = "CLOSE_TICKET",
+            parm04 = userId,
+            parm05 = role,
+            parm01 = ticketNumber
+        };
+        await BackendApi.FetchDataAsync(payload);
+        tickets.Clear();
+        await OnInitializedAsync();
+    }
+
+    private string GetStringSafe(JsonElement el, string propName, string defaultValue = "")
+    {
+        if (el.TryGetProperty(propName, out var p) && p.ValueKind != JsonValueKind.Null && p.ValueKind != JsonValueKind.Undefined)
+        {
+            if (p.ValueKind == JsonValueKind.String)
+                return p.GetString() ?? defaultValue;
+            return p.GetRawText();
+        }
+        return defaultValue;
+    }
+
+    private decimal GetDecimalSafe(JsonElement el, string propName, decimal defaultValue = 0)
+    {
+        if (el.TryGetProperty(propName, out var p) && p.ValueKind != JsonValueKind.Null && p.ValueKind != JsonValueKind.Undefined)
+        {
+            if (p.ValueKind == JsonValueKind.Number && p.TryGetDecimal(out var d))
+                return d;
+            if (decimal.TryParse(p.GetString(), out var parsed))
+                return parsed;
+        }
+        return defaultValue;
+    }
+}

@@ -1,0 +1,330 @@
+@page "/task/{TaskId}"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
+@inject ApiService BackendApi
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Task @TaskId - SupportHub</PageTitle>
+
+@if (isLoading)
+{
+    <div class="text-center p-5"><div class="spinner-border text-primary"></div></div>
+}
+else if (taskData == null)
+{
+    <div class="alert alert-danger m-4">Task not found or permission denied.</div>
+}
+else
+{
+    var status = taskData?.GetProperty("status").GetString() ?? "TODO";
+    var assignee = taskData?.TryGetProperty("assigned_to", out var asgn) == true ? asgn.GetString() ?? "Unknown" : "Unknown";
+    var initials = assignee.Length >= 2 ? assignee[..2].ToUpper() : "?";
+    var rejReason = taskData?.TryGetProperty("rejection_reason", out var rr) == true && rr.ValueKind != JsonValueKind.Null ? rr.GetString() : null;
+    
+    var statusColor = status switch {
+        "TODO" => "secondary",
+        "IN_PROGRESS" => "primary",
+        "COMPLETED" => "info",
+        "APPROVED" => "success",
+        "REJECTED" => "danger",
+        _ => "secondary"
+    };
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="custom-card border-0 mb-4">
+                <div class="card-header bg-white border-bottom p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-@statusColor text-white px-3 py-2 rounded-pill">@status</span>
+                            <span class="text-muted small fw-semibold ms-2">@TaskId</span>
+                        </div>
+                        <a href="/ticket/@(taskData?.GetProperty("ticket_number").GetString())" class="badge bg-light text-dark border text-decoration-none">
+                            <i class="bi bi-ticket me-1"></i> @taskData?.GetProperty("ticket_number").GetString()
+                        </a>
+                    </div>
+                    <h4 class="fw-bold mb-1">@taskData?.GetProperty("name").GetString()</h4>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <div class="avatar-circle" style="width:28px;height:28px;font-size:0.7rem;">@initials</div>
+                        <span class="text-muted small">Assigned to <strong>@assignee</strong></span>
+                    </div>
+                </div>
+
+                <div class="card-body p-4">
+                    @if (!string.IsNullOrEmpty(rejReason))
+                    {
+                        <div class="alert alert-danger d-flex gap-2 mb-4">
+                            <i class="bi bi-x-circle-fill fs-5"></i>
+                            <div><strong>Rejected by PM:</strong> @rejReason. Please rework and resubmit.</div>
+                        </div>
+                    }
+
+                    <!-- Work Log Section -->
+                    <h6 class="fw-bold text-muted text-uppercase small mb-3"><i class="bi bi-clock-history me-2"></i>Work Logs</h6>
+                    @if (workLogs.Count > 0)
+                    {
+                        <div class="mb-4">
+                            @foreach (var log in workLogs)
+                            {
+                                <div class="d-flex justify-content-between bg-light p-2 mb-2 rounded border-start border-4 border-info">
+                                    <div>
+                                        <span class="badge bg-info text-dark me-2">@log.hours hrs</span>
+                                        <span class="text-muted small">@log.description</span>
+                                    </div>
+                                    <span class="text-muted small">@log.date</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else { <p class="text-muted small mb-4">No work logs yet.</p> }
+
+                    <!-- Team Member Actions -->
+                    <AuthorizeView Roles="TeamMember,ProjectManager,SuperAdmin">
+                        <Authorized>
+                            @if (status is "TODO" or "REJECTED" or "IN_PROGRESS")
+                            {
+                                <h6 class="fw-bold text-muted text-uppercase small mb-3"><i class="bi bi-journal-plus me-2"></i>Log Work</h6>
+                                <div class="bg-light p-3 rounded border mb-4">
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label small fw-semibold text-muted">Hours Spent</label>
+                                            <input type="number" class="form-control" @bind="newLogHours" placeholder="1.5" step="0.5" min="0.5" />
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label class="form-label small fw-semibold text-muted">Work Date (When work was performed)</label>
+                                            <input type="date" class="form-control" @bind="newLogDate" @bind:format="yyyy-MM-dd" />
+                                            <small class="text-muted" style="font-size:0.75rem;">Select the date on which this task effort was completed.</small>
+                                        </div>
+                                    </div>
+                                    <label class="form-label small fw-semibold text-muted">Description</label>
+                                    <textarea class="form-control mb-3" rows="2" @bind="newLogDesc" placeholder="What did you work on?"></textarea>
+                                    <div class="text-end">
+                                        <button class="btn btn-info btn-sm fw-semibold text-white" @onclick="SaveWorkLog"><i class="bi bi-check me-1"></i> Save Log</button>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-3 mt-4 border-top pt-4">
+                                    @if (status == "TODO")
+                                    {
+                                        <button class="btn btn-primary fw-semibold px-4 shadow-sm" @onclick='() => UpdateStatus("IN_PROGRESS")'>
+                                            <i class="bi bi-play-circle-fill me-2"></i> Start Working
+                                        </button>
+                                    }
+                                    @if (status == "IN_PROGRESS" || status == "REJECTED")
+                                    {
+                                        <button class="btn btn-success fw-semibold px-4 shadow-sm text-white" @onclick='() => UpdateStatus("COMPLETED")'>
+                                            <i class="bi bi-check-circle-fill me-2"></i> Submit for Approval
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </Authorized>
+                    </AuthorizeView>
+
+                    <!-- PM Approve / Reject -->
+                    <AuthorizeView Roles="ProjectManager,SupportManager,SuperAdmin">
+                        <Authorized>
+                            @if (status == "COMPLETED")
+                            {
+                                <div class="border-top pt-4 mt-4">
+                                    <h6 class="fw-bold text-muted text-uppercase small mb-3"><i class="bi bi-shield-check me-2"></i>Review Task</h6>
+                                    @if (showRejectForm)
+                                    {
+                                        <div class="bg-light p-3 rounded border border-danger mb-3">
+                                            <label class="form-label small fw-semibold text-muted">Rejection Reason</label>
+                                            <textarea class="form-control mb-3" rows="3" @bind="rejectReason" placeholder="Describe what needs to be reworked..."></textarea>
+                                            <div class="d-flex gap-2 justify-content-end">
+                                                <button class="btn btn-secondary btn-sm" @onclick='() => showRejectForm = false'>Cancel</button>
+                                                <button class="btn btn-danger btn-sm fw-semibold" @onclick="SubmitReject"><i class="bi bi-x-circle me-1"></i> Confirm Reject</button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex gap-3">
+                                            <button class="btn btn-success fw-semibold px-4 shadow-sm text-white" @onclick="ApproveTask">
+                                                <i class="bi bi-check-all me-2"></i> Approve
+                                            </button>
+                                            <button class="btn btn-outline-danger fw-semibold px-4" @onclick='() => showRejectForm = true'>
+                                                <i class="bi bi-x-circle me-2"></i> Reject
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </Authorized>
+                    </AuthorizeView>
+
+                    @if (!string.IsNullOrEmpty(actionMessage))
+                    {
+                        <div class="alert @(actionSuccess ? "alert-success" : "alert-danger") mt-3">@actionMessage</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="custom-card border-0 p-4 mb-4">
+                <h6 class="fw-bold border-bottom pb-2 mb-3">Task Info</h6>
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-muted fw-semibold">Status</span>
+                    <span class="badge bg-@statusColor">@status</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-muted fw-semibold">Assignee</span>
+                    <span class="fw-bold">@assignee</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-muted fw-semibold">Parent Ticket</span>
+                    <a href="/ticket/@(taskData?.GetProperty("ticket_number").GetString())" class="text-decoration-none text-primary fw-bold">
+                        @taskData?.GetProperty("ticket_number").GetString()
+                    </a>
+                </div>
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-muted fw-semibold">Total Logged</span>
+                    <span class="fw-bold">@totalHours hrs</span>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string TaskId { get; set; } = "";
+
+    private JsonElement? taskData;
+    private bool isLoading = true;
+    private string actionMessage = "";
+    private bool actionSuccess = false;
+    private bool showRejectForm = false;
+    private string rejectReason = "";
+
+    private decimal newLogHours = 1;
+    private DateTime newLogDate = DateTime.Today;
+    private string newLogDesc = "";
+    private decimal totalHours = 0;
+
+    private List<(string date, decimal hours, string description)> workLogs = new();
+
+    private string tenantId = "";
+    private string userId = "";
+    private string role = "";
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            tenantId = user.FindFirst("TenantId")?.Value ?? "";
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+            var payload = new APIDataAccParms
+            {
+                ComCod = tenantId,
+                ProcID = "GET_TASK_DETAILS",
+                parm04 = userId,
+                parm05 = role,
+                parm01 = TaskId
+            };
+
+            var result = await BackendApi.FetchDataAsync(payload);
+            if (result.HasValue && result.Value.TryGetProperty("task_id", out _))
+            {
+                taskData = result.Value;
+                workLogs.Clear();
+                totalHours = 0;
+                if (taskData.Value.TryGetProperty("work_logs", out var logs) && logs.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var log in logs.EnumerateArray())
+                    {
+                        decimal h = 0;
+                        if (log.TryGetProperty("hours", out var hv))
+                        {
+                            if (hv.ValueKind == JsonValueKind.Number) h = hv.GetDecimal();
+                            else if (decimal.TryParse(hv.GetString(), out var hp)) h = hp;
+                        }
+                        else if (log.TryGetProperty("hours_spent", out var hsv))
+                        {
+                            if (hsv.ValueKind == JsonValueKind.Number) h = hsv.GetDecimal();
+                            else if (decimal.TryParse(hsv.GetString(), out var hsp)) h = hsp;
+                        }
+
+                        var d = log.TryGetProperty("description", out var dv) ? dv.GetString() ?? "" : "";
+                        var dt = log.TryGetProperty("date", out var dtv) ? dtv.GetString() ?? "" : (log.TryGetProperty("log_date", out var ldtv) ? ldtv.GetString() ?? "" : "");
+                        
+                        workLogs.Add((dt, h, d));
+                        totalHours += h;
+                    }
+                }
+            }
+        }
+        isLoading = false;
+    }
+
+    private async Task SaveWorkLog()
+    {
+        if (newLogHours <= 0 || string.IsNullOrWhiteSpace(newLogDesc)) return;
+        var payload = new APIDataAccParms
+        {
+            ComCod = tenantId, ProcID = "ADD_WORK_LOG",
+            parm04 = userId, parm05 = role,
+            parm01 = TaskId, parm02 = newLogHours.ToString("0.##"),
+            parm03 = newLogDate.ToString("yyyy-MM-dd"), parm06 = newLogDesc
+        };
+        await BackendApi.FetchDataAsync(payload);
+        newLogDesc = ""; newLogHours = 1;
+        await LoadData();
+    }
+
+    private async Task UpdateStatus(string newStatus)
+    {
+        var payload = new APIDataAccParms
+        {
+            ComCod = tenantId, ProcID = "UPDATE_TASK_STATUS",
+            parm04 = userId, parm05 = role,
+            parm01 = TaskId, parm02 = newStatus
+        };
+        await BackendApi.FetchDataAsync(payload);
+        await LoadData();
+    }
+
+    private async Task ApproveTask()
+    {
+        var payload = new APIDataAccParms
+        {
+            ComCod = tenantId, ProcID = "APPROVE_TASK",
+            parm04 = userId, parm05 = role,
+            parm01 = TaskId
+        };
+        var result = await BackendApi.FetchDataAsync(payload);
+        actionSuccess = result.HasValue && result.Value.TryGetProperty("success", out _);
+        actionMessage = actionSuccess ? "Task approved successfully!" : "Approval failed.";
+        await LoadData();
+    }
+
+    private async Task SubmitReject()
+    {
+        if (string.IsNullOrWhiteSpace(rejectReason)) return;
+        var payload = new APIDataAccParms
+        {
+            ComCod = tenantId, ProcID = "REJECT_TASK",
+            parm04 = userId, parm05 = role,
+            parm01 = TaskId, parm02 = rejectReason
+        };
+        var result = await BackendApi.FetchDataAsync(payload);
+        actionSuccess = result.HasValue && result.Value.TryGetProperty("success", out _);
+        actionMessage = actionSuccess ? "Task sent back for rework." : "Rejection failed.";
+        showRejectForm = false;
+        rejectReason = "";
+        await LoadData();
+    }
+}

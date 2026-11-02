@@ -1,0 +1,419 @@
+@page "/login"
+@using TechnoArtSupportTicketFrontEnd.Auth
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Text.Json
+@using System.Net.Http.Json
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+@inject IHttpClientFactory ClientFactory
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Config
+@attribute [AllowAnonymous]
+
+<PageTitle>Sign In &middot; @(Config["Branding:SiteName"] ?? "SupportHub")</PageTitle>
+
+<div class="login-wrapper d-flex align-items-center justify-content-center">
+    <div class="background-overlay">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="login-card shadow-lg bg-white rounded-5 overflow-hidden d-flex">
+        
+        <!-- Left Branding Panel -->
+        <div class="brand-panel d-none d-md-flex flex-column justify-content-between p-5 text-white position-relative">
+            <div class="overlay"></div>
+            <div class="position-relative z-index-1">
+                <div class="d-flex align-items-center mb-4">
+                    <img src="@(Config["Branding:CompanyLogo"] ?? "https://pirthe.com/Img/logo.png")" alt="Logo" style="height: 36px; background: white; padding: 6px; border-radius: 8px;" class="me-3 shadow-sm" />
+                    <span class="fs-4 fw-bold tracking-tight">@(Config["Branding:SiteName"] ?? "SupportHub")</span>
+                </div>
+            </div>
+            
+            <div class="position-relative z-index-1 mt-auto">
+                <h1 class="display-6 fw-bold mb-3 lh-sm">Enterprise Support<br/>Simplified.</h1>
+                <p class="fs-6 opacity-75 fw-light mb-5">
+                    Connect securely to the central dashboard. Track, manage, and scale your customer success instantly.
+                </p>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex -space-x-2">
+                        <img class="avatar" src="https://i.pravatar.cc/100?img=1" alt="user" />
+                        <img class="avatar" src="https://i.pravatar.cc/100?img=2" alt="user" />
+                        <img class="avatar" src="https://i.pravatar.cc/100?img=3" alt="user" />
+                    </div>
+                    <span class="small fw-medium opacity-75">Used by 1,000+ Teams</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Login Panel -->
+        <div class="form-panel p-4 p-md-5 d-flex flex-column justify-content-center">
+            
+            <div class="d-md-none d-flex align-items-center justify-content-center mb-4 gap-2">
+                <img src="https://pirthe.com/Img/logo.png" alt="Logo" style="height: 30px;" />
+                <span class="fs-4 fw-bold">@(Config["Branding:SiteName"] ?? "SupportHub")</span>
+            </div>
+
+            <div class="text-center mb-4 pb-2">
+                <h3 class="fw-bold fs-2 text-dark mb-1">Welcome Back</h3>
+                <p class="text-muted small">Access your workspace seamlessly</p>
+            </div>
+
+            <!-- Login Modes Toggle -->
+            <div class="nav nav-pills custom-pills p-1 bg-light rounded-pill mb-4 w-100 d-flex text-center" role="tablist">
+                <button class="nav-link flex-fill rounded-pill fw-semibold py-2 transition-all @(!activeQrMode ? "active bg-white text-primary shadow-sm" : "text-muted")" @onclick="SwitchToPasswordMode" type="button">
+                    <i class="bi bi-person-lock me-1"></i> Password
+                </button>
+                <button class="nav-link flex-fill rounded-pill fw-semibold py-2 transition-all @(activeQrMode ? "active bg-white text-primary shadow-sm" : "text-muted")" @onclick="SwitchToQrMode" type="button">
+                    <i class="bi bi-qr-code-scan me-1"></i> Auth by App
+                </button>
+            </div>
+
+            <div class="form-transition-container position-relative">
+                @if (!activeQrMode)
+                {
+                    <form @onsubmit="HandleLogin" class="slide-up-fade">
+                        
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control custom-input" id="userIdInput" placeholder="User ID" @bind="loginModel.UserId" @bind:event="oninput">
+                            <label for="userIdInput" class="text-muted"><i class="bi bi-person-fill me-2"></i>User ID</label>
+                        </div>
+                        
+                        <div class="form-floating mb-4">
+                            <input type="password" class="form-control custom-input" id="passwordInput" placeholder="Password" @bind="loginModel.Password" @bind:event="oninput">
+                            <label for="passwordInput" class="text-muted"><i class="bi bi-key-fill me-2"></i>Password</label>
+                        </div>
+
+                        @if(!string.IsNullOrEmpty(errorMessage)) {
+                            <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger small py-2 px-3 fw-semibold rounded-3 mb-4 d-flex align-items-center">
+                                <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>@errorMessage
+                            </div>
+                        }
+
+                        <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow-primary text-uppercase letter-spacing-1 btn-auth" disabled="@isLoggingIn">
+                            @if(isLoggingIn) { 
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span> 
+                                <span>Authenticating...</span>
+                            } else {
+                                <span>Sign In to Workspace</span>
+                            }
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <div class="text-center slide-up-fade pt-2">
+                        <p class="text-muted small fw-medium mb-4">Open the <strong class="text-primary">Pirthe App</strong> on your mobile device and scan the QR code to sign in instantly.</p>
+
+                        <div class="qr-box p-3 bg-white rounded-4 shadow-sm border mx-auto position-relative" style="width: fit-content;">
+                            @if (string.IsNullOrEmpty(QrSessionId))
+                            {
+                                <div class="d-flex flex-column align-items-center justify-content-center p-4 bg-light rounded" style="width: 200px; height: 200px;">
+                                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                                    <div class="small text-muted fw-semibold">Preparing Session...</div>
+                                </div>
+                            }
+                            else
+                            {
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=@QrSessionId" alt="QR Code" class="img-fluid rounded" style="width: 200px; height: 200px;" />
+                            }
+                            
+                            <!-- Premium QR Target Corners -->
+                            <div class="qr-target tl"></div> <div class="qr-target tr"></div>
+                            <div class="qr-target bl"></div> <div class="qr-target br"></div>
+                        </div>
+
+                        <div class="mt-4 d-flex align-items-center justify-content-center gap-2">
+                            <span class="spinner-grow spinner-grow-sm text-success" style="opacity: 0.7" role="status"></span>
+                            <span class="text-muted small fw-semibold">Waiting for mobile approval...</span>
+                        </div>
+                        
+                        @if (!string.IsNullOrEmpty(qrStatusText))
+                        {
+                            <div class="text-center text-primary mt-2 small fw-bold">@qrStatusText</div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="mt-auto pt-4 text-center">
+                <span class="text-muted small">Powered by &copy; @DateTime.Now.Year Pirthe System</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Google Font specific to this elegant layout */
+    @@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+    
+    .login-wrapper {
+        min-height: 100vh;
+        width: 100vw;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1050;
+        background-color: #f6f8fb;
+        font-family: 'Outfit', sans-serif;
+    }
+
+    .background-overlay {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: 0;
+    }
+
+    .blob {
+        position: absolute;
+        filter: blur(80px);
+        border-radius: 50%;
+        animation: pulse 12s infinite alternate ease-in-out;
+    }
+
+    .blob-1 {
+        width: 60vw; height: 60vw;
+        max-width: 600px; max-height: 600px;
+        background: rgba(43, 90, 246, 0.15);
+        top: -10%; left: -10%;
+    }
+
+    .blob-2 {
+        width: 50vw; height: 50vw;
+        max-width: 500px; max-height: 500px;
+        background: rgba(14, 165, 233, 0.12);
+        bottom: -10%; right: -10%;
+        animation-delay: -6s;
+    }
+
+    @@keyframes pulse {
+        0% { transform: scale(1) translate(0px, 0px); }
+        100% { transform: scale(1.1) translate(30px, -30px); }
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 960px;
+        min-height: 600px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08) !important;
+        position: relative;
+        z-index: 10;
+        margin: 20px;
+    }
+
+    .brand-panel {
+        flex: 1;
+        background-image: url('https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=2070&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+    }
+    
+    .overlay {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: linear-gradient(135deg, rgba(8, 28, 64, 0.95) 0%, rgba(14, 60, 140, 0.85) 100%);
+    }
+
+    .z-index-1 { z-index: 1; }
+
+    .form-panel {
+        flex: 1;
+        max-width: 480px;
+        width: 100%;
+        background: #ffffff;
+    }
+
+    .custom-input {
+        border-radius: 12px;
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 3.5rem;
+    }
+
+    .custom-input:focus {
+        background-color: #ffffff;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    }
+    
+    .custom-input::placeholder {
+        color: transparent;
+    }
+
+    .btn-auth {
+        background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+        border: none;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-auth:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
+    }
+
+    .letter-spacing-1 { letter-spacing: 1px; }
+
+    /* Custom Avatar Stack */
+    .avatar {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        border: 2px solid #081c40;
+        margin-right: -10px;
+    }
+
+    /* Modal Tabs */
+    .custom-pills .nav-link {
+        color: #64748b;
+        font-size: 0.9rem;
+    }
+
+    /* Target Box for QR */
+    .qr-target {
+        position: absolute;
+        width: 20px; height: 20px;
+        border-color: #4f46e5;
+        border-style: solid;
+        z-index: 10;
+    }
+    .tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
+    .tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
+    .bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
+    .br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
+
+    .slide-up-fade {
+        animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @@keyframes slideUp {
+        0% { opacity: 0; transform: translateY(10px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+@code {
+    private HttpClient Http => ClientFactory.CreateClient("SupportAPI");
+    private LoginModel loginModel = new();
+    private bool activeQrMode = false;
+    private string QrSessionId = "";
+    private bool IsPolling = false;
+    private string errorMessage = "";
+    private string qrStatusText = "";
+    private bool isLoggingIn = false;
+
+    private void SwitchToPasswordMode()
+    {
+        activeQrMode = false;
+        IsPolling = false;
+    }
+
+    private async Task SwitchToQrMode()
+    {
+        activeQrMode = true;
+        await GenerateQrAndStartPolling();
+    }
+
+    private async Task HandleLogin()
+    {
+        errorMessage = "";
+        if (string.IsNullOrWhiteSpace(loginModel.UserId) || string.IsNullOrWhiteSpace(loginModel.Password))
+        {
+            errorMessage = "User ID & Password cannot be empty.";
+            return;
+        }
+
+        isLoggingIn = true;
+        StateHasChanged();
+
+        try
+        {
+            var authPayload = new { userId = loginModel.UserId.Trim(), password = loginModel.Password };
+            var response = await Http.PostAsJsonAsync("api/auth/login", authPayload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+                if (result.TryGetProperty("tokenres", out var tokenProp))
+                {
+                    var token = tokenProp.GetString();
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        var customAuth = (CustomAuthStateProvider)AuthStateProvider;
+                        await customAuth.MarkUserAsAuthenticated(token);
+                        NavigationManager.NavigateTo("/", forceLoad: true);
+                        return;
+                    }
+                }
+                errorMessage = "Login failed: Invalid token received.";
+            }
+            else
+            {
+                errorMessage = "Incorrect User ID or Password.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Connection error: {ex.Message}";
+        }
+
+        isLoggingIn = false;
+    }
+
+    private async Task GenerateQrAndStartPolling()
+    {
+        QrSessionId = "";
+        qrStatusText = "";
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<JsonElement>("api/qr/generate");
+            QrSessionId = response.GetProperty("sessionId").GetString() ?? "";
+            StateHasChanged();
+            IsPolling = true;
+            _ = PollQrSession();
+        }
+        catch (Exception ex)
+        {
+            qrStatusText = $"Network Error: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task PollQrSession()
+    {
+        while (IsPolling && activeQrMode && !string.IsNullOrEmpty(QrSessionId))
+        {
+            await Task.Delay(1500);
+            try
+            {
+                var check = await Http.GetFromJsonAsync<JsonElement>($"api/qr/poll/{QrSessionId}");
+                var status = check.GetProperty("status").GetString();
+
+                if (status == "APPROVED")
+                {
+                    var token = check.GetProperty("token").GetString();
+                    var customAuth = (CustomAuthStateProvider)AuthStateProvider;
+                    await customAuth.MarkUserAsAuthenticated(token!);
+                    IsPolling = false;
+                    NavigationManager.NavigateTo("/", forceLoad: true);
+                    return;
+                }
+                else if (status == "EXPIRED_OR_INVALID")
+                {
+                    qrStatusText = "Session Expired. Regenerating QR...";
+                    await GenerateQrAndStartPolling();
+                    return;
+                }
+            }
+            catch { /* Keep polling */ }
+        }
+    }
+
+    public class LoginModel
+    {
+        public string UserId { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}
