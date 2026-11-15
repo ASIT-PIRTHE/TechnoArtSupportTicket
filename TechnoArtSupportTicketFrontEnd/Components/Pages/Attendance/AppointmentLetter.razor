@@ -1,0 +1,219 @@
+@* Route handled canonically by Components/Pages/AppointmentLetter.razor to avoid ambiguous route conflict *@
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@inject ApiService BackendApi
+
+<PageTitle>Official Appointment Letter - TechnoArt Software</PageTitle>
+
+<div class="container py-4 no-print">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h4 class="fw-bold mb-1 text-primary">
+                <i class="bi bi-file-earmark-text me-2"></i> Official Employment Appointment Letter
+            </h4>
+            <p class="text-muted small mb-0">Legal employment contract on official TechnoArt corporate letterhead</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="history.back()">
+                <i class="bi bi-arrow-left me-1"></i> Back to Directory
+            </button>
+            <button class="btn btn-primary btn-sm px-4 shadow-sm" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Print / Save as PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- A4 Printable Sheet Container -->
+<div class="d-flex justify-content-center my-3">
+    <div class="a4-sheet shadow-lg bg-white p-5">
+        <!-- Letterhead Header -->
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-4 mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-primary text-white d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-cpu-fill fs-3 text-warning"></i>
+                </div>
+                <div>
+                    <h4 class="fw-black mb-0 text-dark tracking-wide">TECHNOART SOFTWARE</h4>
+                    <small class="text-muted text-uppercase fw-semibold" style="letter-spacing: 1.5px;">Technology & Support Solutions Ltd.</small>
+                </div>
+            </div>
+            <div class="text-end small text-muted">
+                <div>Corporate Tower, Level 8, Gulshan</div>
+                <div>Dhaka - 1212, Bangladesh</div>
+                <div>info@technoartsoftware.com | +880 1700-000000</div>
+            </div>
+        </div>
+
+        <!-- Reference & Date -->
+        <div class="d-flex justify-content-between align-items-center mb-4 small">
+            <div><strong>Ref:</strong> TAS/HR/APPT/@DateTime.Now.Year/@employeeCode</div>
+            <div><strong>Date:</strong> @issueDate</div>
+        </div>
+
+        <!-- Recipient Details -->
+        <div class="mb-4">
+            <div class="fw-bold">To:</div>
+            <div class="fs-5 fw-bold text-dark">@employeeName</div>
+            <div class="text-muted small">Address: @address</div>
+            <div class="text-muted small">National ID / Passport: @nidNumber</div>
+            <div class="text-muted small">Email: @email</div>
+        </div>
+
+        <!-- Subject -->
+        <div class="mb-4 p-2 bg-light rounded border">
+            <h6 class="fw-bold mb-0 text-dark">
+                <strong>Subject: Letter of Appointment for the position of "@designation"</strong>
+            </h6>
+        </div>
+
+        <!-- Body Content -->
+        <div class="letter-body text-dark" style="font-size: 14px; line-height: 1.7;">
+            <p>Dear <strong>@employeeName</strong>,</p>
+
+            <p>
+                We are pleased to offer you formal employment with <strong>TechnoArt Software & Technology Solutions Ltd.</strong> as
+                <strong>@designation</strong> under the department of <strong>@department</strong>, commencing on <strong>@joiningDate</strong>.
+            </p>
+
+            <h6 class="fw-bold mt-4 mb-2 text-primary">1. Terms of Employment & Remuneration:</h6>
+            <p class="mb-2">Your total consolidated monthly gross salary package will be <strong>BDT @monthlySalary.ToString("N0")/-</strong> (Bangladeshi Taka), subject to applicable statutory deductions:</p>
+            <table class="table table-sm table-bordered w-75 mb-3" style="font-size: 13px;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Salary Head</th>
+                        <th class="text-end">Amount (BDT)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Basic Salary</td><td class="text-end">@((monthlySalary * 0.55m).ToString("N0"))</td></tr>
+                    <tr><td>House Rent Allowance</td><td class="text-end">@((monthlySalary * 0.25m).ToString("N0"))</td></tr>
+                    <tr><td>Medical & Conveyance</td><td class="text-end">@((monthlySalary * 0.20m).ToString("N0"))</td></tr>
+                    <tr class="fw-bold table-light"><td>Total Monthly Gross</td><td class="text-end">@monthlySalary.ToString("N0")</td></tr>
+                </tbody>
+            </table>
+
+            <h6 class="fw-bold mt-3 mb-2 text-primary">2. Working Hours & Shift Roster:</h6>
+            <p>
+                Your standard assigned shift will be <strong>@shiftSchedule</strong> at our <strong>@branchName</strong>.
+                Daily attendance must be recorded via the official TechnoArt Smart Attendance Terminal (geofence verified).
+                Work from home (WFH) is allowed subject to supervisor prior approval.
+            </p>
+
+            <h6 class="fw-bold mt-3 mb-2 text-primary">3. Probationary Period:</h6>
+            <p>
+                You will be on probation for a period of <strong>3 (three) months</strong> from your joining date.
+                Upon successful completion and evaluation of your KPI performance, your employment will be confirmed in writing.
+            </p>
+
+            <h6 class="fw-bold mt-3 mb-2 text-primary">4. Confidentiality & Non-Disclosure:</h6>
+            <p>
+                You will not at any time during or after your employment divulge any confidential software source code, client records,
+                or proprietary trade secrets of TechnoArt Software to any unauthorized third party.
+            </p>
+
+            <p class="mt-4">
+                We warmly welcome you to the TechnoArt family and look forward to a mutually fruitful professional association.
+            </p>
+        </div>
+
+        <!-- Signatures Block -->
+        <div class="row pt-5 mt-5">
+            <div class="col-6">
+                <div class="border-top pt-2 text-center" style="width: 220px;">
+                    <div class="fw-bold text-dark">Tanvir Ahmed</div>
+                    <div class="small text-muted">Managing Director / CEO</div>
+                    <div class="small text-muted">TechnoArt Software Ltd.</div>
+                </div>
+            </div>
+            <div class="col-6 text-end d-flex flex-column align-items-end">
+                <div class="border-top pt-2 text-center" style="width: 220px;">
+                    <div class="fw-bold text-dark">@employeeName</div>
+                    <div class="small text-muted">Employee Acceptance Signature</div>
+                    <div class="small text-muted">Date: ____________________</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* A4 Dimensions: 210mm × 297mm */
+    .a4-sheet {
+        width: 820px;
+        min-height: 1120px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    @@media print {
+        body {
+            background: #ffffff !important;
+        }
+        .no-print, nav, header, aside, .sidebar-menu, .sidebar-logo {
+            display: none !important;
+        }
+        .a4-sheet {
+            width: 100% !important;
+            min-height: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 20mm !important;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public string? EmployeeId { get; set; }
+
+    private string employeeName = "Shuvo TAS";
+    private string employeeCode = "TAS-104";
+    private string designation = "Full Stack Engineer";
+    private string department = "Software & Product Engineering";
+    private string branchName = "Dhaka Corporate Hub";
+    private string shiftSchedule = "09:30 AM - 06:30 PM";
+    private string address = "Gulshan-1, Dhaka, Bangladesh";
+    private string nidNumber = "1995267123456789";
+    private string email = "shuvo@tas.com";
+    private string joiningDate = "15 January 2024";
+    private string issueDate = DateTime.Now.ToString("dd MMMM yyyy");
+    private decimal monthlySalary = 65000m;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeeAppointmentData();
+    }
+
+    private async Task LoadEmployeeAppointmentData()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(EmployeeId))
+            {
+                var req = new APIDataAccParms
+                {
+                    ProcName = "sp_attendance_operations",
+                    ProcID = "GET_EMPLOYEE_APPT",
+                    parm01 = EmployeeId
+                };
+
+                var res = await BackendApi.FetchDataAsync(req);
+                if (res.HasValue && res.Value.ValueKind == JsonValueKind.Object)
+                {
+                    var root = res.Value;
+                    if (root.TryGetProperty("name", out var n)) employeeName = n.GetString() ?? employeeName;
+                    if (root.TryGetProperty("code", out var c)) employeeCode = c.GetString() ?? employeeCode;
+                    if (root.TryGetProperty("designation", out var d)) designation = d.GetString() ?? designation;
+                    if (root.TryGetProperty("email", out var e)) email = e.GetString() ?? email;
+                    if (root.TryGetProperty("join_date", out var j)) joiningDate = j.GetString() ?? joiningDate;
+                    if (root.TryGetProperty("salary", out var s)) monthlySalary = s.GetDecimal();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Appt load err: " + ex.Message);
+        }
+    }
+}

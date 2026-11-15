@@ -1,4 +1,5 @@
 @page "/ticket/{TicketNumber}"
+@attribute [Authorize]
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
 @using System.Security.Claims
@@ -19,31 +20,50 @@ else if (ticketData == null)
 }
 else
 {
-    var status = ticketData?.GetProperty("status").GetString() ?? "NEW";
-    var priority = ticketData?.GetProperty("priority").GetString() ?? "MEDIUM";
+    var status = GetPropString(ticketData, "status", "Status");
+    if (string.IsNullOrEmpty(status)) status = "NEW";
+    var priority = GetPropString(ticketData, "priority", "Priority");
+    if (string.IsNullOrEmpty(priority)) priority = "MEDIUM";
     var pClass = priority == "CRITICAL" ? "badge-urgent" : priority == "HIGH" ? "badge-high" : priority == "MEDIUM" ? "badge-medium" : "badge-low";
+    var subject = GetPropString(ticketData, "subject", "Subject", "title", "Title");
+    var createdAt = GetPropString(ticketData, "created_at", "CreatedAt");
+    var projectName = GetPropString(ticketData, "project_name", "ProjectName");
+    if (string.IsNullOrEmpty(projectName)) projectName = "—";
+    var headerMod = GetPropString(ticketData, "module_name", "ModuleName");
+    var assignedToName = GetPropString(ticketData, "assigned_to_name", "AssignedToName");
+    if (string.IsNullOrEmpty(assignedToName)) assignedToName = "Unassigned";
+    var createdByName = GetPropString(ticketData, "created_by_name", "CreatedByName");
+    if (string.IsNullOrEmpty(createdByName)) createdByName = "—";
+    var ticketDescription = GetPropString(ticketData, "description", "Description");
 
-    <div class="row g-4">
+    decimal prog = 0;
+    if (ticketData.HasValue && ticketData.Value.ValueKind == JsonValueKind.Object && ticketData.Value.TryGetProperty("progress_percent", out var prg))
+    {
+        if (prg.ValueKind == JsonValueKind.Number) prog = prg.GetDecimal();
+        else if (decimal.TryParse(prg.GetString(), out var dp)) prog = dp;
+    }
+
+    var slaDue = GetPropString(ticketData, "sla_due_at", "SlaDueAt");
+    bool slaBreached = !string.IsNullOrEmpty(slaDue) && DateTime.TryParse(slaDue, out var slaDate) && slaDate < DateTime.Now;
+
+    <div class="row g-3 g-md-4">
         <!-- Main Content: Ticket Details & Conversation -->
         <div class="col-lg-8">
             <div class="custom-card border-0 mb-4">
-                <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-start">
+                <div class="card-header bg-white border-bottom p-3 p-md-4 d-flex flex-column flex-sm-row justify-content-between align-items-start gap-3">
                     <div>
                         <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
                             <span class="badge border border-secondary text-dark bg-light px-2 py-1">@status</span>
                             <span class="priority-badge @pClass">@priority</span>
                             <span class="text-muted small fw-semibold ms-2">@TicketNumber</span>
-                            @{
-                                var headerMod = ticketData?.TryGetProperty("module_name", out var hmn) == true ? hmn.GetString() : null;
-                                if (!string.IsNullOrEmpty(headerMod))
-                                {
-                                    <span class="badge bg-primary-subtle text-primary border"><i class="bi bi-diagram-3 me-1"></i>@headerMod</span>
-                                }
+                            @if (!string.IsNullOrEmpty(headerMod))
+                            {
+                                <span class="badge bg-primary-subtle text-primary border"><i class="bi bi-diagram-3 me-1"></i>@headerMod</span>
                             }
                         </div>
-                        <h4 class="fw-bold mb-1">@ticketData?.GetProperty("subject").GetString()</h4>
+                        <h4 class="fw-bold mb-1">@subject</h4>
                         <div class="text-muted small">
-                            Opened on @ticketData?.GetProperty("created_at").GetString()
+                            Opened on @createdAt
                         </div>
                     </div>
                     <AuthorizeView Roles="SuperAdmin,SupportManager,ProjectManager">
@@ -71,9 +91,9 @@ else
                         </Authorized>
                     </AuthorizeView>
                 </div>
-                <div class="card-body p-4">
+                <div class="card-body p-3 p-md-4">
                     <h6 class="fw-bold text-muted text-uppercase small mb-3">Original Description</h6>
-                    <p class="text-dark" style="white-space: pre-wrap; line-height: 1.6;">@(ticketData.HasValue && ticketData.Value.TryGetProperty("description", out var description) ? description.GetString() ?? "" : "")</p>
+                    <p class="text-dark" style="white-space: pre-wrap; line-height: 1.6;">@ticketDescription</p>
                     
                     @if (classAttachments.Count > 0)
                     {
@@ -110,24 +130,29 @@ else
                 </div>
             </div>
 
-            <div class="custom-card border-0 p-4">
+            <div class="custom-card border-0 p-3 p-md-4">
                 <h6 class="fw-bold border-bottom pb-3 mb-4"><i class="bi bi-chat-left-text text-primary me-2"></i>Conversation</h6>
                 
                 <!-- Comment thread -->
-                @if (ticketData?.TryGetProperty("comments", out var commentsElement) == true && commentsElement.ValueKind == JsonValueKind.Array)
+                @if (ticketData.HasValue && ticketData.Value.ValueKind == JsonValueKind.Object && ticketData.Value.TryGetProperty("comments", out var commentsElement) && commentsElement.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var comment in commentsElement.EnumerateArray())
                     {
-                        var userName = comment.TryGetProperty("user_name", out var un) ? un.GetString() : "User";
+                        if (comment.ValueKind != JsonValueKind.Object) continue;
+                        var userName = GetPropString(comment, "user_name", "UserName", "name");
+                        if (string.IsNullOrEmpty(userName)) userName = "User";
+                        var commentTime = GetPropString(comment, "created_at", "CreatedAt");
+                        var commentBody = GetPropString(comment, "comment_text", "comment", "CommentText", "Comment");
+
                         <div class="d-flex gap-3 mb-4">
-                            <div class="avatar-circle bg-primary text-white mt-1">@userName?[..2]</div>
+                            <div class="avatar-circle bg-primary text-white mt-1">@(userName.Length >= 2 ? userName[..2] : userName)</div>
                             <div class="flex-grow-1 bg-light p-3 rounded-3 border">
                                 <div class="d-flex justify-content-between mb-2">
                                     <span class="fw-bold small">@userName</span>
-                                    <span class="text-muted small">@comment.GetProperty("created_at").GetString()</span>
+                                    <span class="text-muted small">@commentTime</span>
                                 </div>
                                 <p class="mb-0 small text-dark" style="white-space: pre-wrap;">
-                                    @comment.GetProperty("comment_text").GetString()
+                                    @commentBody
                                 </p>
                             </div>
                         </div>
@@ -136,9 +161,24 @@ else
 
                 <!-- Add Comment Form -->
                 <div class="mt-4 border-top pt-4">
-                    <textarea class="form-control bg-light mb-3" rows="4" placeholder="Reply to this ticket..." @bind="newComment"></textarea>
-                    <div class="d-flex justify-content-end">
-                        <button class="btn btn-primary fw-semibold px-4" @onclick="PostComment">Post Reply</button>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold text-muted mb-0">Post an update or reply</label>
+                        <span class="small text-muted">@newComment.Length characters</span>
+                    </div>
+                    <textarea class="form-control bg-light mb-2" rows="4" placeholder="Reply to this ticket..." @bind="newComment" @bind:event="oninput"></textarea>
+                    
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <InputFile class="form-control form-control-sm" OnChange="HandleReplyFilesSelected" accept="image/*" multiple />
+                            @if (replyFiles.Count > 0)
+                            {
+                                <span class="badge bg-primary">@replyFiles.Count attachment(s)</span>
+                            }
+                        </div>
+                        <button class="btn btn-primary fw-semibold px-4" @onclick="PostComment" disabled="@isPostingComment">
+                            @if (isPostingComment) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            Post Reply
+                        </button>
                     </div>
                 </div>
             </div>
@@ -158,22 +198,19 @@ else
                 </div>
                 <div class="d-flex justify-content-between mb-2 small">
                     <span class="text-muted fw-semibold">Project</span>
-                    <span class="fw-bold">@(ticketData?.TryGetProperty("project_name", out var pn) == true ? pn.GetString() : "—")</span>
+                    <span class="fw-bold">@projectName</span>
                 </div>
-                @{
-                    var tMod = ticketData?.TryGetProperty("module_name", out var mn) == true ? mn.GetString() : null;
-                    if (!string.IsNullOrEmpty(tMod))
-                    {
-                        <div class="d-flex justify-content-between mb-2 small">
-                            <span class="text-muted fw-semibold">Module / Dept</span>
-                            <span class="badge bg-light text-primary border"><i class="bi bi-diagram-3 me-1"></i>@tMod</span>
-                        </div>
-                    }
+                @if (!string.IsNullOrEmpty(headerMod))
+                {
+                    <div class="d-flex justify-content-between mb-2 small">
+                        <span class="text-muted fw-semibold">Module / Dept</span>
+                        <span class="badge bg-light text-primary border"><i class="bi bi-diagram-3 me-1"></i>@headerMod</span>
+                    </div>
                 }
                 <div class="d-flex justify-content-between align-items-center mb-2 small">
                     <span class="text-muted fw-semibold">Assigned PM</span>
                     <div class="d-flex align-items-center gap-1">
-                        <span class="fw-bold text-primary">@(ticketData?.TryGetProperty("assigned_to_name", out var atn) == true ? atn.GetString() : "Unassigned")</span>
+                        <span class="fw-bold text-primary">@assignedToName</span>
                         <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager">
                             <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted" @onclick="() => showReassignPm = !showReassignPm" title="Reassign PM">
                                 <i class="bi bi-pencil-square"></i>
@@ -191,9 +228,10 @@ else
                                 <option value="">-- Choose Member --</option>
                                 @foreach (var m in teamMembers)
                                 {
-                                    var uid = m.TryGetProperty("user_id", out var up) ? up.GetString() : "";
-                                    var unm = m.TryGetProperty("full_name", out var unp) ? unp.GetString() : "";
-                                    var urole = m.TryGetProperty("role", out var urp) ? urp.GetString() : "";
+                                    var uid = GetPropString(m, "user_id", "id", "UserId");
+                                    var unm = GetPropString(m, "full_name", "name", "FullName", "Name");
+                                    if (string.IsNullOrEmpty(unm)) unm = GetPropString(m, "username", "userName", "email");
+                                    var urole = GetPropString(m, "role", "Role");
                                     <option value="@uid">@unm (@urole)</option>
                                 }
                             </select>
@@ -206,11 +244,8 @@ else
 
                 <div class="d-flex justify-content-between mb-2 small">
                     <span class="text-muted fw-semibold">Reporter</span>
-                    <span class="fw-bold">@(ticketData?.TryGetProperty("created_by_name", out var cbn) == true ? cbn.GetString() : "—")</span>
+                    <span class="fw-bold">@createdByName</span>
                 </div>
-                @{
-                    var prog = ticketData?.TryGetProperty("progress_percent", out var prg) == true ? (prg.ValueKind == JsonValueKind.Number ? prg.GetDecimal() : 0) : 0;
-                }
                 <div class="mt-3 pt-2 border-top">
                     <div class="d-flex justify-content-between align-items-center mb-1 small">
                         <span class="text-muted fw-semibold">Resolution Progress</span>
@@ -221,10 +256,6 @@ else
                     </div>
                 </div>
 
-                @{
-                    var slaDue = ticketData?.TryGetProperty("sla_due_at", out var slaEl) == true ? slaEl.GetString() : null;
-                    bool slaBreached = !string.IsNullOrEmpty(slaDue) && DateTime.TryParse(slaDue, out var slaDate) && slaDate < DateTime.Now;
-                }
                 @if (!string.IsNullOrEmpty(slaDue))
                 {
                     <div class="d-flex justify-content-between mt-3 mb-2 small border-top pt-2">
@@ -234,12 +265,12 @@ else
                 }
             </div>
 
-            <div class="custom-card border-0 p-4">
+            <div class="custom-card border-0 p-3 p-md-4">
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                     <h6 class="fw-bold mb-0">Linked Tasks</h6>
                     <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager">
                         <Authorized>
-                            <button class="btn btn-sm btn-light border text-primary" @onclick="ToggleTaskForm"><i class="bi @(isAssignTaskMode ? "bi-x-lg" : "bi-plus")"></i></button>
+                            <button type="button" class="btn btn-sm btn-light border text-primary" @onclick="ToggleTaskForm" title="Assign New Task"><i class="bi @(isAssignTaskMode ? "bi-x-lg" : "bi-plus")"></i></button>
                         </Authorized>
                     </AuthorizeView>
                 </div>
@@ -259,8 +290,11 @@ else
                                     <option value="">-- Select Member --</option>
                                     @foreach(var member in teamMembers)
                                     {
-                                        var mRole = member.TryGetProperty("role", out var mr) ? mr.GetString() : "";
-                                        <option value="@member.GetProperty("user_id").GetString()">@member.GetProperty("full_name").GetString() (@mRole)</option>
+                                        var mUid = GetPropString(member, "user_id", "id", "UserId");
+                                        var mName = GetPropString(member, "full_name", "name", "FullName", "Name");
+                                        if (string.IsNullOrEmpty(mName)) mName = GetPropString(member, "username", "userName", "email");
+                                        var mRole = GetPropString(member, "role", "Role");
+                                        <option value="@mUid">@mName (@mRole)</option>
                                     }
                                 </select>
                             </div>
@@ -273,21 +307,26 @@ else
                     </div>
                 }
                 
-                @if (ticketData?.TryGetProperty("tasks", out var tasksElement) == true && tasksElement.ValueKind == JsonValueKind.Array)
+                @if (ticketData.HasValue && ticketData.Value.ValueKind == JsonValueKind.Object && ticketData.Value.TryGetProperty("tasks", out var tasksElement) && tasksElement.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var task in tasksElement.EnumerateArray())
                     {
-                        var tStat = task.TryGetProperty("status", out var tsp) ? tsp.GetString() : "TODO";
-                        var tAssignee = task.TryGetProperty("assigned_to_name", out var tap) ? tap.GetString() : "Unassigned";
+                        if (task.ValueKind != JsonValueKind.Object) continue;
+                        var tId = GetPropString(task, "task_id", "TaskId", "id");
+                        var tName = GetPropString(task, "name", "Name", "title");
+                        var tStat = GetPropString(task, "status", "Status");
+                        if (string.IsNullOrEmpty(tStat)) tStat = "TODO";
+                        var tAssignee = GetPropString(task, "assigned_to_name", "AssignedToName");
+                        if (string.IsNullOrEmpty(tAssignee)) tAssignee = "Unassigned";
                         var statColor = tStat is "COMPLETED" or "APPROVED" ? "bg-success" : tStat == "IN_PROGRESS" ? "bg-primary" : "bg-secondary";
 
                         <div class="card shadow-sm border-0 mb-3 border-start border-4 @(tStat == "COMPLETED" ? "border-success" : "border-primary") bg-light">
                             <div class="card-body p-3">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <span class="badge bg-white text-dark border small">@task.GetProperty("task_id").GetString()</span>
+                                    <span class="badge bg-white text-dark border small">@tId</span>
                                     <span class="badge @statColor rounded-pill small">@tStat</span>
                                 </div>
-                                <a href="/task/@task.GetProperty("task_id").GetString()" class="text-decoration-none fw-semibold text-dark small d-block mb-1">@task.GetProperty("name").GetString()</a>
+                                <a href="/task/@tId" class="text-decoration-none fw-semibold text-dark small d-block mb-1">@tName</a>
                                 <div class="small text-muted" style="font-size:0.75rem;"><i class="bi bi-person me-1"></i>@tAssignee</div>
                             </div>
                         </div>
@@ -316,6 +355,8 @@ else
 
     private bool isLoading = true;
     private string newComment = "";
+    private bool isPostingComment = false;
+    private List<AttachmentModel> replyFiles = new();
 
     private bool isAssignTaskMode = false;
     private bool isSubmittingTask = false;
@@ -330,30 +371,116 @@ else
     private string userId = "";
     private string role = "";
 
+    private static string GetPropString(JsonElement? el, params string[] propertyNames)
+    {
+        if (!el.HasValue || el.Value.ValueKind != JsonValueKind.Object) return "";
+        foreach (var p in propertyNames)
+        {
+            if (el.Value.TryGetProperty(p, out var val))
+            {
+                if (val.ValueKind == JsonValueKind.String) return val.GetString() ?? "";
+                if (val.ValueKind == JsonValueKind.Number) return val.ToString();
+                if (val.ValueKind == JsonValueKind.True) return "true";
+                if (val.ValueKind == JsonValueKind.False) return "false";
+            }
+        }
+        return "";
+    }
+
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                ExtractItems(item, onObject);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
         await LoadTeamMembers();
     }
 
-    private void ToggleTaskForm() => isAssignTaskMode = !isAssignTaskMode;
+    private async Task ToggleTaskForm()
+    {
+        isAssignTaskMode = !isAssignTaskMode;
+        if (isAssignTaskMode && teamMembers.Count == 0)
+        {
+            await LoadTeamMembers();
+        }
+        StateHasChanged();
+    }
 
     private async Task LoadTeamMembers()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        if (authState.User.Identity?.IsAuthenticated == true && (role == "SuperAdmin" || role == "MD" || role == "SupportManager" || role == "ProjectManager"))
+        if (authState.User.Identity?.IsAuthenticated == true)
         {
+            if (string.IsNullOrEmpty(role))
+            {
+                role = authState.User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+                tenantId = authState.User.FindFirst("TenantId")?.Value ?? authState.User.FindFirst("tenant_id")?.Value ?? "";
+                userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? authState.User.FindFirst("nameid")?.Value ?? "";
+            }
+
+            teamMembers.Clear();
+
+            // 1. Try GET_TEAM_MEMBERS
             var payload = new APIDataAccParms { ComCod = tenantId, ProcID = "GET_TEAM_MEMBERS", parm04 = userId, parm05 = role };
             var result = await BackendApi.FetchDataAsync(payload);
             
             if (result.HasValue)
             {
-                try {
-                    teamMembers.Clear();
-                    if (result.Value.ValueKind == JsonValueKind.Array)
-                        foreach (var el in result.Value.EnumerateArray()) teamMembers.Add(el);
-                    else if(result.Value.TryGetProperty("user_id", out _)) teamMembers.Add(result.Value);
-                } catch { }
+                ExtractItems(result.Value, el =>
+                {
+                    if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        var uid = GetPropString(el, "user_id", "id", "UserId");
+                        if (!string.IsNullOrEmpty(uid) && !teamMembers.Any(m => GetPropString(m, "user_id", "id", "UserId") == uid))
+                        {
+                            teamMembers.Add(el);
+                        }
+                    }
+                });
+            }
+
+            // 2. If empty, fallback to GET_USERS
+            if (teamMembers.Count == 0)
+            {
+                var usersPayload = new APIDataAccParms { ProcName = "sp_ticket_operations", ProcID = "GET_USERS", parm04 = userId, parm05 = role, ComCod = tenantId };
+                var usersResult = await BackendApi.FetchDataAsync(usersPayload);
+                if (usersResult.HasValue)
+                {
+                    ExtractItems(usersResult.Value, el =>
+                    {
+                        if (el.ValueKind == JsonValueKind.Object)
+                        {
+                            var uid = GetPropString(el, "user_id", "id", "UserId");
+                            if (!string.IsNullOrEmpty(uid) && !teamMembers.Any(m => GetPropString(m, "user_id", "id", "UserId") == uid))
+                            {
+                                teamMembers.Add(el);
+                            }
+                        }
+                    });
+                }
             }
         }
     }
@@ -394,12 +521,23 @@ else
         };
         
         var result = await BackendApi.FetchDataAsync(payload);
-        if (result.HasValue && result.Value.TryGetProperty("success", out var success) && success.GetBoolean())
+        bool isCommentSuccess = false;
+        if (result.HasValue && result.Value.TryGetProperty("success", out var success))
+        {
+            isCommentSuccess = success.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.Number => success.GetInt64() != 0,
+                JsonValueKind.String => success.GetString() == "1" || string.Equals(success.GetString(), "true", StringComparison.OrdinalIgnoreCase),
+                _ => false
+            };
+        }
+        if (isCommentSuccess)
         {
             newTaskName = "";
             newTaskAssignee = "";
             isAssignTaskMode = false;
-            await LoadData(); // Reload tasks safely
+            await LoadData();
         }
         isSubmittingTask = false;
     }
@@ -412,8 +550,8 @@ else
         if (user.Identity?.IsAuthenticated == true)
         {
             role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
-            tenantId = user.FindFirst("TenantId")?.Value ?? "";
-            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+            tenantId = user.FindFirst("TenantId")?.Value ?? user.FindFirst("tenant_id")?.Value ?? "";
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("nameid")?.Value ?? "";
 
             var payload = new APIDataAccParms 
             { 
@@ -425,10 +563,34 @@ else
             };
             
             var result = await BackendApi.FetchDataAsync(payload);
+            ticketData = null;
             
-            if (result.HasValue && result.Value.TryGetProperty("ticket_number", out _))
+            if (result.HasValue)
             {
-                ticketData = result.Value;
+                ExtractItems(result.Value, el =>
+                {
+                    if (el.ValueKind == JsonValueKind.Object && !string.IsNullOrEmpty(GetPropString(el, "ticket_number", "TicketNumber")))
+                    {
+                        ticketData = el;
+                    }
+                });
+            }
+
+            // Fallback to GET_TICKETS if GET_TICKET_DETAILS didn't match ticket_number
+            if (ticketData == null)
+            {
+                var tPayload = new APIDataAccParms { ComCod = tenantId, ProcID = "GET_TICKETS", parm04 = userId, parm05 = role };
+                var tRes = await BackendApi.FetchDataAsync(tPayload);
+                if (tRes.HasValue)
+                {
+                    ExtractItems(tRes.Value, el =>
+                    {
+                        if (el.ValueKind == JsonValueKind.Object && GetPropString(el, "ticket_number", "TicketNumber") == TicketNumber)
+                        {
+                            ticketData = el;
+                        }
+                    });
+                }
             }
 
             // Load Attachments Safely
@@ -438,25 +600,23 @@ else
                 attachments.Clear();
                 classAttachments.Clear();
                 if (r.HasValue) {
-                    if (r.Value.ValueKind == JsonValueKind.Array) {
-                        foreach(var el in r.Value.EnumerateArray()) {
-                            classAttachments.Add(new AttachmentModel{
-                                fileId = el.TryGetProperty("file_id", out var a)?a.GetString()??"" : "",
-                                fileName = el.TryGetProperty("file_name", out var bn)?bn.GetString()??"" : "",
-                                mimeType = el.TryGetProperty("mime_type", out var cn)?cn.GetString()??"" : "",
-                                base64Data = el.TryGetProperty("base64_data", out var dn)?dn.GetString()??"" : ""
-                            });
-                            attachments.Add(el);
+                    ExtractItems(r.Value, el =>
+                    {
+                        if (el.ValueKind == JsonValueKind.Object)
+                        {
+                            var fId = GetPropString(el, "file_id", "id");
+                            if (!string.IsNullOrEmpty(fId) || !string.IsNullOrEmpty(GetPropString(el, "file_name", "name")))
+                            {
+                                classAttachments.Add(new AttachmentModel{
+                                    fileId = fId,
+                                    fileName = GetPropString(el, "file_name", "name"),
+                                    mimeType = GetPropString(el, "mime_type", "type"),
+                                    base64Data = GetPropString(el, "base64_data", "data")
+                                });
+                                attachments.Add(el);
+                            }
                         }
-                    } else if (r.Value.TryGetProperty("file_id", out var fpId)) {
-                        classAttachments.Add(new AttachmentModel{
-                                fileId = fpId.GetString()??"",
-                                fileName = r.Value.TryGetProperty("file_name", out var bn)?bn.GetString()??"" : "",
-                                mimeType = r.Value.TryGetProperty("mime_type", out var cn)?cn.GetString()??"" : "",
-                                base64Data = r.Value.TryGetProperty("base64_data", out var dn)?dn.GetString()??"" : ""
-                            });
-                        attachments.Add(r.Value);
-                    }
+                    });
                 }
             } catch {}
         }
@@ -464,25 +624,84 @@ else
         isLoading = false;
     }
 
+    private async Task HandleReplyFilesSelected(InputFileChangeEventArgs e)
+    {
+        var files = e.GetMultipleFiles(5);
+        foreach (var file in files)
+        {
+            if (file.Size <= 1024 * 1024 * 5)
+            {
+                using var stream = file.OpenReadStream(1024 * 1024 * 5);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                replyFiles.Add(new AttachmentModel
+                {
+                    fileId = Guid.NewGuid().ToString(),
+                    fileName = file.Name,
+                    mimeType = file.ContentType,
+                    base64Data = Convert.ToBase64String(ms.ToArray())
+                });
+            }
+        }
+    }
+
     private async Task PostComment()
     {
-        if (string.IsNullOrWhiteSpace(newComment)) return;
+        if (string.IsNullOrWhiteSpace(newComment) && replyFiles.Count == 0) return;
 
-        var payload = new APIDataAccParms 
-        { 
-            ComCod = tenantId,
-            ProcID = "ADD_COMMENT",
-            parm04 = userId,
-            parm05 = role,
-            parm01 = TicketNumber,
-            parm02 = newComment
-        };
-        
-        var result = await BackendApi.FetchDataAsync(payload);
-        if (result.HasValue && result.Value.TryGetProperty("success", out var success) && success.GetBoolean())
+        isPostingComment = true;
+        try
         {
+            if (!string.IsNullOrWhiteSpace(newComment))
+            {
+                var payload = new APIDataAccParms 
+                { 
+                    ComCod = tenantId,
+                    ProcID = "ADD_COMMENT",
+                    parm04 = userId,
+                    parm05 = role,
+                    parm01 = TicketNumber,
+                    parm02 = newComment.Length > 255 ? newComment.Substring(0, 255) : newComment,
+                    parm06 = newComment
+                };
+                
+                await BackendApi.FetchDataAsync(payload);
+            }
+
+            // Upload any attachments attached to reply
+            foreach (var rf in replyFiles)
+            {
+                try
+                {
+                    var filePayload = new APIDataAccParms
+                    {
+                        ComCod = tenantId,
+                        ProcID = "UPLOAD_FILE",
+                        ProcName = "support.sp_ticket_files",
+                        parm01 = TicketNumber,
+                        parm02 = rf.fileName,
+                        parm03 = rf.mimeType,
+                        parm04 = userId,
+                        parm05 = role,
+                        parm06 = rf.base64Data,
+                        parmJson1 = rf.base64Data
+                    };
+                    await BackendApi.FetchDataAsync(filePayload);
+                }
+                catch { }
+            }
+
             newComment = "";
+            replyFiles.Clear();
             await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Post comment error: " + ex.Message);
+        }
+        finally
+        {
+            isPostingComment = false;
         }
     }
 

@@ -13,14 +13,14 @@
 <div class="row g-4">
     <!-- User Profile Header Card -->
     <div class="col-12">
-        <div class="custom-card p-4 border-0 shadow-sm bg-primary text-white position-relative overflow-hidden">
-            <div class="d-flex align-items-center gap-4 position-relative" style="z-index: 2;">
+        <div class="custom-card p-3 p-md-4 border-0 shadow-sm bg-primary text-white position-relative overflow-hidden">
+            <div class="d-flex flex-column flex-sm-row align-items-center text-center text-sm-start gap-3 gap-md-4 position-relative" style="z-index: 2;">
                 <div class="avatar-circle-lg bg-white text-primary fw-bold display-6 rounded-circle d-flex align-items-center justify-content-center" style="width: 70px; height: 70px;">
                     @(string.IsNullOrEmpty(fullName) ? "U" : fullName.Substring(0, 1).ToUpper())
                 </div>
                 <div>
                     <h3 class="fw-bold mb-1">@fullName</h3>
-                    <div class="d-flex align-items-center gap-2 opacity-75">
+                    <div class="d-flex flex-wrap justify-content-center justify-content-sm-start align-items-center gap-2 opacity-75 small">
                         <span><i class="bi bi-person-badge me-1"></i> User ID: <strong>@userId</strong></span>
                         <span>•</span>
                         <span><i class="bi bi-shield-check me-1"></i> Role: <strong>@role</strong></span>
@@ -34,7 +34,7 @@
 
     <!-- Edit Profile & Password Form -->
     <div class="col-lg-7">
-        <div class="custom-card p-4 h-100 shadow-sm border-0">
+        <div class="custom-card p-3 p-md-4 h-100 shadow-sm border-0">
             <h5 class="fw-bold mb-4 text-primary border-bottom pb-3">
                 <i class="bi bi-person-gear me-2"></i> Account Information & Security
             </h5>
@@ -84,7 +84,7 @@
 
     <!-- Mobile App QR Linking & 2FA -->
     <div class="col-lg-5">
-        <div class="custom-card p-4 h-100 shadow-sm border-0">
+        <div class="custom-card p-3 p-md-4 h-100 shadow-sm border-0">
             <h5 class="fw-bold mb-3 text-primary border-bottom pb-3">
                 <i class="bi bi-qr-code-scan me-2"></i> Mobile App & QR Binding
             </h5>
@@ -119,7 +119,7 @@
 
     <!-- My Managed & Assigned Projects Card -->
     <div class="col-12">
-        <div class="custom-card p-4 shadow-sm border-0">
+        <div class="custom-card p-3 p-md-4 shadow-sm border-0">
             <h5 class="fw-bold mb-3 text-primary border-bottom pb-3">
                 <i class="bi bi-kanban me-2"></i> My Managed & Assigned Projects
             </h5>
@@ -136,7 +136,7 @@
                         var pName = proj.TryGetProperty("name", out var n) ? n.GetString() : "";
                         var tName = proj.TryGetProperty("tenant_name", out var tn) ? tn.GetString() : "Internal";
                         var pmName = proj.TryGetProperty("pm_name", out var pm) ? pm.GetString() : "";
-                        <div class="col-md-4">
+                        <div class="col-12 col-sm-6 col-md-4">
                             <div class="border rounded p-3 bg-light">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <span class="badge bg-primary">@pCode</span>
@@ -194,8 +194,39 @@
 
             if (string.IsNullOrEmpty(fullName)) fullName = username;
 
+            await LoadTenantName();
             await LoadMyProjects();
         }
+    }
+
+    private async Task LoadTenantName()
+    {
+        if (string.IsNullOrEmpty(tenantId) || tenantId == "00000000-0000-0000-0000-000000000000")
+        {
+            tenantName = "Global / Internal System";
+            return;
+        }
+
+        try
+        {
+            var p = new APIDataAccParms { ProcID = "GET_TENANTS" };
+            var res = await BackendApi.FetchDataAsync(p);
+            if (res.HasValue && res.Value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var el in res.Value.EnumerateArray())
+                {
+                    if (el.TryGetProperty("tenant_id", out var tid) && tid.GetString() == tenantId)
+                    {
+                        if (el.TryGetProperty("name", out var tname) && !string.IsNullOrEmpty(tname.GetString()))
+                        {
+                            tenantName = tname.GetString()!;
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        catch {}
     }
 
     private async Task LoadMyProjects()
@@ -220,6 +251,14 @@
                 else if (result.Value.TryGetProperty("project_id", out _))
                 {
                     myProjects.Add(result.Value);
+                }
+
+                if (role == "ProjectManager")
+                {
+                    myProjects = myProjects.Where(p => {
+                        var pm = p.TryGetProperty("pm_name", out var pmp) ? pmp.GetString() : "";
+                        return !string.IsNullOrEmpty(pm) && (pm.Equals(fullName, StringComparison.OrdinalIgnoreCase) || pm.Equals(username, StringComparison.OrdinalIgnoreCase));
+                    }).ToList();
                 }
             } catch { }
         }
@@ -248,8 +287,9 @@
                 parm01 = userId,
                 parm02 = fullName,
                 parm03 = role,
-                parm04 = string.IsNullOrEmpty(newPassword) ? "" : newPassword,
-                parm05 = tenantId
+                parm04 = "",
+                parm05 = tenantId,
+                parm06 = string.IsNullOrEmpty(newPassword) ? "" : newPassword
             };
 
             var res = await BackendApi.FetchDataAsync(payload);

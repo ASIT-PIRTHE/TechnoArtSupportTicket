@@ -14,105 +14,165 @@ build_property.EnforceExtendedAnalyzerRules =
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = TechnoArtSupportTicketFrontEnd
 build_property.RootNamespace = TechnoArtSupportTicketFrontEnd
-build_property.ProjectDir = D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\
+build_property.ProjectDir = D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 9.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd
+build_property.MSBuildProjectDirectory = D:\Ticket\TechnoArtSupportTicket\TechnoArtSupportTicket\TechnoArtSupportTicketFrontEnd
 build_property._RazorSourceGeneratorDebug = 
 build_property.EffectiveAnalysisLevelStyle = 10.0
 build_property.EnableCodeStyleSeverity = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/App.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/App.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBcHAucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/AllTickets.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Layout/EmptyLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcRW1wdHlMYXlvdXQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/AllTickets.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBbGxUaWNrZXRzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Clients.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/AppointmentLetter.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBcHBvaW50bWVudExldHRlci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/AppointmentLetter.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXEFwcG9pbnRtZW50TGV0dGVyLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/AttendanceApprovals.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXEF0dGVuZGFuY2VBcHByb3ZhbHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/AttendanceReports.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXEF0dGVuZGFuY2VSZXBvcnRzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/Branches.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXEJyYW5jaGVzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/EmployeeIdCard.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXEVtcGxveWVlSWRDYXJkLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/Leaves.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXExlYXZlcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/Notices.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXE5vdGljZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/OfficeTime.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXE9mZmljZVRpbWUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/Permissions.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXFBlcm1pc3Npb25zLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Attendance/Terminal.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdHRlbmRhbmNlXFRlcm1pbmFsLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Clients.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDbGllbnRzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Counter.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Counter.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb3VudGVyLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Employees.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/EmployeeIdCard.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xFbXBsb3llZUlkQ2FyZC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Employees.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xFbXBsb3llZXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Error.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Error.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xFcnJvci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Home.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Home.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xIb21lLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Login.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Login.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xMb2dpbi5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/MyTasks.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/MyTasks.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNeVRhc2tzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/MyTickets.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/MyTickets.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xNeVRpY2tldHMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Projects.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Profile.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9maWxlLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Projects.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9qZWN0cy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/RaiseTicket.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/RaiseTicket.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xSYWlzZVRpY2tldC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Reports.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Reports.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xSZXBvcnRzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Settings.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Settings.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTZXR0aW5ncy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/TaskDetails.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/TaskDetails.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUYXNrRGV0YWlscy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/TeamWorkload.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/TeamWorkload.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUZWFtV29ya2xvYWQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/TicketDetails.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/TicketDetails.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUaWNrZXREZXRhaWxzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Weather.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/Weather.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXZWF0aGVyLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/RedirectToLogin.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Pages/_Imports.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xfSW1wb3J0cy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/RedirectToLogin.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xSZWRpcmVjdFRvTG9naW4ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Routes.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Routes.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xSb3V0ZXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/_Imports.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/_Imports.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xfSW1wb3J0cy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Layout/MainLayout.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Layout/MainLayout.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTWFpbkxheW91dC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = b-9gtdl757vh
 
-[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Layout/NavMenu.razor]
+[D:/Ticket/TechnoArtSupportTicket/TechnoArtSupportTicket/TechnoArtSupportTicketFrontEnd/Components/Layout/NavMenu.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTmF2TWVudS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = b-m0a2amltz7

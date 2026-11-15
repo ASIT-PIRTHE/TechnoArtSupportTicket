@@ -25,6 +25,11 @@ namespace TechnoArtSupportTicketFrontEnd.Services
         public string parm08 { get; set; } = "";
         public string parm09 { get; set; } = "";
         public string parm10 { get; set; } = "";
+        public string Desc01 { get; set; } = "";
+        public string Desc02 { get; set; } = "";
+        public string Desc03 { get; set; } = "";
+        public string Desc04 { get; set; } = "";
+        public string Desc05 { get; set; } = "";
     }
 
     public class ApiService
@@ -41,16 +46,32 @@ namespace TechnoArtSupportTicketFrontEnd.Services
             _localStorage = localStorage;
         }
 
+        public void SetToken(string? token)
+        {
+            _cachedToken = token;
+        }
+
+        public void ClearToken()
+        {
+            _cachedToken = null;
+        }
+
         public async Task<JsonElement?> FetchDataAsync(APIDataAccParms requestParams)
         {
             try
             {
                 // 1. JWT Implementation - attach token to header
-                if (!_tokenLoaded)
+                if (string.IsNullOrWhiteSpace(_cachedToken))
                 {
-                    var tokenResult = await _localStorage.GetAsync<string>("userToken");
-                    if (tokenResult.Success) _cachedToken = tokenResult.Value;
-                    _tokenLoaded = true;
+                    try
+                    {
+                        var tokenResult = await _localStorage.GetAsync<string>("userToken");
+                        if (tokenResult.Success && !string.IsNullOrWhiteSpace(tokenResult.Value))
+                        {
+                            _cachedToken = tokenResult.Value;
+                        }
+                    }
+                    catch { }
                 }
                 
                 // 2. Prepare payload (Base64 encoded JSON string exactly as API expects)
@@ -58,7 +79,7 @@ namespace TechnoArtSupportTicketFrontEnd.Services
                 var base64Request = Convert.ToBase64String(Encoding.UTF8.GetBytes(jsonRequest));
 
                 // 3. Post to specific API endpoint using HttpRequestMessage to prevent concurrent header issues
-                var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/api/dbAsyncRequest")
+                var requestMessage = new HttpRequestMessage(HttpMethod.Post, "api/dbAsyncRequest")
                 {
                     Content = JsonContent.Create(base64Request)
                 };
@@ -73,16 +94,38 @@ namespace TechnoArtSupportTicketFrontEnd.Services
                 if (!response.IsSuccessStatusCode)
                 {
                     var errContent = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"API Error: {response.StatusCode} - {errContent}");
+                    Console.WriteLine($"[API Error {response.StatusCode}]: {errContent}");
+                    
+                    string serverDetail = "";
                     try
                     {
                         using var errDoc = JsonDocument.Parse(errContent);
-                        return errDoc.RootElement.Clone();
+                        var rootErr = errDoc.RootElement;
+                        if (rootErr.TryGetProperty("detail", out var dt) && !string.IsNullOrEmpty(dt.GetString()))
+                            serverDetail = dt.GetString()!;
+                        else if (rootErr.TryGetProperty("title", out var tt) && !string.IsNullOrEmpty(tt.GetString()))
+                            serverDetail = tt.GetString()!;
+                        else if (rootErr.TryGetProperty("error", out var er) && !string.IsNullOrEmpty(er.GetString()))
+                            serverDetail = er.GetString()!;
+                        else if (rootErr.TryGetProperty("message", out var msg) && !string.IsNullOrEmpty(msg.GetString()))
+                            serverDetail = msg.GetString()!;
+                        else
+                            serverDetail = errContent;
                     }
                     catch
                     {
-                        return null;
+                        serverDetail = string.IsNullOrWhiteSpace(errContent) ? response.ReasonPhrase ?? "Internal Server Error" : errContent;
                     }
+
+                    // Return normalized error object with explicit "error" message so frontend surfaces it directly
+                    var normalizedError = JsonSerializer.Serialize(new
+                    {
+                        success = false,
+                        error = $"Live API Server Error ({response.StatusCode}): {serverDetail}",
+                        status = (int)response.StatusCode
+                    });
+                    using var normalizedDoc = JsonDocument.Parse(normalizedError);
+                    return normalizedDoc.RootElement.Clone();
                 }
 
                 // 4. Read response
@@ -91,32 +134,210 @@ namespace TechnoArtSupportTicketFrontEnd.Services
 
                 // 5. Decompress
                 var decompressedJson = DecompressString(compressedResponseStr);
-                
-                // 6. Parse and extract directly
-                using var document = JsonDocument.Parse(decompressedJson);
-                var root = document.RootElement;
-                
-                // Allow fallback if backend is accidentally rendering legacy dataset still
-                if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("Table", out var tableArray) && tableArray.GetArrayLength() > 0)
+                if (string.IsNullOrWhiteSpace(decompressedJson))
                 {
-                    var firstRow = tableArray[0];
-                    if (firstRow.TryGetProperty("result_json", out var resultJsonStr))
+                    return null;
+                }
+
+                // 6. Parse and extract defensively
+                var jsonOptions = new JsonDocumentOptions
+                {
+                    AllowTrailingCommas = true,
+                    CommentHandling = JsonCommentHandling.Skip
+                };
+
+                JsonDocument? document = null;
+                try
+                {
+                    document = JsonDocument.Parse(decompressedJson, jsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    Console.WriteLine($"[ApiService] Warning: Direct JsonDocument.Parse failed at byte {ex.BytePositionInLine}: {ex.Message}");
+
+                    // Defensive repair for chunked or split JSON strings
+                    var sanitized = decompressedJson.Trim();
+
+                    // If double commas exist due to SQL row splitting: ",," -> ","
+                    if (sanitized.Contains(",,"))
                     {
-                        var parsedString = resultJsonStr.GetString();
-                        if (parsedString != null)
-                             return JsonDocument.Parse(parsedString).RootElement.Clone();
-                        return resultJsonStr.Clone();
+                        sanitized = sanitized.Replace(",,", ",");
+                    }
+
+                    // If starts with comma
+                    if (sanitized.StartsWith(","))
+                    {
+                        sanitized = sanitized.TrimStart(',', ' ', '\r', '\n', '\t');
+                    }
+
+                    // If it is enclosed in an extra set of escaped quotes
+                    if (sanitized.StartsWith("\"") && sanitized.EndsWith("\"") && sanitized.Length > 2)
+                    {
+                        try
+                        {
+                            sanitized = JsonSerializer.Deserialize<string>(sanitized) ?? sanitized;
+                        }
+                        catch { }
+                    }
+
+                    try
+                    {
+                        document = JsonDocument.Parse(sanitized, jsonOptions);
+                    }
+                    catch (Exception ex2)
+                    {
+                        Console.WriteLine($"[ApiService] Sanitized parse attempt failed: {ex2.Message}");
                     }
                 }
-                
-                // Otherwise natively process the Dapper PostgreSQL output
-                return root.Clone();
+
+                if (document == null)
+                {
+                    Console.WriteLine($"[ApiService] Unable to parse response JSON: {decompressedJson.Substring(0, Math.Min(300, decompressedJson.Length))}");
+                    return null;
+                }
+
+                using (document)
+                {
+                    var root = document.RootElement;
+                    return ExtractData(root).Clone();
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Exception in FetchDataAsync: {ex.Message}");
                 return null;
             }
+        }
+
+        private JsonElement ExtractData(JsonElement root)
+        {
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                return UnwrapJsonChunks(root);
+            }
+
+            if (root.ValueKind == JsonValueKind.String)
+            {
+                var s = root.GetString()?.Trim();
+                if (!string.IsNullOrEmpty(s) && ((s.StartsWith("[") && s.EndsWith("]")) || (s.StartsWith("{") && s.EndsWith("}"))))
+                {
+                    try
+                    {
+                        var doc = JsonDocument.Parse(s);
+                        return ExtractData(doc.RootElement.Clone());
+                    }
+                    catch { }
+                }
+                return root;
+            }
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                // Check if root has a direct result_json string property
+                if (root.TryGetProperty("result_json", out var rj) && rj.ValueKind == JsonValueKind.String)
+                {
+                    var s = rj.GetString()?.Trim();
+                    if (!string.IsNullOrEmpty(s))
+                    {
+                        try
+                        {
+                            var doc = JsonDocument.Parse(s);
+                            return ExtractData(doc.RootElement.Clone());
+                        }
+                        catch { }
+                    }
+                }
+
+                // Check for Table, Table1, table, or dataset envelope array properties
+                var envelopeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "Table", "Table1", "Table2", "Table3", "data", "items", "rows", "results"
+                };
+
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Value.ValueKind == JsonValueKind.Array && envelopeNames.Contains(prop.Name))
+                    {
+                        return UnwrapJsonChunks(prop.Value);
+                    }
+                }
+            }
+
+            return root;
+        }
+
+        private JsonElement UnwrapJsonChunks(JsonElement arr)
+        {
+            if (arr.ValueKind != JsonValueKind.Array || arr.GetArrayLength() == 0)
+            {
+                return arr;
+            }
+
+            var firstRow = arr[0];
+            if (firstRow.ValueKind == JsonValueKind.Object)
+            {
+                // Safely find JSON column name without throwing InvalidOperationException on default struct
+                string? jsonColName = null;
+                foreach (var prop in firstRow.EnumerateObject())
+                {
+                    if ((prop.Name.StartsWith("JSON_", StringComparison.OrdinalIgnoreCase) ||
+                         prop.Name.Equals("result_json", StringComparison.OrdinalIgnoreCase) ||
+                         prop.Name.Equals("Column1", StringComparison.OrdinalIgnoreCase)) &&
+                        prop.Value.ValueKind == JsonValueKind.String)
+                    {
+                        jsonColName = prop.Name;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(jsonColName))
+                {
+                    var sb = new StringBuilder();
+                    foreach (var row in arr.EnumerateArray())
+                    {
+                        if (row.ValueKind == JsonValueKind.Object &&
+                            row.TryGetProperty(jsonColName, out var chunk) &&
+                            chunk.ValueKind == JsonValueKind.String)
+                        {
+                            sb.Append(chunk.GetString());
+                        }
+                    }
+
+                    var combined = sb.ToString().Trim();
+                    if (!string.IsNullOrEmpty(combined) &&
+                        ((combined.StartsWith("[") && combined.EndsWith("]")) ||
+                         (combined.StartsWith("{") && combined.EndsWith("}"))))
+                    {
+                        try
+                        {
+                            var doc = JsonDocument.Parse(combined);
+                            return ExtractData(doc.RootElement.Clone());
+                        }
+                        catch { }
+                    }
+                }
+
+                // 2. Check if single column row contains embedded JSON
+                var objProps = firstRow.EnumerateObject().ToList();
+                if (objProps.Count == 1 && objProps[0].Value.ValueKind == JsonValueKind.String)
+                {
+                    var singleStr = objProps[0].Value.GetString()?.Trim();
+                    if (!string.IsNullOrEmpty(singleStr) &&
+                        ((singleStr.StartsWith("[") && singleStr.EndsWith("]")) ||
+                         (singleStr.StartsWith("{") && singleStr.EndsWith("}"))))
+                    {
+                        try
+                        {
+                            var doc = JsonDocument.Parse(singleStr);
+                            return ExtractData(doc.RootElement.Clone());
+                        }
+                        catch { }
+                    }
+                }
+            }
+
+            // 3. Regular data table array (e.g. [{"id": "1", "name": "Dhaka"}, ...])
+            return arr;
         }
 
         private string DecompressString(string compressedBase64)
@@ -128,7 +349,21 @@ namespace TechnoArtSupportTicketFrontEnd.Services
                 using var gs = new GZipStream(msi, CompressionMode.Decompress);
                 using var mso = new MemoryStream();
                 gs.CopyTo(mso);
-                return Encoding.Unicode.GetString(mso.ToArray());
+                var decompressedBytes = mso.ToArray();
+
+                string textUnicode = Encoding.Unicode.GetString(decompressedBytes);
+                if (textUnicode.TrimStart().StartsWith("{") || textUnicode.TrimStart().StartsWith("["))
+                {
+                    return textUnicode;
+                }
+
+                string textUtf8 = Encoding.UTF8.GetString(decompressedBytes);
+                if (textUtf8.TrimStart().StartsWith("{") || textUtf8.TrimStart().StartsWith("["))
+                {
+                    return textUtf8;
+                }
+
+                return textUnicode;
             }
             catch
             {

@@ -480,6 +480,15 @@ GO
                     await cmdFiles.ExecuteNonQueryAsync();
                 }
 
+                bool spAlreadyExists = false;
+                try
+                {
+                    using var checkCmd = new SqlCommand("SELECT 1 FROM sys.procedures WHERE name = 'SP_TICKET_OPERATIONS' AND schema_id = SCHEMA_ID('support')", conn);
+                    var obj = await checkCmd.ExecuteScalarAsync();
+                    if (obj != null) spAlreadyExists = true;
+                }
+                catch { }
+
                 string spSql = @"
 CREATE OR ALTER PROCEDURE support.SP_TICKET_OPERATIONS
     @p_ComCod  NVARCHAR(100)  = '',
@@ -1640,12 +1649,27 @@ BEGIN
     END CATCH
 END;
 ";
-                using (var cmdSp = new SqlCommand(spSql, conn))
+                if (!spAlreadyExists)
+                {
+                    using (var cmdSp = new SqlCommand(spSql, conn))
+                    {
+                        cmdSp.CommandTimeout = 60;
+                        await cmdSp.ExecuteNonQueryAsync();
+                    }
+                }
+                else
+                {
+                    diagnostics.Add("support.SP_TICKET_OPERATIONS already exists; preserved custom operations.");
+                }
+#if false
+                }
+
                 {
                     cmdSp.CommandTimeout = 60;
                     await cmdSp.ExecuteNonQueryAsync();
                 }
 
+#endif
                 return $"MSSQL Initialized successfully on [{targetDatabase}] using [{workingAuth}]. Schemas, tables, seed data, and SP_TICKET_OPERATIONS deployed. Diagnostics: {string.Join(" -> ", diagnostics)}";
             }
             catch (Exception ex)

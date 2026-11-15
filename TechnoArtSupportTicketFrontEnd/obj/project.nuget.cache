@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "XY3CzUTQ11M=",
+  "dgSpecHash": "lqCjJH2RBaE=",
   "success": true,
-  "projectFilePath": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\TechnoArtSupportTicketFrontEnd.csproj",
+  "projectFilePath": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\TechnoArtSupportTicketFrontEnd.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.aspnetcore.app.internal.assets\\10.0.8\\microsoft.aspnetcore.app.internal.assets.10.0.8.nupkg.sha512",
     "C:\\Users\\Administrator\\.nuget\\packages\\mudblazor\\9.11.0\\mudblazor.9.11.0.nupkg.sha512"

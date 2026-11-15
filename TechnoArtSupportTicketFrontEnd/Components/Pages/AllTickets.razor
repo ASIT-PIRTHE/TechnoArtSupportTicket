@@ -10,11 +10,11 @@
 
 <PageTitle>Ticket Queue</PageTitle>
 
-<div class="custom-card p-4 h-100">
+<div class="custom-card p-3 p-md-4 h-100" style="max-width: 100%; overflow-x: hidden;">
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 flex-wrap gap-2">
         <h5 class="fw-bold m-0"><i class="bi bi-inboxes text-primary me-2"></i> Queue Master — All Tickets</h5>
-        <div class="d-flex align-items-center gap-2">
-            <div class="input-group input-group-sm" style="width: 260px;">
+        <div class="d-flex align-items-center gap-2 w-100 w-sm-auto">
+            <div class="input-group input-group-sm w-100" style="max-width: 280px;">
                 <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
                 <input type="text" class="form-control" placeholder="Filter tickets..." @bind="filterText" @bind:event="oninput" />
                 @if (!string.IsNullOrEmpty(filterText))
@@ -32,9 +32,11 @@
     else
     {
         var displayList = FilteredTickets;
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
+        
+        <!-- Desktop & Tablet View: Full Data Table -->
+        <div class="table-responsive d-none d-md-block shadow-sm rounded-3 border">
+            <table class="table table-hover align-middle mb-0" style="min-width: 900px;">
+                <thead class="table-light text-nowrap">
                     <tr>
                         <th>Ticket</th>
                         <th>Subject</th>
@@ -107,6 +109,68 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Mobile View for Smart Phones (< 768px) -->
+        <div class="d-md-none mt-2">
+            @if (displayList.Count > 0)
+            {
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var t in displayList)
+                    {
+                        var priority = GetStringSafe(t, "priority", "MEDIUM");
+                        var pClass = priority == "CRITICAL" ? "bg-danger" : priority == "HIGH" ? "bg-warning text-dark" : "bg-primary";
+                        var status = GetStringSafe(t, "status", "NEW");
+                        var sClass = status == "NEW" ? "badge bg-info text-dark" : status == "OPEN" ? "badge bg-primary" : status == "IN_PROGRESS" ? "badge bg-warning text-dark" : status == "CLOSED" ? "badge bg-success" : "badge bg-secondary";
+                        var progress = GetDecimalSafe(t, "progress_percent", 0);
+                        var pmName = GetStringSafe(t, "assigned_to_name", "Unassigned");
+                        var dateStr = GetStringSafe(t, "created_at");
+                        var formattedDate = DateTime.TryParse(dateStr, out var d) ? d.ToString("yyyy-MMM-dd") : "";
+                        var createdByName = GetStringSafe(t, "created_by_name", "User");
+                        var tNum = GetStringSafe(t, "ticket_number", "N/A");
+                        var projName = GetStringSafe(t, "project_name", "Internal");
+                        var modName = GetStringSafe(t, "module_name", "");
+
+                        <div class="card border rounded-3 shadow-sm" style="cursor: pointer;" @onclick='() => NavigationManager.NavigateTo($"/ticket/{tNum}")'>
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="fw-bold font-monospace text-primary small">@tNum</span>
+                                    <div class="d-flex gap-1">
+                                        <span class="badge @pClass">@priority</span>
+                                        <span class="@sClass">@status</span>
+                                    </div>
+                                </div>
+                                <h6 class="fw-bold text-dark mb-2">@GetStringSafe(t, "subject", "No Subject")</h6>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2 text-muted small">
+                                    <span><i class="bi bi-folder me-1 text-primary"></i>@projName</span>
+                                    @if (!string.IsNullOrEmpty(modName))
+                                    {
+                                        <span class="badge bg-light text-primary border"><i class="bi bi-diagram-3 me-1"></i>@modName</span>
+                                    }
+                                    @if (pmName != "Unassigned")
+                                    {
+                                        <span class="badge bg-info-subtle text-dark border"><i class="bi bi-person me-1"></i>@pmName</span>
+                                    }
+                                </div>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <div class="progress flex-grow-1" style="height: 6px;">
+                                        <div class="progress-bar @(progress >= 100 ? "bg-success" : "bg-primary")" role="progressbar" style="width: @(progress)%"></div>
+                                    </div>
+                                    <span class="small text-muted fw-bold">@(((int)progress))%</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-2 border-top text-muted small">
+                                    <span><i class="bi bi-person me-1"></i>@createdByName</span>
+                                    <span><i class="bi bi-clock me-1"></i>@formattedDate</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-center text-muted p-4 bg-light rounded-3">No matching tickets found.</div>
+            }
+        </div>
     }
 </div>
 
@@ -120,40 +184,96 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!string.IsNullOrEmpty(QueryParam))
+        try
         {
-            filterText = QueryParam;
-        }
-
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-
-        if (user.Identity?.IsAuthenticated == true)
-        {
-            var role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
-            var tenantId = user.FindFirst("TenantId")?.Value ?? "";
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
-
-            var payload = new APIDataAccParms 
-            { 
-                ProcID = "GET_TICKETS",
-                ComCod = tenantId,
-                parm04 = userId,
-                parm05 = role
-            };
-            
-            var result = await BackendApi.FetchDataAsync(payload);
-            if (result.HasValue)
+            if (!string.IsNullOrEmpty(QueryParam))
             {
-                try {
-                    if (result.Value.ValueKind == JsonValueKind.Array)
-                        foreach (var el in result.Value.EnumerateArray()) ticketList.Add(el);
-                    else if(!result.Value.TryGetProperty("error", out _)) ticketList.Add(result.Value);
-                } catch {}
+                filterText = QueryParam;
+            }
+
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+                var tenantId = user.FindFirst("TenantId")?.Value ?? "";
+                var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+                var payload = new APIDataAccParms 
+                { 
+                    ProcID = "GET_TICKETS",
+                    ComCod = tenantId,
+                    parm04 = userId,
+                    parm05 = role
+                };
+                
+                var result = await BackendApi.FetchDataAsync(payload);
+                if (result.HasValue)
+                {
+                    ticketList.Clear();
+                    ExtractItems(result.Value, el =>
+                    {
+                        if (el.ValueKind == JsonValueKind.Object)
+                        {
+                            var num = GetStringSafe(el, "ticket_number");
+                            if (string.IsNullOrEmpty(num)) num = GetStringSafe(el, "id");
+                            if (!string.IsNullOrEmpty(num))
+                            {
+                                if (!ticketList.Any(x => GetStringSafe(x, "ticket_number") == num || GetStringSafe(x, "id") == num))
+                                {
+                                    ticketList.Add(el);
+                                }
+                            }
+                            else
+                            {
+                                ticketList.Add(el);
+                            }
+                        }
+                    });
+                }
             }
         }
-        isLoading = false;
-        await InvokeAsync(StateHasChanged);
+        catch (Exception ex)
+        {
+            Console.WriteLine("[AllTickets] Init error: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) ExtractItems(item, onObject);
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("Table1", out var tbl1) && tbl1.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl1.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("error", out var er) && !string.IsNullOrEmpty(er.GetString()))
+            {
+                // ignore
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
     }
 
     protected override void OnParametersSet()
@@ -183,6 +303,7 @@
 
     private string GetStringSafe(JsonElement el, string propName, string defaultValue = "")
     {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
         if (el.TryGetProperty(propName, out var p) && p.ValueKind != JsonValueKind.Null && p.ValueKind != JsonValueKind.Undefined)
         {
             if (p.ValueKind == JsonValueKind.String)
@@ -194,6 +315,7 @@
 
     private decimal GetDecimalSafe(JsonElement el, string propName, decimal defaultValue = 0)
     {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
         if (el.TryGetProperty(propName, out var p) && p.ValueKind != JsonValueKind.Null && p.ValueKind != JsonValueKind.Undefined)
         {
             if (p.ValueKind == JsonValueKind.Number && p.TryGetDecimal(out var d))

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TechnoArtSupprtAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e769d3d60694904519933dbbbbd0a2604fdddb55")]
 [assembly: System.Reflection.AssemblyProductAttribute("TechnoArtSupprtAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TechnoArtSupprtAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

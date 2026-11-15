@@ -1,0 +1,581 @@
+@page "/attendance/branches"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@attribute [Authorize(Roles = "SuperAdmin,MD,SupportManager")]
+@inject ApiService BackendApi
+@inject IJSRuntime JS
+
+<PageTitle>Office Hubs & Geofence - TechnoArt</PageTitle>
+
+<div class="container-fluid py-2 py-md-4 px-2 px-md-3" style="max-width: 100%; overflow-x: hidden;">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-3">
+        <div>
+            <h4 class="fw-bold mb-1 text-primary">
+                <i class="bi bi-geo-alt me-2"></i> Office Hubs & Geofence Zones
+            </h4>
+            <p class="text-muted small mb-0">Define office locations, GPS coordinates, and allowed physical attendance radiuses in meters</p>
+        </div>
+        <div>
+            <button class="btn btn-primary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="OpenAddModal">
+                <i class="bi bi-plus-lg me-1"></i> Add New Office Hub
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi @(isSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i> @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    <!-- Hubs Grid -->
+    <div class="row g-3 g-md-4 mb-4">
+        @if (branches.Count == 0)
+        {
+            <div class="col-12 text-center py-5">
+                <i class="bi bi-building-exclamation fs-1 text-muted d-block mb-2"></i>
+                <h6 class="text-muted">No office hubs configured yet.</h6>
+            </div>
+        }
+        else
+        {
+            @foreach (var b in branches)
+            {
+                <div class="col-12 col-md-6 col-xl-4">
+                    <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                        <div class="card-body p-3 p-md-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="fw-bold text-dark mb-1">@b.Name</h5>
+                                    <span class="badge @(b.IsActive ? "bg-success-subtle text-success border border-success-subtle" : "bg-secondary-subtle text-secondary border border-secondary-subtle") rounded-pill" @onclick="() => ToggleActive(b.Id)" title="Click to toggle status" style="cursor: pointer;">
+                                        <i class="bi @(b.IsActive ? "bi-check-circle" : "bi-pause-circle") me-1"></i>
+                                        @(b.IsActive ? "Active Hub" : "Inactive")
+                                    </span>
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-light btn-sm rounded-circle" type="button" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                        <li><button type="button" class="dropdown-item" @onclick="() => OpenEditModal(b)"><i class="bi bi-pencil me-2"></i> Edit Hub</button></li>
+                                        <li><button type="button" class="dropdown-item @(b.IsActive ? "text-warning" : "text-success")" @onclick="() => ToggleActive(b.Id)"><i class="bi bi-power me-2"></i> @(b.IsActive ? "Deactivate Hub" : "Activate Hub")</button></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-light rounded-3 mb-3">
+                                @if (!string.IsNullOrEmpty(b.Address))
+                                {
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-muted small"><i class="bi bi-geo-alt me-1"></i> Address:</span>
+                                        <span class="small fw-semibold text-truncate ms-2" style="max-width: 180px;" title="@b.Address">@b.Address</span>
+                                    </div>
+                                }
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-muted small"><i class="bi bi-geo me-1"></i> GPS Coordinates:</span>
+                                    <span class="font-monospace small fw-bold">@b.Latitude.ToString("F5", System.Globalization.CultureInfo.InvariantCulture), @b.Longitude.ToString("F5", System.Globalization.CultureInfo.InvariantCulture)</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-muted small"><i class="bi bi-bullseye me-1"></i> Geofence Radius:</span>
+                                    <span class="badge bg-primary px-2 py-1">@b.Radius meters</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small"><i class="bi bi-people me-1"></i> Assigned Staff:</span>
+                                    <span class="fw-bold">@b.EmployeeCount Employees</span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <a href="https://www.google.com/maps?q=@b.Latitude.ToString(System.Globalization.CultureInfo.InvariantCulture),@b.Longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)" target="_blank" class="btn btn-outline-secondary btn-sm flex-fill">
+                                    <i class="bi bi-map me-1"></i> View on Maps
+                                </a>
+                                <button class="btn btn-outline-primary btn-sm" @onclick="() => OpenEditModal(b)" title="Edit Hub">
+                                    <i class="bi bi-pencil me-1"></i> Edit
+                                </button>
+                                <button class="btn btn-sm @(b.IsActive ? "btn-outline-danger" : "btn-outline-success") text-nowrap" @onclick="() => ToggleActive(b.Id)" title="@(b.IsActive ? "Deactivate Hub" : "Activate Hub")">
+                                    <i class="bi @(b.IsActive ? "bi-slash-circle" : "bi-check2-circle") me-1"></i>
+                                    @(b.IsActive ? "Deactivate" : "Activate")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <!-- Modal for Add/Edit -->
+    @if (showModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-bottom">
+                        <h5 class="modal-title fw-bold">@(editingBranchId == null ? "Add New Office Hub" : "Edit Office Hub")</h5>
+                        <button type="button" class="btn-close" @onclick="() => showModal = false"></button>
+                    </div>
+                    <div class="modal-body p-3 p-md-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Hub / Branch Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="formName" placeholder="e.g. Dhaka Headquarters, Gulshan" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Address / Street Location</label>
+                            <input type="text" class="form-control" @bind="formAddress" placeholder="e.g. House 12, Road 4, Gulshan-1, Dhaka" />
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label small fw-semibold">Latitude <span class="text-danger">*</span></label>
+                                <input type="number" step="any" class="form-control" @bind="formLatitude" placeholder="23.7925" />
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label small fw-semibold">Longitude <span class="text-danger">*</span></label>
+                                <input type="number" step="any" class="form-control" @bind="formLongitude" placeholder="90.4078" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-info btn-sm w-100" @onclick="DetectCurrentGps">
+                                <i class="bi bi-crosshair me-1"></i> Use My Current Location as Hub Coordinates
+                            </button>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Geofence Radius (Meters) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" @bind="formRadius" placeholder="100" />
+                            <small class="text-muted">Employees within this meter distance can punch without WFH approval.</small>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="branchActiveSwitch" @bind="formIsActive">
+                            <label class="form-check-label small fw-semibold" for="branchActiveSwitch">Active Office Hub</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top d-flex justify-content-stretch justify-content-sm-end gap-2">
+                        <button type="button" class="btn btn-light w-100 w-sm-auto" @onclick="() => showModal = false">Cancel</button>
+                        <button type="button" class="btn btn-primary px-4 w-100 w-sm-auto" @onclick="SaveBranch">
+                            <i class="bi bi-save me-1"></i> Save Hub
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool showModal = false;
+    private string? editingBranchId;
+    private string formName = "";
+    private string formAddress = "";
+    private double formLatitude = 23.7925;
+    private double formLongitude = 90.4078;
+    private int formRadius = 150;
+    private bool formIsActive = true;
+
+    private string? statusMessage;
+    private bool isSuccess = true;
+
+    public class FlexibleBoolConverter : System.Text.Json.Serialization.JsonConverter<bool>
+    {
+        public override bool Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+        {
+            if (reader.TokenType == System.Text.Json.JsonTokenType.True) return true;
+            if (reader.TokenType == System.Text.Json.JsonTokenType.False) return false;
+            if (reader.TokenType == System.Text.Json.JsonTokenType.Number)
+            {
+                if (reader.TryGetInt64(out long lVal)) return lVal != 0;
+                if (reader.TryGetDouble(out double dVal)) return dVal != 0.0;
+                return false;
+            }
+            if (reader.TokenType == System.Text.Json.JsonTokenType.String)
+            {
+                var s = reader.GetString()?.Trim();
+                return s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "yes", StringComparison.OrdinalIgnoreCase);
+            }
+            return false;
+        }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, bool value, System.Text.Json.JsonSerializerOptions options)
+        {
+            writer.WriteBooleanValue(value);
+        }
+    }
+
+    public class BranchItem
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        public string Id { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("name")]
+        public string Name { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("address")]
+        public string Address { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("latitude")]
+        public double Latitude { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("longitude")]
+        public double Longitude { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("radius")]
+        public int Radius { get; set; } = 100;
+
+        [System.Text.Json.Serialization.JsonPropertyName("is_active")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(FlexibleBoolConverter))]
+        public bool IsActive { get; set; } = true;
+
+        [System.Text.Json.Serialization.JsonPropertyName("employee_count")]
+        public int EmployeeCount { get; set; } = 0;
+    }
+
+    private List<BranchItem> branches = new();
+
+    public class LocationResult
+    {
+        public bool Success { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBranches();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && (branches == null || branches.Count == 0))
+        {
+            await LoadBranches();
+            StateHasChanged();
+        }
+    }
+
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) ExtractItems(item, onObject);
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
+    }
+
+    private async Task LoadBranches()
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "GET_BRANCHES"
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            // Fallback if needed
+            if (!res.HasValue || (res.Value.ValueKind == JsonValueKind.Object && res.Value.TryGetProperty("error", out _)))
+            {
+                req.ProcName = "sp_attendance_operations";
+                res = await BackendApi.FetchDataAsync(req);
+            }
+
+            if (res.HasValue)
+            {
+                var loadedList = new List<BranchItem>();
+                ExtractItems(res.Value, el =>
+                {
+                    try
+                    {
+                        var id = GetPropString(el, "id", "branch_id", "Id");
+                        var name = GetPropString(el, "name", "Name");
+                        if (!string.IsNullOrEmpty(name) && !loadedList.Any(x => x.Id == id))
+                        {
+                            var b = new BranchItem
+                            {
+                                Id = id,
+                                Name = name,
+                                Address = GetPropString(el, "address", "Address"),
+                                Latitude = GetPropDouble(el, 23.7925, "latitude", "Latitude"),
+                                Longitude = GetPropDouble(el, 90.4078, "longitude", "Longitude"),
+                                Radius = GetPropInt(el, 150, "radius", "radius_meters", "Radius", "RadiusMeters"),
+                                IsActive = GetPropBool(el, true, "is_active", "IsActive"),
+                                EmployeeCount = GetPropInt(el, 0, "employee_count", "EmployeeCount")
+                            };
+                            loadedList.Add(b);
+                        }
+                    }
+                    catch { }
+                });
+
+                if (loadedList.Count > 0)
+                {
+                    branches = loadedList;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Branches load error: " + ex.Message;
+            isSuccess = false;
+        }
+        StateHasChanged();
+    }
+
+    private void OpenAddModal()
+    {
+        editingBranchId = null;
+        formName = "";
+        formAddress = "";
+        formLatitude = 23.7925;
+        formLongitude = 90.4078;
+        formRadius = 150;
+        formIsActive = true;
+        showModal = true;
+    }
+
+    private void OpenEditModal(BranchItem b)
+    {
+        editingBranchId = b.Id;
+        formName = b.Name;
+        formAddress = b.Address;
+        formLatitude = b.Latitude;
+        formLongitude = b.Longitude;
+        formRadius = b.Radius;
+        formIsActive = b.IsActive;
+        showModal = true;
+    }
+
+    private async Task DetectCurrentGps()
+    {
+        try
+        {
+            var loc = await JS.InvokeAsync<LocationResult>("getBrowserLocation");
+            if (loc != null && loc.Success)
+            {
+                formLatitude = loc.Latitude;
+                formLongitude = loc.Longitude;
+                statusMessage = "Coordinates populated from browser GPS.";
+                isSuccess = true;
+            }
+            else
+            {
+                statusMessage = loc?.ErrorMessage ?? "GPS detection failed.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "GPS error: " + ex.Message;
+            isSuccess = false;
+        }
+    }
+
+    private async Task SaveBranch()
+    {
+        if (string.IsNullOrWhiteSpace(formName))
+        {
+            statusMessage = "Please enter branch name.";
+            isSuccess = false;
+            return;
+        }
+
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = string.IsNullOrEmpty(editingBranchId) ? "SAVE_BRANCH" : "UPDATE_BRANCH",
+                parm01 = editingBranchId ?? "",
+                parm02 = formName,
+                parm03 = formLatitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture),
+                parm04 = formLongitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture),
+                parm05 = formRadius.ToString(),
+                parm06 = formAddress,
+                parm07 = formIsActive ? "1" : "0"
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue && res.Value.ValueKind == JsonValueKind.Object && res.Value.TryGetProperty("error", out var errEl) && !string.IsNullOrEmpty(errEl.GetString()))
+            {
+                statusMessage = "Save error from DB: " + errEl.GetString();
+                isSuccess = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Optimistic update
+            if (!string.IsNullOrEmpty(editingBranchId))
+            {
+                var existing = branches.FirstOrDefault(x => x.Id == editingBranchId);
+                if (existing != null)
+                {
+                    existing.Name = formName;
+                    existing.Address = formAddress;
+                    existing.Latitude = formLatitude;
+                    existing.Longitude = formLongitude;
+                    existing.Radius = formRadius;
+                    existing.IsActive = formIsActive;
+                }
+            }
+
+            showModal = false;
+            statusMessage = "Office hub saved successfully.";
+            isSuccess = true;
+            StateHasChanged();
+            await LoadBranches();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Save error: " + ex.Message;
+            isSuccess = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleActive(string branchId)
+    {
+        var b = branches.FirstOrDefault(x => x.Id == branchId);
+        if (b != null)
+        {
+            var newStatus = !b.IsActive;
+
+            try
+            {
+                var req = new APIDataAccParms
+                {
+                    ProcName = "sp_ticket_operations",
+                    ProcID = "UPDATE_BRANCH_STATUS",
+                    parm01 = branchId,
+                    parm02 = newStatus ? "1" : "0",
+                    parm07 = newStatus ? "1" : "0",
+                    Desc01 = b.Name
+                };
+
+                var res = await BackendApi.FetchDataAsync(req);
+
+                // If UPDATE_BRANCH_STATUS wasn't supported by older SP in DB, fallback to UPDATE_BRANCH
+                if (res == null || (res.Value.ValueKind == JsonValueKind.Object && res.Value.TryGetProperty("error", out _)))
+                {
+                    req.ProcID = "UPDATE_BRANCH";
+                    req.parm02 = b.Name;
+                    req.parm03 = b.Latitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
+                    req.parm04 = b.Longitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
+                    req.parm05 = b.Radius.ToString();
+                    req.parm06 = b.Address ?? "";
+                    req.parm07 = newStatus ? "1" : "0";
+                    res = await BackendApi.FetchDataAsync(req);
+                }
+
+                if (res.HasValue && res.Value.ValueKind == JsonValueKind.Object && res.Value.TryGetProperty("error", out var errEl) && !string.IsNullOrEmpty(errEl.GetString()))
+                {
+                    statusMessage = "Database error: " + errEl.GetString();
+                    isSuccess = false;
+                }
+                else
+                {
+                    b.IsActive = newStatus;
+                    statusMessage = $"Hub '{b.Name}' is now {(newStatus ? "Active" : "Inactive")}.";
+                    isSuccess = true;
+                }
+
+                await LoadBranches();
+            }
+            catch (Exception ex)
+            {
+                statusMessage = "Toggle status error: " + ex.Message;
+                isSuccess = false;
+            }
+            StateHasChanged();
+        }
+    }
+
+    private static string GetPropString(JsonElement el, params string[] propertyNames)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return "";
+        foreach (var name in propertyNames)
+        {
+            if (el.TryGetProperty(name, out var prop))
+            {
+                return prop.ValueKind switch
+                {
+                    JsonValueKind.String => prop.GetString() ?? "",
+                    JsonValueKind.Number => prop.ToString(),
+                    JsonValueKind.True => "true",
+                    JsonValueKind.False => "false",
+                    JsonValueKind.Null => "",
+                    _ => prop.ToString()
+                };
+            }
+        }
+        return "";
+    }
+
+    private static double GetPropDouble(JsonElement el, double defaultValue, params string[] propertyNames)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
+        foreach (var name in propertyNames)
+        {
+            if (el.TryGetProperty(name, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.Number && prop.TryGetDouble(out var d)) return d;
+                if (prop.ValueKind == JsonValueKind.String && double.TryParse(prop.GetString()?.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var ps)) return ps;
+            }
+        }
+        return defaultValue;
+    }
+
+    private static int GetPropInt(JsonElement el, int defaultValue, params string[] propertyNames)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
+        foreach (var name in propertyNames)
+        {
+            if (el.TryGetProperty(name, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out var i)) return i;
+                if (prop.ValueKind == JsonValueKind.String && int.TryParse(prop.GetString(), out var ps)) return ps;
+            }
+        }
+        return defaultValue;
+    }
+
+    private static bool GetPropBool(JsonElement el, bool defaultValue, params string[] propertyNames)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
+        foreach (var name in propertyNames)
+        {
+            if (el.TryGetProperty(name, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.True) return true;
+                if (prop.ValueKind == JsonValueKind.False) return false;
+                if (prop.ValueKind == JsonValueKind.Number) return prop.GetInt32() == 1;
+                if (prop.ValueKind == JsonValueKind.String)
+                {
+                    var s = prop.GetString()?.Trim();
+                    if (s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase)) return true;
+                    if (s == "0" || string.Equals(s, "false", StringComparison.OrdinalIgnoreCase)) return false;
+                }
+            }
+        }
+        return defaultValue;
+    }
+}

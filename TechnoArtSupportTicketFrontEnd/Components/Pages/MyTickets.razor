@@ -10,12 +10,14 @@
 
 <PageTitle>My Tickets - SupportHub</PageTitle>
 
-<div class="custom-card p-4 h-100">
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+<div class="custom-card p-3 p-md-4 h-100" style="max-width: 100%; overflow-x: hidden;">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-4 border-bottom pb-3">
         <h5 class="fw-bold m-0"><i class="bi bi-ticket text-primary me-2"></i> My Support Tickets</h5>
-        <a href="/raise-ticket" class="btn btn-primary btn-sm fw-semibold shadow-sm">
-            <i class="bi bi-plus-lg me-1"></i> Raise New Ticket
-        </a>
+        <div>
+            <a href="/raise-ticket" class="btn btn-primary btn-sm rounded-pill px-3 py-2 fw-semibold shadow-sm text-nowrap d-inline-flex align-items-center">
+                <i class="bi bi-plus-lg me-1"></i> Raise New Ticket
+            </a>
+        </div>
     </div>
 
     @if (isLoading)
@@ -31,9 +33,10 @@
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="bg-light">
+        <!-- Desktop & Tablet View: Full Table -->
+        <div class="table-responsive d-none d-md-block shadow-sm rounded-3 border">
+            <table class="table table-hover align-middle mb-0" style="min-width: 900px;">
+                <thead class="bg-light text-nowrap">
                     <tr>
                         <th class="fw-semibold text-muted small">Ticket #</th>
                         <th class="fw-semibold text-muted small">Subject</th>
@@ -55,7 +58,7 @@
                         var stat = GetStringSafe(t, "status", "NEW");
                         var progress = GetDecimalSafe(t, "progress_percent", 0);
                         var pmName = GetStringSafe(t, "assigned_to_name", "Unassigned");
-                        var slaDue = t.TryGetProperty("sla_due_at", out var sla) && sla.ValueKind != JsonValueKind.Null ? sla.GetString() : null;
+                        var slaDue = t.ValueKind == JsonValueKind.Object && t.TryGetProperty("sla_due_at", out var sla) && sla.ValueKind != JsonValueKind.Null && sla.ValueKind != JsonValueKind.Undefined ? (sla.ValueKind == JsonValueKind.String ? sla.GetString() : sla.ToString()) : null;
                         var slaBreached = !string.IsNullOrEmpty(slaDue) && DateTime.TryParse(slaDue, out var sd) && sd < DateTime.Now;
                         var priClass = pri == "CRITICAL" ? "badge-urgent" : pri == "HIGH" ? "badge-high" : pri == "MEDIUM" ? "badge-medium" : "badge-low";
                         var statColor = stat is "CLOSED" or "RESOLVED" ? "success" : stat == "IN_PROGRESS" ? "warning text-dark" : stat == "NEW" ? "info text-dark" : "primary";
@@ -98,7 +101,7 @@
                                 else { <span class="text-muted small">—</span> }
                             </td>
                             <td class="small text-muted">@GetStringSafe(t, "created_at")</td>
-                            <td>
+                            <td class="text-nowrap">
                                 <a href="/ticket/@tNum" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
                                 @if (stat == "RESOLVED")
                                 {
@@ -109,6 +112,72 @@
                     }
                 </tbody>
             </table>
+        </div>
+
+        <!-- Mobile View for Smart Phones (< 768px) -->
+        <div class="d-md-none mt-2">
+            <div class="d-flex flex-column gap-3">
+                @foreach (var t in tickets)
+                {
+                    var tNum = GetStringSafe(t, "ticket_number", "N/A");
+                    var pri = GetStringSafe(t, "priority", "MEDIUM");
+                    var stat = GetStringSafe(t, "status", "NEW");
+                    var progress = GetDecimalSafe(t, "progress_percent", 0);
+                    var pmName = GetStringSafe(t, "assigned_to_name", "Unassigned");
+                    var slaDue = t.ValueKind == JsonValueKind.Object && t.TryGetProperty("sla_due_at", out var sla) && sla.ValueKind != JsonValueKind.Null && sla.ValueKind != JsonValueKind.Undefined ? (sla.ValueKind == JsonValueKind.String ? sla.GetString() : sla.ToString()) : null;
+                    var slaBreached = !string.IsNullOrEmpty(slaDue) && DateTime.TryParse(slaDue, out var sd) && sd < DateTime.Now;
+                    var priClass = pri == "CRITICAL" ? "badge-urgent" : pri == "HIGH" ? "badge-high" : pri == "MEDIUM" ? "badge-medium" : "badge-low";
+                    var statColor = stat is "CLOSED" or "RESOLVED" ? "success" : stat == "IN_PROGRESS" ? "warning text-dark" : stat == "NEW" ? "info text-dark" : "primary";
+                    var projName = GetStringSafe(t, "project_name", "—");
+                    var modName = GetStringSafe(t, "module_name", "");
+
+                    <div class="card border rounded-3 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="fw-bold font-monospace text-primary small">@tNum</span>
+                                <div class="d-flex gap-1">
+                                    <span class="priority-badge @priClass">@pri</span>
+                                    <span class="badge bg-@statColor">@stat</span>
+                                </div>
+                            </div>
+                            <h6 class="fw-bold text-dark mb-2">@GetStringSafe(t, "subject", "No Subject")</h6>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2 text-muted small">
+                                <span><i class="bi bi-folder me-1 text-primary"></i>@projName</span>
+                                @if (!string.IsNullOrEmpty(modName))
+                                {
+                                    <span class="badge bg-light text-primary border"><i class="bi bi-diagram-3 me-1"></i>@modName</span>
+                                }
+                                @if (pmName != "Unassigned")
+                                {
+                                    <span class="badge bg-info-subtle text-dark border"><i class="bi bi-person me-1"></i>@pmName</span>
+                                }
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <div class="progress flex-grow-1" style="height: 6px;">
+                                    <div class="progress-bar @(progress >= 100 ? "bg-success" : "bg-primary")" role="progressbar" style="width: @(progress)%"></div>
+                                </div>
+                                <span class="small text-muted fw-bold">@(((int)progress))%</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(slaDue))
+                            {
+                                <div class="small fw-semibold @(slaBreached ? "text-danger" : "text-success") mb-2">
+                                    <i class="bi bi-alarm me-1"></i>SLA Due: @slaDue
+                                </div>
+                            }
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                <span class="small text-muted">@GetStringSafe(t, "created_at")</span>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="/ticket/@tNum" class="btn btn-outline-primary"><i class="bi bi-eye me-1"></i> View</a>
+                                    @if (stat == "RESOLVED")
+                                    {
+                                        <button class="btn btn-success" @onclick="() => CloseTicket(tNum)"><i class="bi bi-check-all me-1"></i> Close</button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
         </div>
     }
 </div>
@@ -145,14 +214,61 @@
             if (result.HasValue)
             {
                 try {
-                    if (result.Value.ValueKind == JsonValueKind.Array)
-                        foreach (var el in result.Value.EnumerateArray()) tickets.Add(el);
-                    else if (result.Value.TryGetProperty("ticket_number", out _))
-                        tickets.Add(result.Value);
+                    tickets.Clear();
+                    ExtractItems(result.Value, el =>
+                    {
+                        if (el.ValueKind == JsonValueKind.Object)
+                        {
+                            var num = GetStringSafe(el, "ticket_number");
+                            if (string.IsNullOrEmpty(num)) num = GetStringSafe(el, "id");
+                            if (!string.IsNullOrEmpty(num))
+                            {
+                                if (!tickets.Any(x => GetStringSafe(x, "ticket_number") == num || GetStringSafe(x, "id") == num))
+                                {
+                                    tickets.Add(el);
+                                }
+                            }
+                            else
+                            {
+                                tickets.Add(el);
+                            }
+                        }
+                    });
                 } catch { }
             }
         }
         isLoading = false;
+    }
+
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) ExtractItems(item, onObject);
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("Table1", out var tbl1) && tbl1.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl1.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("error", out var er) && !string.IsNullOrEmpty(er.GetString()))
+            {
+                // ignore
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
     }
 
     private async Task CloseTicket(string? ticketNumber)
@@ -173,6 +289,7 @@
 
     private string GetStringSafe(JsonElement el, string propName, string defaultValue = "")
     {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
         if (el.TryGetProperty(propName, out var p) && p.ValueKind != JsonValueKind.Null && p.ValueKind != JsonValueKind.Undefined)
         {
             if (p.ValueKind == JsonValueKind.String)
@@ -184,6 +301,7 @@
 
     private decimal GetDecimalSafe(JsonElement el, string propName, decimal defaultValue = 0)
     {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
         if (el.TryGetProperty(propName, out var p) && p.ValueKind != JsonValueKind.Null && p.ValueKind != JsonValueKind.Undefined)
         {
             if (p.ValueKind == JsonValueKind.Number && p.TryGetDecimal(out var d))

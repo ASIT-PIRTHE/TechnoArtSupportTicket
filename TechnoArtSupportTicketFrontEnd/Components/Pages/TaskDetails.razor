@@ -19,10 +19,14 @@ else if (taskData == null)
 }
 else
 {
-    var status = taskData?.GetProperty("status").GetString() ?? "TODO";
-    var assignee = taskData?.TryGetProperty("assigned_to", out var asgn) == true ? asgn.GetString() ?? "Unknown" : "Unknown";
+    var status = GetPropString(taskData, "status", "Status");
+    if (string.IsNullOrEmpty(status)) status = "TODO";
+    var assignee = GetPropString(taskData, "assigned_to", "AssignedTo", "assigned_to_name");
+    if (string.IsNullOrEmpty(assignee)) assignee = "Unknown";
     var initials = assignee.Length >= 2 ? assignee[..2].ToUpper() : "?";
-    var rejReason = taskData?.TryGetProperty("rejection_reason", out var rr) == true && rr.ValueKind != JsonValueKind.Null ? rr.GetString() : null;
+    var rejReason = GetPropString(taskData, "rejection_reason", "RejectionReason");
+    var ticketNumber = GetPropString(taskData, "ticket_number", "TicketNumber");
+    var taskName = GetPropString(taskData, "name", "Name", "title");
     
     var statusColor = status switch {
         "TODO" => "secondary",
@@ -42,11 +46,11 @@ else
                             <span class="badge bg-@statusColor text-white px-3 py-2 rounded-pill">@status</span>
                             <span class="text-muted small fw-semibold ms-2">@TaskId</span>
                         </div>
-                        <a href="/ticket/@(taskData?.GetProperty("ticket_number").GetString())" class="badge bg-light text-dark border text-decoration-none">
-                            <i class="bi bi-ticket me-1"></i> @taskData?.GetProperty("ticket_number").GetString()
+                        <a href="/ticket/@ticketNumber" class="badge bg-light text-dark border text-decoration-none">
+                            <i class="bi bi-ticket me-1"></i> @ticketNumber
                         </a>
                     </div>
-                    <h4 class="fw-bold mb-1">@taskData?.GetProperty("name").GetString()</h4>
+                    <h4 class="fw-bold mb-1">@taskName</h4>
                     <div class="d-flex align-items-center gap-2 mt-2">
                         <div class="avatar-circle" style="width:28px;height:28px;font-size:0.7rem;">@initials</div>
                         <span class="text-muted small">Assigned to <strong>@assignee</strong></span>
@@ -179,8 +183,8 @@ else
                 </div>
                 <div class="d-flex justify-content-between mb-2 small">
                     <span class="text-muted fw-semibold">Parent Ticket</span>
-                    <a href="/ticket/@(taskData?.GetProperty("ticket_number").GetString())" class="text-decoration-none text-primary fw-bold">
-                        @taskData?.GetProperty("ticket_number").GetString()
+                    <a href="/ticket/@ticketNumber" class="text-decoration-none text-primary fw-bold">
+                        @ticketNumber
                     </a>
                 </div>
                 <div class="d-flex justify-content-between mb-2 small">
@@ -214,6 +218,45 @@ else
     private string userId = "";
     private string role = "";
 
+    private static string GetPropString(JsonElement? el, params string[] propertyNames)
+    {
+        if (!el.HasValue || el.Value.ValueKind != JsonValueKind.Object) return "";
+        foreach (var p in propertyNames)
+        {
+            if (el.Value.TryGetProperty(p, out var val))
+            {
+                if (val.ValueKind == JsonValueKind.String) return val.GetString() ?? "";
+                if (val.ValueKind == JsonValueKind.Number) return val.ToString();
+                if (val.ValueKind == JsonValueKind.True) return "true";
+                if (val.ValueKind == JsonValueKind.False) return "false";
+            }
+        }
+        return "";
+    }
+
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) ExtractItems(item, onObject);
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
+    }
+
     protected override async Task OnInitializedAsync() => await LoadData();
 
     private async Task LoadData()
@@ -224,8 +267,8 @@ else
         if (user.Identity?.IsAuthenticated == true)
         {
             role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
-            tenantId = user.FindFirst("TenantId")?.Value ?? "";
-            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+            tenantId = user.FindFirst("TenantId")?.Value ?? user.FindFirst("tenant_id")?.Value ?? "";
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("nameid")?.Value ?? "";
 
             var payload = new APIDataAccParms
             {
@@ -237,15 +280,27 @@ else
             };
 
             var result = await BackendApi.FetchDataAsync(payload);
-            if (result.HasValue && result.Value.TryGetProperty("task_id", out _))
+            taskData = null;
+            if (result.HasValue)
             {
-                taskData = result.Value;
+                ExtractItems(result.Value, el =>
+                {
+                    if (el.ValueKind == JsonValueKind.Object && (el.TryGetProperty("task_id", out _) || el.TryGetProperty("TaskId", out _)))
+                    {
+                        taskData = el;
+                    }
+                });
+            }
+
+            if (taskData.HasValue && taskData.Value.ValueKind == JsonValueKind.Object)
+            {
                 workLogs.Clear();
                 totalHours = 0;
                 if (taskData.Value.TryGetProperty("work_logs", out var logs) && logs.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var log in logs.EnumerateArray())
                     {
+                        if (log.ValueKind != JsonValueKind.Object) continue;
                         decimal h = 0;
                         if (log.TryGetProperty("hours", out var hv))
                         {
@@ -258,8 +313,8 @@ else
                             else if (decimal.TryParse(hsv.GetString(), out var hsp)) h = hsp;
                         }
 
-                        var d = log.TryGetProperty("description", out var dv) ? dv.GetString() ?? "" : "";
-                        var dt = log.TryGetProperty("date", out var dtv) ? dtv.GetString() ?? "" : (log.TryGetProperty("log_date", out var ldtv) ? ldtv.GetString() ?? "" : "");
+                        var d = GetPropString(log, "description", "Description");
+                        var dt = GetPropString(log, "date", "log_date", "Date", "LogDate");
                         
                         workLogs.Add((dt, h, d));
                         totalHours += h;

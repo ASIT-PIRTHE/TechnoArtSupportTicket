@@ -1,0 +1,388 @@
+@page "/admin/employees/{Id}/id-card"
+@page "/attendance/id-card/{Id}"
+@page "/attendance/id-card"
+@attribute [Authorize(Roles = "SuperAdmin,MD,HRManager,SupportManager,ProjectManager,ClientAdmin")]
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@inject ApiService BackendApi
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>Corporate ID Card - @(employeeName ?? "Personnel")</PageTitle>
+
+<div class="container py-4 no-print">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <a href="admin/employees" class="btn btn-outline-secondary btn-sm rounded-pill mb-2">
+                <i class="bi bi-arrow-left me-1"></i> Back to User Directory
+            </a>
+            <h4 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-person-badge text-primary me-2"></i> Corporate Identity Card
+            </h4>
+            <small class="text-muted">High-precision dual-sided RFID / Barcode smart identification badge</small>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary fw-semibold px-4 rounded-pill shadow-sm" onclick="window.print()">
+                <i class="bi bi-printer me-2"></i> Print ID Badge
+            </button>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center p-5 no-print"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    <div class="idcard-viewport d-flex flex-column flex-md-row justify-content-center align-items-center gap-5 my-4">
+        
+        <!-- ================= FRONT SIDE ================= -->
+        <div class="id-card-wrapper shadow-lg position-relative overflow-hidden bg-white text-dark border">
+            <!-- Corporate Top Banner -->
+            <div class="card-header-banner position-relative">
+                <div class="banner-accent-1"></div>
+                <div class="banner-accent-2"></div>
+                <div class="banner-accent-3"></div>
+                <div class="p-3 position-relative d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="logo-mark"><i class="bi bi-shield-lock-fill text-white fs-5"></i></div>
+                        <div>
+                            <div class="fw-black text-white brand-title">TECHNOART</div>
+                            <div class="brand-sub text-white-50">SOFTWARE SOLUTIONS</div>
+                        </div>
+                    </div>
+                    <span class="badge bg-white text-dark fw-bold badge-tag">STAFF</span>
+                </div>
+            </div>
+
+            <!-- Card Body / Personnel Photo -->
+            <div class="card-body-content text-center px-4 pt-3">
+                <div class="photo-frame mx-auto mb-3 shadow-sm position-relative">
+                    @if (!string.IsNullOrEmpty(photoUrl))
+                    {
+                        <img src="@photoUrl" alt="@employeeName" class="w-100 h-100 object-fit-cover rounded-3" />
+                    }
+                    else
+                    {
+                        <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center rounded-3">
+                            <i class="bi bi-person-fill text-secondary display-4"></i>
+                        </div>
+                    }
+                    <div class="blood-pill position-absolute bottom-0 end-0 translate-middle-y me-1 badge bg-danger text-white border border-2 border-white">
+                        <i class="bi bi-droplet-fill me-1"></i>@(bloodGroup ?? "B+")
+                    </div>
+                </div>
+
+                <h5 class="fw-bold text-dark mb-1 text-uppercase tracking-wide">@(employeeName ?? "Personnel Name")</h5>
+                <div class="designation-title fw-semibold text-primary mb-3">@(designation ?? "Engineering Staff")</div>
+
+                <div class="meta-data-grid bg-light rounded-3 p-2 mb-3 border text-start">
+                    <div class="d-flex justify-content-between py-1 border-bottom border-light">
+                        <span class="text-muted small fw-semibold">Employee ID:</span>
+                        <span class="fw-bold font-monospace small">@(employeeCode ?? Id)</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1 border-bottom border-light">
+                        <span class="text-muted small fw-semibold">Department:</span>
+                        <span class="fw-semibold small">@(department ?? "Engineering")</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1 border-bottom border-light">
+                        <span class="text-muted small fw-semibold">Joining Date:</span>
+                        <span class="fw-semibold small">@(joiningDate ?? "15 Jan 2024")</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-muted small fw-semibold">Office Hub:</span>
+                        <span class="fw-semibold small">@(branchName ?? "Dhaka Main Hub")</span>
+                    </div>
+                </div>
+
+                <!-- QR Code Verification -->
+                <div class="d-flex justify-content-center align-items-center gap-3">
+                    <img src="@qrCodeUrl" class="border p-1 rounded bg-white shadow-sm" style="width: 75px; height: 75px;" alt="QR Verification" />
+                    <div class="text-start">
+                        <div class="text-uppercase fw-bold text-muted" style="font-size: 8px; letter-spacing: 1px;">Digital Verification</div>
+                        <div class="small fw-semibold text-dark">Scan to Verify</div>
+                        <div class="text-muted" style="font-size: 9px;">Valid Thru: 2028</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-bottom-bar bg-primary text-white text-center py-1 mt-auto">
+                <small style="font-size: 9px; letter-spacing: 1px;" class="fw-semibold text-uppercase">www.technoartsoftware.com</small>
+            </div>
+        </div>
+
+        <!-- ================= BACK SIDE ================= -->
+        <div class="id-card-wrapper shadow-lg position-relative overflow-hidden bg-white text-dark border d-flex flex-column">
+            <!-- Top Banner -->
+            <div class="p-3 bg-light border-bottom text-center">
+                <div class="fw-bold text-uppercase small text-dark" style="letter-spacing: 1px;">Terms & Conditions of Badge</div>
+            </div>
+
+            <div class="p-4 flex-grow-1 d-flex flex-column justify-content-between">
+                <div class="terms-text small text-muted" style="font-size: 10px; line-height: 1.5;">
+                    <p class="mb-2">1. This card is the property of <strong>TechnoArt Software Solutions Ltd.</strong> and is non-transferable.</p>
+                    <p class="mb-2">2. The cardholder must wear this badge at all times during office hours and while representing the organization.</p>
+                    <p class="mb-2">3. If found, please return to: <em>HR & Corporate Affairs, Level 6, TAS Tower, Dhaka</em>.</p>
+                    <p class="mb-0">4. Report loss or theft immediately to the Helpdesk at <strong>+880 1700-000000</strong>.</p>
+                </div>
+
+                <div class="emergency-block bg-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-2 my-2">
+                    <div class="text-danger fw-bold text-uppercase" style="font-size: 9px;"><i class="bi bi-telephone-plus me-1"></i> Emergency Contact</div>
+                    <div class="fw-bold text-dark small">@(phone ?? "+880 1711-223344")</div>
+                </div>
+
+                <!-- Barcode & Signatures -->
+                <div class="mt-2 pt-2 border-top">
+                    <div class="d-flex justify-content-between align-items-end mb-2">
+                        <div class="text-center" style="width: 100px;">
+                            <div class="signature-line border-bottom border-dark pb-1" style="height: 25px;">
+                                <span class="font-monospace text-muted fst-italic" style="font-size: 11px;">M. Rahman</span>
+                            </div>
+                            <small class="text-muted text-uppercase" style="font-size: 8px;">Authorized HR</small>
+                        </div>
+                        <div class="text-center" style="width: 100px;">
+                            <div class="signature-line border-bottom border-dark pb-1" style="height: 25px;">
+                                <span class="font-monospace text-muted fst-italic" style="font-size: 11px;">S. Ahmed</span>
+                            </div>
+                            <small class="text-muted text-uppercase" style="font-size: 8px;">Managing Director</small>
+                        </div>
+                    </div>
+
+                    <div class="barcode-container text-center pt-1">
+                        <div class="fake-barcode mx-auto mb-1"></div>
+                        <span class="font-monospace small text-muted" style="font-size: 9px;">*@(employeeCode ?? Id)*</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-bottom-bar bg-dark text-white text-center py-1 mt-auto">
+                <small style="font-size: 9px; letter-spacing: 1px;" class="fw-semibold text-uppercase">Emergency Help: support@technoart.com</small>
+            </div>
+        </div>
+
+    </div>
+}
+
+<style>
+    .id-card-wrapper {
+        width: 320px;
+        height: 500px;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        background: #ffffff;
+    }
+
+    .card-header-banner {
+        height: 70px;
+        background-color: #1e1b4b;
+        overflow: hidden;
+    }
+
+    .banner-accent-1 {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: #2b3990;
+        clip-path: polygon(0 0, 75% 0, 60% 100%, 0% 100%);
+    }
+
+    .banner-accent-2 {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: #ef4444;
+        clip-path: polygon(72% 0, 78% 0, 63% 100%, 57% 100%);
+    }
+
+    .banner-accent-3 {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: #3b82f6;
+        clip-path: polygon(76% 0, 80% 0, 65% 100%, 61% 100%);
+    }
+
+    .brand-title {
+        font-size: 13px;
+        letter-spacing: 1.5px;
+        line-height: 1;
+    }
+
+    .brand-sub {
+        font-size: 7px;
+        letter-spacing: 0.8px;
+    }
+
+    .badge-tag {
+        font-size: 9px;
+        letter-spacing: 1px;
+    }
+
+    .photo-frame {
+        width: 110px;
+        height: 110px;
+        border-radius: 12px;
+        border: 3px solid #ffffff;
+        outline: 2px solid #2b3990;
+    }
+
+    .designation-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .fake-barcode {
+        height: 25px;
+        width: 180px;
+        background: repeating-linear-gradient(
+            90deg,
+            #111,
+            #111 2px,
+            transparent 2px,
+            transparent 4px,
+            #111 4px,
+            #111 7px,
+            transparent 7px,
+            transparent 9px
+        );
+    }
+
+    @@media print {
+        body {
+            background: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .no-print, header, nav, .sidebar-wrapper, .top-header {
+            display: none !important;
+        }
+
+        .idcard-viewport {
+            flex-direction: row !important;
+            gap: 20px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .id-card-wrapper {
+            box-shadow: none !important;
+            border: 1px solid #ccc !important;
+            page-break-inside: avoid;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    private bool isLoading = true;
+    private string? employeeName;
+    private string? designation;
+    private string? department;
+    private string? employeeCode;
+    private string? bloodGroup;
+    private string? photoUrl;
+    private string? joiningDate;
+    private string? branchName;
+    private string? phone;
+    private string qrCodeUrl = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeeData();
+    }
+
+    private async Task LoadEmployeeData()
+    {
+        isLoading = true;
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "GET_USERS",
+                parm01 = Id
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue)
+            {
+                void ExtractUser(JsonElement el)
+                {
+                    if (el.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var sub in el.EnumerateArray()) ExtractUser(sub);
+                    }
+                    else if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        if (el.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var sub in tbl.EnumerateArray()) ExtractUser(sub);
+                        }
+                        else
+                        {
+                            var uid = GetStr(el, "user_id", "id", "UserId");
+                            var ucode = GetStr(el, "employee_code", "username");
+                            if (string.Equals(uid, Id, StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(ucode, Id, StringComparison.OrdinalIgnoreCase) ||
+                                (string.IsNullOrEmpty(employeeName) && !string.IsNullOrEmpty(uid)))
+                            {
+                                employeeName = GetStr(el, "full_name", "name");
+                                designation = GetStr(el, "designation", "role");
+                                department = GetStr(el, "department");
+                                if (string.IsNullOrEmpty(department)) department = "Engineering";
+                                employeeCode = GetStr(el, "employee_code", "user_id", "id");
+                                bloodGroup = GetStr(el, "blood_group");
+                                if (string.IsNullOrEmpty(bloodGroup)) bloodGroup = "B+";
+                                photoUrl = GetStr(el, "photo_url");
+                                joiningDate = GetStr(el, "joining_date");
+                                if (string.IsNullOrEmpty(joiningDate)) joiningDate = DateTime.Today.ToString("dd MMM yyyy");
+                                branchName = GetStr(el, "tenant_name", "branch_name");
+                                if (string.IsNullOrEmpty(branchName)) branchName = "Dhaka Main Hub";
+                                phone = GetStr(el, "phone");
+                            }
+                        }
+                    }
+                }
+                ExtractUser(res.Value);
+            }
+
+            if (string.IsNullOrEmpty(employeeName))
+            {
+                employeeName = "Employee " + Id;
+                designation = "Staff Engineer";
+                employeeCode = Id;
+                bloodGroup = "B+";
+            }
+
+            var qrContent = Uri.EscapeDataString($"ID:{employeeCode}|NAME:{employeeName}|BLOOD:{bloodGroup}|ORG:TECHNOART");
+            qrCodeUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qrContent}";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("ID Card error: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStr(JsonElement el, params string[] names)
+    {
+        foreach (var n in names)
+        {
+            if (el.TryGetProperty(n, out var prop) && prop.ValueKind == JsonValueKind.String)
+            {
+                var val = prop.GetString();
+                if (!string.IsNullOrEmpty(val)) return val;
+            }
+        }
+        return "";
+    }
+}

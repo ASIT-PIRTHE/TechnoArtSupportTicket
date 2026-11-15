@@ -1,0 +1,420 @@
+@page "/attendance/notices"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@inject ApiService BackendApi
+
+<PageTitle>Notice Board - TechnoArt</PageTitle>
+
+<div class="container-fluid py-2 py-md-4 px-2 px-md-3" style="max-width: 100%; overflow-x: hidden;">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-3">
+        <div>
+            <h4 class="fw-bold mb-1 text-primary">
+                <i class="bi bi-megaphone me-2"></i> Company Notice Board
+            </h4>
+            <p class="text-muted small mb-0">Official notices, holiday circulars, and executive announcements</p>
+        </div>
+        <AuthorizeView Roles="SuperAdmin,MD,SupportManager,HRManager">
+            <Authorized>
+                <div>
+                    <button class="btn btn-primary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="OpenAddModal">
+                        <i class="bi bi-plus-lg me-1"></i> Post New Notice
+                    </button>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi @(isSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i> @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    <!-- Notices Grid -->
+    <div class="row g-3 g-md-4">
+        @if (notices.Count == 0)
+        {
+            <div class="col-12 text-center py-5">
+                <i class="bi bi-bell-slash fs-1 text-muted d-block mb-2"></i>
+                <h6 class="text-muted">No active notices broadcast at this time.</h6>
+            </div>
+        }
+        else
+        {
+            @foreach (var n in notices)
+            {
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden border-top border-4 @(n.IsActive ? "border-primary" : "border-secondary")">
+                        <div class="card-body p-3 p-md-4 d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="badge @(n.IsActive ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-light text-muted border") rounded-pill">
+                                    @(n.IsActive ? "Broadcast Active" : "Archived")
+                                </span>
+                                <small class="text-muted"><i class="bi bi-clock me-1"></i> @n.CreatedAt.ToString("MMM dd, yyyy")</small>
+                            </div>
+
+                            <h5 class="fw-bold text-dark my-2">@n.Title</h5>
+                            <p class="text-muted small flex-grow-1" style="white-space: pre-line;">
+                                @(n.Content.Length > 120 ? n.Content.Substring(0, 120) + "..." : n.Content)
+                            </p>
+                            <div class="mb-2">
+                                <button class="btn btn-link btn-sm text-primary p-0 fw-semibold text-decoration-none" @onclick="() => viewingNotice = n">
+                                    <i class="bi bi-eye me-1"></i> Read Full Notice
+                                </button>
+                            </div>
+
+                            <AuthorizeView Roles="SuperAdmin,MD,SupportManager,HRManager">
+                                <Authorized>
+                                    <div class="border-top pt-3 d-flex justify-content-end gap-2">
+                                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => OpenEditModal(n)">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" @onclick="() => ToggleNoticeStatus(n.Id)">
+                                            <i class="bi @(n.IsActive ? "bi-archive" : "bi-check2")"></i> @(n.IsActive ? "Archive" : "Activate")
+                                        </button>
+                                    </div>
+                                </Authorized>
+                            </AuthorizeView>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <!-- Modal -->
+    @if (showModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-bottom">
+                        <h5 class="modal-title fw-bold">@(editingId == null ? "Post Notice" : "Edit Notice")</h5>
+                        <button type="button" class="btn-close" @onclick="() => showModal = false"></button>
+                    </div>
+                    <div class="modal-body p-3 p-md-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Notice Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="formTitle" placeholder="e.g. Eid-ul-Fitr Holiday Circular 2026" />
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold mb-0">Content Details <span class="text-danger">*</span></label>
+                                <span class="small text-muted">@formContent.Length characters</span>
+                            </div>
+                            <textarea class="form-control" rows="5" @bind="formContent" @bind:event="oninput" placeholder="Official announcement body..."></textarea>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="activeNoticeSwitch" @bind="formIsActive">
+                            <label class="form-check-label small fw-semibold" for="activeNoticeSwitch">Publish to all employees immediately</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top d-flex justify-content-stretch justify-content-sm-end gap-2">
+                        <button type="button" class="btn btn-light w-100 w-sm-auto" @onclick="() => showModal = false">Cancel</button>
+                        <button type="button" class="btn btn-primary px-4 w-100 w-sm-auto" @onclick="SaveNotice">
+                            <i class="bi bi-megaphone me-1"></i> Post Announcement
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- View Notice Modal -->
+    @if (viewingNotice != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-bottom">
+                        <div>
+                            <span class="badge @(viewingNotice.IsActive ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-light text-muted border") rounded-pill mb-1">
+                                @(viewingNotice.IsActive ? "Active Notice" : "Archived")
+                            </span>
+                            <h5 class="modal-title fw-bold text-dark">@viewingNotice.Title</h5>
+                            <small class="text-muted"><i class="bi bi-calendar3 me-1"></i> Posted on @viewingNotice.CreatedAt.ToString("MMMM dd, yyyy")</small>
+                        </div>
+                        <button type="button" class="btn-close" @onclick="() => viewingNotice = null"></button>
+                    </div>
+                    <div class="modal-body p-3 p-md-4">
+                        <div class="p-3 bg-light rounded-3 border text-dark" style="white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem;">
+                            @viewingNotice.Content
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top d-flex justify-content-stretch justify-content-sm-end">
+                        <button type="button" class="btn btn-secondary px-4 w-100 w-sm-auto" @onclick="() => viewingNotice = null">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool showModal = false;
+    private NoticeItem? viewingNotice;
+    private string? editingId;
+    private string formTitle = "";
+    private string formContent = "";
+    private bool formIsActive = true;
+
+    private string? statusMessage;
+    private bool isSuccess = true;
+
+    public class FlexibleBoolConverter : System.Text.Json.Serialization.JsonConverter<bool>
+    {
+        public override bool Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+        {
+            if (reader.TokenType == System.Text.Json.JsonTokenType.True) return true;
+            if (reader.TokenType == System.Text.Json.JsonTokenType.False) return false;
+            if (reader.TokenType == System.Text.Json.JsonTokenType.Number)
+            {
+                if (reader.TryGetInt64(out long lVal)) return lVal != 0;
+                if (reader.TryGetDouble(out double dVal)) return dVal != 0.0;
+                return false;
+            }
+            if (reader.TokenType == System.Text.Json.JsonTokenType.String)
+            {
+                var s = reader.GetString()?.Trim();
+                return s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "yes", StringComparison.OrdinalIgnoreCase);
+            }
+            return false;
+        }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, bool value, System.Text.Json.JsonSerializerOptions options)
+        {
+            writer.WriteBooleanValue(value);
+        }
+    }
+
+    public class NoticeItem
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Title { get; set; } = "";
+        public string Content { get; set; } = "";
+        [System.Text.Json.Serialization.JsonConverter(typeof(FlexibleBoolConverter))]
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+    }
+
+    private List<NoticeItem> notices = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotices();
+    }
+
+    private async Task LoadNotices()
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
+                ProcID = "GET_NOTICES"
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue)
+            {
+                var opts = new JsonSerializerOptions 
+                { 
+                    PropertyNameCaseInsensitive = true,
+                    NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+                };
+                opts.Converters.Add(new FlexibleBoolConverter());
+
+                var loaded = new List<NoticeItem>();
+                void ExtractNotices(JsonElement el)
+                {
+                    if (el.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var sub in el.EnumerateArray()) ExtractNotices(sub);
+                    }
+                    else if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        if (el.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var sub in tbl.EnumerateArray()) ExtractNotices(sub);
+                        }
+                        else if (el.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var sub in dt.EnumerateArray()) ExtractNotices(sub);
+                        }
+                        else
+                        {
+                            try
+                            {
+                                var item = JsonSerializer.Deserialize<NoticeItem>(el.GetRawText(), opts);
+                                if (item != null)
+                                {
+                                    // Fallback mapping if standard properties are named differently
+                                    if (string.IsNullOrEmpty(item.Title))
+                                    {
+                                        if (el.TryGetProperty("notice_title", out var nt)) item.Title = nt.GetString() ?? "";
+                                        else if (el.TryGetProperty("Subject", out var sub)) item.Title = sub.GetString() ?? "";
+                                    }
+                                    if (string.IsNullOrEmpty(item.Content))
+                                    {
+                                        if (el.TryGetProperty("notice_content", out var nc)) item.Content = nc.GetString() ?? "";
+                                        else if (el.TryGetProperty("description", out var desc)) item.Content = desc.GetString() ?? "";
+                                        else if (el.TryGetProperty("details", out var det)) item.Content = det.GetString() ?? "";
+                                    }
+                                    if (string.IsNullOrEmpty(item.Id))
+                                    {
+                                        if (el.TryGetProperty("notice_id", out var nid)) item.Id = nid.GetString() ?? Guid.NewGuid().ToString();
+                                    }
+
+                                    if (!string.IsNullOrEmpty(item.Title) || !string.IsNullOrEmpty(item.Content))
+                                    {
+                                        loaded.Add(item);
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                ExtractNotices(res.Value);
+                if (loaded.Count > 0)
+                {
+                    notices = loaded;
+                }
+            }
+            if (notices.Count == 0)
+            {
+                // Demo seed
+                notices = new List<NoticeItem>
+                {
+                    new NoticeItem
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Title = "Official Working Hours Policy 2026",
+                        Content = "Please note that all staff must clock-in by their assigned shift time (09:30 AM or 11:00 AM override). A 15-minute grace period applies.",
+                        IsActive = true,
+                        CreatedAt = DateTime.Today.AddDays(-2)
+                    },
+                    new NoticeItem
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Title = "Upcoming System Maintenance & App Upgrade",
+                        Content = "The unified support ticket and attendance mobile API will undergo scheduled database maintenance this Friday at 11:00 PM.",
+                        IsActive = true,
+                        CreatedAt = DateTime.Today.AddDays(-1)
+                    }
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Notice load err: " + ex.Message);
+        }
+    }
+
+    private void OpenAddModal()
+    {
+        editingId = null;
+        formTitle = "";
+        formContent = "";
+        formIsActive = true;
+        showModal = true;
+    }
+
+    private void OpenEditModal(NoticeItem n)
+    {
+        editingId = n.Id;
+        formTitle = n.Title;
+        formContent = n.Content;
+        formIsActive = n.IsActive;
+        showModal = true;
+    }
+
+    private async Task SaveNotice()
+    {
+        if (string.IsNullOrWhiteSpace(formTitle) || string.IsNullOrWhiteSpace(formContent))
+        {
+            statusMessage = "Please complete both the title and content.";
+            isSuccess = false;
+            return;
+        }
+
+        try
+        {
+            if (editingId == null)
+            {
+                var n = new NoticeItem
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Title = formTitle,
+                    Content = formContent,
+                    IsActive = formIsActive,
+                    CreatedAt = DateTime.Now
+                };
+                notices.Insert(0, n);
+            }
+            else
+            {
+                var n = notices.FirstOrDefault(x => x.Id == editingId);
+                if (n != null)
+                {
+                    n.Title = formTitle;
+                    n.Content = formContent;
+                    n.IsActive = formIsActive;
+                }
+            }
+
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
+                ProcID = "SAVE_NOTICE",
+                parm01 = string.IsNullOrEmpty(editingId) ? Guid.NewGuid().ToString() : editingId,
+                parm02 = formTitle,
+                parm03 = formContent.Length > 255 ? formContent.Substring(0, 255) : formContent,
+                parm06 = formContent,
+                parm04 = formIsActive ? "1" : "0"
+            };
+
+            await BackendApi.FetchDataAsync(req);
+            showModal = false;
+            statusMessage = "Notice posted successfully!";
+            isSuccess = true;
+            await LoadNotices();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Error saving notice: " + ex.Message;
+            isSuccess = false;
+        }
+    }
+
+    private async Task ToggleNoticeStatus(string id)
+    {
+        var n = notices.FirstOrDefault(x => x.Id == id);
+        if (n != null)
+        {
+            n.IsActive = !n.IsActive;
+            try
+            {
+                var req = new APIDataAccParms
+                {
+                    ProcName = "sp_attendance_operations",
+                    ProcID = "SAVE_NOTICE",
+                    parm01 = n.Id,
+                    parm02 = n.Title,
+                    parm03 = n.Content.Length > 255 ? n.Content.Substring(0, 255) : n.Content,
+                    parm06 = n.Content,
+                    parm04 = n.IsActive ? "1" : "0"
+                };
+                await BackendApi.FetchDataAsync(req);
+            }
+            catch { }
+            statusMessage = $"Notice '{n.Title}' status updated.";
+            isSuccess = true;
+        }
+    }
+}

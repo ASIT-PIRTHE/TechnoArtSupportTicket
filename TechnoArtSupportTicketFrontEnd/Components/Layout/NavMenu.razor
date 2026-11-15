@@ -18,11 +18,37 @@
         <NavLink class="nav-link" href="admin/clients">
             <i class="bi bi-building"></i> Clients & Tenants
         </NavLink>
+    </AuthorizeView>
+
+    <AuthorizeView Roles="SuperAdmin,MD,HRManager,ProjectManager">
         <NavLink class="nav-link" href="admin/employees">
             <i class="bi bi-people"></i> User Management
         </NavLink>
+    </AuthorizeView>
         
-        <div class="nav-section-title">Management</div>
+    <AuthorizeView Roles="SuperAdmin,MD,HRManager,AccountsOfficer">
+        <div class="nav-section-title">Management & HRM</div>
+        <NavLink class="nav-link" href="attendance/approvals">
+            <i class="bi bi-calendar-check"></i> Attendance Approvals
+        </NavLink>
+        <NavLink class="nav-link" href="attendance/branches">
+            <i class="bi bi-geo-alt"></i> Office Hubs & Geofence
+        </NavLink>
+        <NavLink class="nav-link" href="attendance/office-time">
+            <i class="bi bi-clock-history"></i> Office Shifts & Timing
+        </NavLink>
+        <NavLink class="nav-link" href="attendance/leaves">
+            <i class="bi bi-calendar2-range"></i> Leave Management
+        </NavLink>
+        <NavLink class="nav-link" href="attendance/reports">
+            <i class="bi bi-file-earmark-bar-graph"></i> Attendance Reports
+        </NavLink>
+        <NavLink class="nav-link" href="attendance/notices">
+            <i class="bi bi-megaphone"></i> Notice Board
+        </NavLink>
+        <NavLink class="nav-link" href="attendance/permissions">
+            <i class="bi bi-shield-lock"></i> Menu Permissions
+        </NavLink>
         <NavLink class="nav-link" href="admin/reports">
             <i class="bi bi-bar-chart"></i> Executive Reports
         </NavLink>
@@ -44,8 +70,11 @@
         </NavLink>
     </AuthorizeView>
 
-    <AuthorizeView Roles="TeamMember,ProjectManager,SupportManager,SuperAdmin,MD">
-        <div class="nav-section-title">My Work</div>
+    <AuthorizeView Roles="TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer">
+        <div class="nav-section-title">My Work & Attendance</div>
+        <NavLink class="nav-link" href="attendance/terminal">
+            <i class="bi bi-fingerprint text-success"></i> Attendance Terminal
+        </NavLink>
         <NavLink class="nav-link" href="raise-ticket">
             <i class="bi bi-ticket-plus"></i> Raise a Ticket
         </NavLink>
@@ -74,6 +103,9 @@
     </AuthorizeView>
 
     <div class="nav-section-title mt-4">Account</div>
+    <NavLink class="nav-link" href="profile">
+        <i class="bi bi-person-circle"></i> My Profile
+    </NavLink>
     <NavLink class="nav-link" href="settings">
         <i class="bi bi-gear"></i> Settings
     </NavLink>

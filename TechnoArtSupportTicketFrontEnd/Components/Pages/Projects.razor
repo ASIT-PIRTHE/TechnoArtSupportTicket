@@ -10,30 +10,38 @@
 
 <PageTitle>Project Management - SupportHub</PageTitle>
 
-<div class="custom-card p-4 h-100">
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 flex-wrap gap-2">
+<div class="custom-card p-3 p-md-4 h-100" style="max-width: 100%; overflow-x: hidden;">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 border-bottom pb-3 gap-2">
         <div>
             <h5 class="fw-bold m-0"><i class="bi bi-kanban text-primary me-2"></i> Project Management & Modules</h5>
             <small class="text-muted">Manage projects, software modules (HRM, Payroll, Inventory, CPF), and cross-functional teams.</small>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
             <AuthorizeView Roles="SuperAdmin,SupportManager,ProjectManager">
-                <button class="btn btn-outline-primary btn-sm fw-semibold shadow-sm" @onclick="OpenTaskModal">
+                <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-2 fw-semibold shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="OpenTaskModal">
                     <i class="bi bi-plus-circle me-1"></i> Quick Assign Task
                 </button>
             </AuthorizeView>
             <AuthorizeView Roles="SuperAdmin">
-                <button class="btn btn-primary btn-sm fw-semibold shadow-sm" @onclick="ToggleAddMode">
+                <button class="btn btn-primary btn-sm rounded-pill px-3 py-2 fw-semibold shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="ToggleAddMode">
                     <i class="bi @(isAddMode ? "bi-x-lg" : "bi-plus-lg") me-1"></i> @(isAddMode ? "Cancel" : "Create Project")
                 </button>
             </AuthorizeView>
         </div>
     </div>
 
+    @if (!string.IsNullOrEmpty(projectErrorMessage) && !isAddMode)
+    {
+        <div class="alert alert-danger py-2 small d-flex align-items-center mb-3">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@projectErrorMessage
+            <button type="button" class="btn-close ms-auto" @onclick="() => projectErrorMessage = string.Empty"></button>
+        </div>
+    }
+
     @if (isAddMode)
     {
         <div class="card bg-light border-success mb-4 shadow-sm border-0 border-start border-4">
-            <div class="card-body p-4">
+            <div class="card-body p-3 p-md-4">
                 <h6 class="fw-bold mb-3 text-success">@(string.IsNullOrEmpty(editProjectId) ? "Initialize New Software Project" : "Edit Software Project")</h6>
                 @if (!string.IsNullOrEmpty(projectErrorMessage))
                 {
@@ -41,25 +49,25 @@
                 }
                 <form @onsubmit="CreateProject">
                     <div class="row g-3 mb-3">
-                        <div class="col-md-4">
+                        <div class="col-12 col-sm-6 col-md-4">
                             <label class="form-label small fw-semibold">Project Name</label>
                             <input type="text" class="form-control" @bind="newProjectName" required placeholder="e.g. Enterprise ERP Upgrade" />
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-12 col-sm-6 col-md-4">
                             <label class="form-label small fw-semibold">Project Code (Alias)</label>
                             <input type="text" class="form-control" @bind="newProjectCode" required placeholder="e.g. PRJ-ERP" />
                         </div>
 
                         @if(isAdmin)
                         {
-                            <div class="col-md-4">
+                            <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label small fw-semibold">Client / Company</label>
                                 <select class="form-select" @bind="newTenantId" required>
                                     <option value="">-- Select Company --</option>
                                     @foreach (var tenant in tenantList)
                                     {
-                                        var tid = tenant.TryGetProperty("tenant_id", out var tip) ? tip.GetString() : "";
-                                        var tname = tenant.TryGetProperty("name", out var tnp) ? tnp.GetString() : "";
+                                        var tid = GetPropString(tenant, "tenant_id", "id");
+                                        var tname = GetPropString(tenant, "name", "tenant_name");
                                         <option value="@tid">@tname</option>
                                     }
                                 </select>
@@ -87,20 +95,21 @@
         {
             foreach (var proj in projectList)
             {
-                var projectId = proj.TryGetProperty("project_id", out var pid) ? pid.GetString() ?? "" : "";
-                var pCode = proj.TryGetProperty("code", out var pcd) ? pcd.GetString() ?? "" : "";
-                var pName = proj.TryGetProperty("name", out var pnm) ? pnm.GetString() ?? "" : "";
-                var projTenantId = proj.TryGetProperty("tenant_id", out var ptid) ? ptid.GetString() ?? "" : "";
-                var tenantName = proj.TryGetProperty("tenant_name", out var tn) ? tn.GetString() : "Internal";
-                var pmName = proj.TryGetProperty("pm_name", out var pmp) ? pmp.GetString() : null;
+                var projectId = GetPropString(proj, "project_id", "id");
+                var pCode = GetPropString(proj, "code", "Code");
+                var pName = GetPropString(proj, "name", "Name");
+                var projTenantId = GetPropString(proj, "tenant_id", "TenantId");
+                var tenantName = GetPropString(proj, "tenant_name", "TenantName");
+                if (string.IsNullOrEmpty(tenantName)) tenantName = "Internal";
+                var pmName = GetPropString(proj, "pm_name", "PmName");
                 
-                var ticketCount = proj.TryGetProperty("ticket_count", out var tc) ? (tc.ValueKind == JsonValueKind.Number ? tc.GetInt64() : 0) : 0;
-                var taskCount = proj.TryGetProperty("task_count", out var tsk) ? (tsk.ValueKind == JsonValueKind.Number ? tsk.GetInt64() : 0) : 0;
-                var progress = proj.TryGetProperty("progress_percent", out var prg) ? (prg.ValueKind == JsonValueKind.Number ? prg.GetDecimal() : 0) : 0;
+                var ticketCount = proj.ValueKind == JsonValueKind.Object && proj.TryGetProperty("ticket_count", out var tc) ? (tc.ValueKind == JsonValueKind.Number && tc.TryGetInt64(out var tcv) ? tcv : 0) : 0;
+                var taskCount = proj.ValueKind == JsonValueKind.Object && proj.TryGetProperty("task_count", out var tsk) ? (tsk.ValueKind == JsonValueKind.Number && tsk.TryGetInt64(out var tskv) ? tskv : 0) : 0;
+                var progress = proj.ValueKind == JsonValueKind.Object && proj.TryGetProperty("progress_percent", out var prg) ? (prg.ValueKind == JsonValueKind.Number && prg.TryGetDecimal(out var prgv) ? prgv : 0) : 0;
 
-                <div class="col-md-6 col-xl-4">
+                <div class="col-12 col-md-6 col-xl-4">
                     <div class="card shadow-sm border-0 h-100 border-top border-4 border-primary">
-                        <div class="card-body p-4 d-flex flex-column justify-content-between">
+                        <div class="card-body p-3 p-md-4 d-flex flex-column justify-content-between">
                             <div>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
@@ -113,7 +122,7 @@
                                 </div>
                                 <h5 class="fw-bold mt-2 mb-1">@pName</h5>
                                 <div class="text-muted small mb-1"><i class="bi bi-building me-1"></i> @tenantName</div>
-                                <div class="text-muted small mb-3"><i class="bi bi-person-badge text-primary me-1"></i> PM: <strong class="text-dark">@(string.IsNullOrEmpty(pmName) ? "Unassigned" : pmName)</strong></div>
+                                <div class="text-muted small mb-3"><i class="bi bi-person-badge text-primary me-1"></i> PM: <strong class="text-dark">@(string.IsNullOrEmpty(pmName) || pmName == "Unassigned" ? "Unassigned" : pmName)</strong></div>
                                 
                                 <div class="d-flex justify-content-between align-items-center mt-3 mb-1 small text-muted">
                                     <span>Task Completion</span>
@@ -164,7 +173,7 @@
 @if (showModulesModal)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header border-bottom">
                     <div>
@@ -173,7 +182,7 @@
                     </div>
                     <button type="button" class="btn-close" @onclick="CloseModulesModal"></button>
                 </div>
-                <div class="modal-body p-4 bg-light">
+                <div class="modal-body p-3 p-md-4 bg-light">
                     <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,ClientAdmin">
                         <div class="card border-0 shadow-sm mb-4">
                             <div class="card-body p-3">
@@ -183,15 +192,15 @@
                                     <div class="alert alert-danger py-2 small mb-3">@moduleErrorMessage</div>
                                 }
                                 <div class="row g-2">
-                                    <div class="col-md-4">
+                                    <div class="col-12 col-sm-6 col-md-4">
                                         <label class="form-label small fw-semibold text-muted">Module Name <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control form-control-sm" placeholder="e.g. HRM / Human Resources" @bind="newModuleName" />
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-md-3">
                                         <label class="form-label small fw-semibold text-muted">Module Code <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control form-control-sm" placeholder="e.g. HRM" @bind="newModuleCode" />
                                     </div>
-                                    <div class="col-md-5">
+                                    <div class="col-12 col-md-5">
                                         <label class="form-label small fw-semibold text-muted">Description / Notes</label>
                                         <div class="input-group input-group-sm">
                                             <input type="text" class="form-control form-control-sm" placeholder="Department / Module scope..." @bind="newModuleDesc" />
@@ -210,7 +219,7 @@
                     @if (projectModulesList.Count > 0)
                     {
                         <div class="table-responsive bg-white rounded shadow-sm">
-                            <table class="table table-hover align-middle mb-0">
+                            <table class="table table-hover align-middle mb-0" style="min-width: 600px;">
                                 <thead class="table-light small">
                                     <tr>
                                         <th>Module Code</th>
@@ -226,12 +235,13 @@
                                 <tbody>
                                     @foreach (var mod in projectModulesList)
                                     {
-                                        var modId = mod.TryGetProperty("module_id", out var mId) ? mId.GetString() ?? "" : "";
-                                        var mCode = mod.TryGetProperty("code", out var mc) ? mc.GetString() ?? "" : "";
-                                        var mName = mod.TryGetProperty("name", out var mn) ? mn.GetString() ?? "" : "";
-                                        var mDesc = mod.TryGetProperty("description", out var md) ? md.GetString() ?? "—" : "—";
-                                        var userCount = mod.TryGetProperty("assigned_users_count", out var uc) ? uc.GetInt32() : 0;
-                                        var ticketCount = mod.TryGetProperty("tickets_count", out var tc) ? tc.GetInt32() : 0;
+                                        var modId = GetPropString(mod, "module_id", "id");
+                                        var mCode = GetPropString(mod, "code");
+                                        var mName = GetPropString(mod, "name");
+                                        var mDesc = GetPropString(mod, "description");
+                                        if (string.IsNullOrEmpty(mDesc)) mDesc = "—";
+                                        var userCount = mod.ValueKind == JsonValueKind.Object && mod.TryGetProperty("assigned_users_count", out var uc) ? (uc.ValueKind == JsonValueKind.Number && uc.TryGetInt32(out var ucv) ? ucv : 0) : 0;
+                                        var ticketCount = mod.ValueKind == JsonValueKind.Object && mod.TryGetProperty("tickets_count", out var tc) ? (tc.ValueKind == JsonValueKind.Number && tc.TryGetInt32(out var tcv) ? tcv : 0) : 0;
 
                                         <tr>
                                             <td><span class="badge bg-light text-primary border font-monospace">@mCode</span></td>
@@ -272,7 +282,7 @@
 @if (showTeamModal)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header border-bottom">
                     <div>
@@ -286,34 +296,44 @@
                         <div class="card border-0 shadow-sm mb-4">
                             <div class="card-body p-3">
                                 <h6 class="fw-semibold small text-muted mb-2">Assign Member or Designate Project Manager</h6>
+                                @if (!string.IsNullOrEmpty(teamModalMessage))
+                                {
+                                    <div class="alert alert-info py-2 small mb-3">@teamModalMessage</div>
+                                }
                                 <div class="row g-2">
-                                    <div class="col-md-5">
+                                    <div class="col-12 col-sm-6 col-md-5">
                                         <select class="form-select form-select-sm" @bind="selectedUserId">
-                                            <option value="">-- Select User --</option>
+                                            <option value="">-- Select User (@userList.Count available) --</option>
                                             @foreach(var u in userList)
                                             {
-                                                var uId = u.TryGetProperty("user_id", out var uidp) ? uidp.GetString() : "";
-                                                var uName = u.TryGetProperty("full_name", out var unmp) ? unmp.GetString() : "";
-                                                var uRole = u.TryGetProperty("role", out var urlp) ? urlp.GetString() : "";
+                                                var uId = GetPropString(u, "user_id", "id", "UserId");
+                                                var uName = GetPropString(u, "full_name", "name", "FullName", "Name");
+                                                if (string.IsNullOrEmpty(uName)) uName = GetPropString(u, "username", "userName", "email");
+                                                var uRole = GetPropString(u, "role", "Role");
                                                 <option value="@uId">@uName (@uRole)</option>
                                             }
                                         </select>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-12 col-sm-6 col-md-4">
                                         <select class="form-select form-select-sm" @bind="selectedModuleForAssign">
                                             <option value="">-- General / No Module --</option>
                                             @foreach(var mod in projectModulesList)
                                             {
-                                                var mId = mod.TryGetProperty("module_id", out var mp) ? mp.GetString() : "";
-                                                var mNm = mod.TryGetProperty("name", out var mnp) ? mnp.GetString() : "";
-                                                var mCd = mod.TryGetProperty("code", out var mcp) ? mcp.GetString() : "";
+                                                var mId = GetPropString(mod, "module_id", "id");
+                                                var mNm = GetPropString(mod, "name");
+                                                var mCd = GetPropString(mod, "code");
                                                 <option value="@mId">@mNm (@mCd)</option>
                                             }
                                         </select>
                                     </div>
-                                    <div class="col-md-3 d-flex gap-1">
-                                        <button class="btn btn-success btn-sm fw-semibold flex-grow-1" @onclick="AssignTeamMember">Assign</button>
-                                        <button class="btn btn-primary btn-sm fw-semibold flex-grow-1" @onclick="AssignProjectManager" title="Assign as Designated PM">Set PM</button>
+                                    <div class="col-12 col-md-3 d-flex gap-1">
+                                        <button class="btn btn-success btn-sm fw-semibold flex-grow-1" @onclick="AssignTeamMember" disabled="@isAssigningTeam">
+                                            @if(isAssigningTeam) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                            Assign
+                                        </button>
+                                        <button class="btn btn-primary btn-sm fw-semibold flex-grow-1" @onclick="AssignProjectManager" title="Assign as Designated PM" disabled="@isAssigningTeam">
+                                            Set PM
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -331,25 +351,30 @@
                             <ul class="list-group list-group-flush shadow-sm rounded">
                                 @foreach (var member in InternalMembers)
                                 {
-                                    var mUserId = member.TryGetProperty("user_id", out var muId) ? muId.GetString() : "";
-                                    var mFullName = member.TryGetProperty("full_name", out var mfName) ? mfName.GetString() : "";
-                                    var mUsername = member.TryGetProperty("username", out var mun) ? mun.GetString() : "";
-                                    var mRole = member.TryGetProperty("role", out var mrProp) ? mrProp.GetString() : "";
-                                    var mRoleDisplay = member.TryGetProperty("project_role_display", out var prd) ? prd.GetString() : mRole;
-                                    var isPm = mRole == "PROJECT_MANAGER" || mRole == "ProjectManager";
+                                    var mUserId = GetPropString(member, "user_id", "id", "UserId");
+                                    var mFullName = GetPropString(member, "full_name", "name", "FullName", "Name");
+                                    var mUsername = GetPropString(member, "username", "userName", "email");
+                                    var mRole = GetPropString(member, "role", "Role");
+                                    var mRoleDisplay = GetPropString(member, "project_role_display");
+                                    if (string.IsNullOrEmpty(mRoleDisplay)) mRoleDisplay = mRole;
+                                    var isPm = (member.ValueKind == JsonValueKind.Object && member.TryGetProperty("is_pm", out var isPmEl) && (isPmEl.ValueKind == JsonValueKind.True || (isPmEl.ValueKind == JsonValueKind.Number && isPmEl.GetInt32() == 1)))
+                                               || mRole == "PROJECT_MANAGER" || mRole == "ProjectManager";
 
                                     <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
                                         <div>
                                             <div class="fw-semibold">
                                                 @mFullName
-                                                <span class="text-muted small fw-normal ms-1 font-monospace">(@mUsername)</span>
+                                                @if (!string.IsNullOrEmpty(mUsername))
+                                                {
+                                                    <span class="text-muted small fw-normal ms-1 font-monospace">(@mUsername)</span>
+                                                }
                                                 @if (isPm)
                                                 {
                                                     <span class="badge bg-primary ms-2"><i class="bi bi-star-fill me-1"></i>Designated PM</span>
                                                 }
                                                 else
                                                 {
-                                                    <span class="badge bg-light text-secondary border ms-2">Developer / Support</span>
+                                                    <span class="badge bg-light text-secondary border ms-2">@(string.IsNullOrEmpty(mRole) ? "Developer / Support" : mRole)</span>
                                                 }
                                             </div>
                                             <div class="small text-muted">@mRoleDisplay</div>
@@ -378,21 +403,25 @@
                             <ul class="list-group list-group-flush shadow-sm rounded">
                                 @foreach (var member in ClientMembers)
                                 {
-                                    var mUserId = member.TryGetProperty("user_id", out var muId) ? muId.GetString() : "";
-                                    var mFullName = member.TryGetProperty("full_name", out var mfName) ? mfName.GetString() : "";
-                                    var mUsername = member.TryGetProperty("username", out var mun) ? mun.GetString() : "";
-                                    var mSystemRole = member.TryGetProperty("system_role", out var msr) ? msr.GetString() : "ClientUser";
-                                    var mModule = member.TryGetProperty("module_name", out var mmn) ? mmn.GetString() : null;
+                                    var mUserId = GetPropString(member, "user_id", "id", "UserId");
+                                    var mFullName = GetPropString(member, "full_name", "name", "FullName", "Name");
+                                    var mUsername = GetPropString(member, "username", "userName", "email");
+                                    var mSystemRole = GetPropString(member, "role", "system_role", "Role");
+                                    if (string.IsNullOrEmpty(mSystemRole)) mSystemRole = "ClientUser";
+                                    var mModule = GetPropString(member, "module_name", "ModuleName");
 
                                     <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
                                         <div>
                                             <div class="fw-semibold">
                                                 @mFullName
-                                                <span class="text-muted small fw-normal ms-1 font-monospace">(@mUsername)</span>
+                                                @if (!string.IsNullOrEmpty(mUsername))
+                                                {
+                                                    <span class="text-muted small fw-normal ms-1 font-monospace">(@mUsername)</span>
+                                                }
                                                 <span class="badge @(mSystemRole == "ClientAdmin" ? "bg-dark" : "bg-light text-dark border") ms-1">@mSystemRole</span>
                                             </div>
                                             <div class="small mt-1">
-                                                @if (!string.IsNullOrEmpty(mModule))
+                                                @if (!string.IsNullOrEmpty(mModule) && mModule != "—")
                                                 {
                                                     <span class="badge bg-primary-subtle text-primary border">
                                                         <i class="bi bi-diagram-3 me-1"></i>Module: <strong>@mModule</strong>
@@ -415,8 +444,8 @@
                                                     <ul class="dropdown-menu dropdown-menu-end shadow">
                                                         @foreach (var mod in projectModulesList)
                                                         {
-                                                            var modId = mod.TryGetProperty("module_id", out var mId) ? mId.GetString() ?? "" : "";
-                                                            var modName = mod.TryGetProperty("name", out var mn) ? mn.GetString() ?? "" : "";
+                                                            var modId = GetPropString(mod, "module_id", "id");
+                                                            var modName = GetPropString(mod, "name");
                                                             <li>
                                                                 <button class="dropdown-item small" type="button" @onclick="() => AssignUserToModuleDirect(mUserId, modId)">
                                                                     <i class="bi bi-check-circle me-1"></i> @modName
@@ -464,8 +493,8 @@
                             <option value="">-- Choose Ticket --</option>
                             @foreach (var t in allTickets)
                             {
-                                var tNum = t.TryGetProperty("ticket_number", out var tnp) ? tnp.GetString() : "";
-                                var tSub = t.TryGetProperty("subject", out var tsp) ? tsp.GetString() : "";
+                                var tNum = GetPropString(t, "ticket_number", "id");
+                                var tSub = GetPropString(t, "subject", "title");
                                 <option value="@tNum">@tNum - @tSub</option>
                             }
                         </select>
@@ -482,9 +511,10 @@
                             <option value="">-- Choose Member --</option>
                             @foreach (var u in userList)
                             {
-                                var uId = u.TryGetProperty("user_id", out var uidp) ? uidp.GetString() : "";
-                                var uName = u.TryGetProperty("full_name", out var unmp) ? unmp.GetString() : "";
-                                var uRole = u.TryGetProperty("role", out var urlp) ? urlp.GetString() : "";
+                                var uId = GetPropString(u, "user_id", "id", "UserId");
+                                var uName = GetPropString(u, "full_name", "name", "FullName", "Name");
+                                if (string.IsNullOrEmpty(uName)) uName = GetPropString(u, "username", "userName", "email");
+                                var uRole = GetPropString(u, "role", "Role");
                                 <option value="@uId">@uName (@uRole)</option>
                             }
                         </select>
@@ -523,6 +553,8 @@
     private bool showTeamModal = false;
     private bool showModulesModal = false;
     private bool isSubmittingModule = false;
+    private bool isAssigningTeam = false;
+    private string teamModalMessage = "";
 
     private bool showTaskModal = false;
     private bool isSubmittingTask = false;
@@ -551,41 +583,72 @@
     private string userId = "";
     private string role = "";
 
-    private List<JsonElement> InternalMembers => projectMembers.Where(m => 
+    private static string GetPropString(JsonElement el, params string[] propertyNames)
     {
-        if (m.TryGetProperty("is_client_user", out var icu) && icu.ValueKind == JsonValueKind.Number)
+        if (el.ValueKind != JsonValueKind.Object) return "";
+        foreach (var p in propertyNames)
         {
-            return icu.GetInt32() == 0;
+            if (el.TryGetProperty(p, out var val))
+            {
+                if (val.ValueKind == JsonValueKind.String) return val.GetString() ?? "";
+                if (val.ValueKind == JsonValueKind.Number) return val.ToString();
+                if (val.ValueKind == JsonValueKind.True) return "true";
+                if (val.ValueKind == JsonValueKind.False) return "false";
+            }
         }
-        if (m.TryGetProperty("system_role", out var sr))
-        {
-            var s = sr.GetString() ?? "";
-            return s != "ClientAdmin" && s != "ClientUser";
-        }
-        return true;
-    }).ToList();
+        return "";
+    }
 
-    private List<JsonElement> ClientMembers => projectMembers.Where(m => 
+    private static bool IsClientUser(JsonElement m)
     {
-        if (m.TryGetProperty("is_client_user", out var icu) && icu.ValueKind == JsonValueKind.Number)
+        if (m.ValueKind != JsonValueKind.Object) return false;
+        if (m.TryGetProperty("is_client_user", out var icu))
         {
-            return icu.GetInt32() == 1;
+            if (icu.ValueKind == JsonValueKind.Number) return icu.GetInt32() == 1;
+            if (icu.ValueKind == JsonValueKind.True) return true;
+            if (icu.ValueKind == JsonValueKind.False) return false;
+            if (icu.ValueKind == JsonValueKind.String) return icu.GetString() == "1" || icu.GetString()?.ToLower() == "true";
         }
-        if (m.TryGetProperty("system_role", out var sr))
+        var r = GetPropString(m, "role", "system_role", "Role");
+        return r.Contains("Client", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private List<JsonElement> InternalMembers => projectMembers.Where(m => !IsClientUser(m)).ToList();
+    private List<JsonElement> ClientMembers => projectMembers.Where(m => IsClientUser(m)).ToList();
+
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
         {
-            var s = sr.GetString() ?? "";
-            return s == "ClientAdmin" || s == "ClientUser";
+            foreach (var item in element.EnumerateArray())
+            {
+                ExtractItems(item, onObject);
+            }
         }
-        return false;
-    }).ToList();
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
         role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
-        tenantId = user.FindFirst("TenantId")?.Value ?? "";
-        userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+        tenantId = user.FindFirst("TenantId")?.Value ?? user.FindFirst("tenant_id")?.Value ?? "";
+        userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("nameid")?.Value ?? "";
         isAdmin = role == "SuperAdmin" || role == "MD";
 
         await LoadTenants();
@@ -596,80 +659,91 @@
     private async Task LoadTenants()
     {
         if (!isAdmin) return;
-        tenantList.Clear();
+        var tempTenants = new List<JsonElement>();
         var payload = new APIDataAccParms { ProcID = "GET_TENANTS", parm04 = userId, parm05 = role };
         var result = await BackendApi.FetchDataAsync(payload);
         if (result.HasValue)
         {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
+            ExtractItems(result.Value, el =>
+            {
+                if (el.ValueKind == JsonValueKind.Object)
                 {
-                    foreach (var el in result.Value.EnumerateArray())
+                    var tid = GetPropString(el, "tenant_id", "id");
+                    var name = GetPropString(el, "name", "tenant_name");
+                    if (!string.IsNullOrEmpty(tid) || !string.IsNullOrEmpty(name))
                     {
-                        if (el.TryGetProperty("tenant_id", out _) || el.TryGetProperty("name", out _))
-                            tenantList.Add(el);
+                        if (!tempTenants.Any(t => (!string.IsNullOrEmpty(tid) && GetPropString(t, "tenant_id", "id") == tid)))
+                        {
+                            tempTenants.Add(el);
+                        }
                     }
                 }
-                else if (result.Value.ValueKind == JsonValueKind.Object && 
-                        (result.Value.TryGetProperty("tenant_id", out _) || result.Value.TryGetProperty("name", out _)))
-                {
-                    tenantList.Add(result.Value);
-                }
-            } catch {}
+            });
         }
+        tenantList = tempTenants;
     }
 
     private async Task LoadUsers()
     {
-        userList.Clear();
-        var payload = new APIDataAccParms { ProcID = "GET_TEAM_MEMBERS", parm04 = userId, parm05 = role };
+        var tempUsers = new List<JsonElement>();
+        var payload = new APIDataAccParms 
+        { 
+            ProcName = "sp_ticket_operations",
+            ProcID = "GET_USERS", 
+            parm04 = userId, 
+            parm05 = role, 
+            ComCod = (isAdmin ? "" : tenantId) 
+        };
         var result = await BackendApi.FetchDataAsync(payload);
         if (result.HasValue)
         {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
+            ExtractItems(result.Value, el =>
+            {
+                if (el.ValueKind == JsonValueKind.Object)
                 {
-                    foreach (var el in result.Value.EnumerateArray())
+                    var uid = GetPropString(el, "user_id", "id", "UserId");
+                    if (!string.IsNullOrEmpty(uid) && !tempUsers.Any(u => GetPropString(u, "user_id", "id", "UserId") == uid))
                     {
-                        if (el.TryGetProperty("user_id", out _) || el.TryGetProperty("full_name", out _))
-                            userList.Add(el);
+                        tempUsers.Add(el);
                     }
                 }
-                else if (result.Value.ValueKind == JsonValueKind.Object && 
-                        (result.Value.TryGetProperty("user_id", out _) || result.Value.TryGetProperty("full_name", out _)))
-                {
-                    userList.Add(result.Value);
-                }
-            } catch {}
+            });
         }
+        userList = tempUsers;
     }
 
     private async Task LoadProjects()
     {
         isLoading = true;
-        projectList.Clear();
-        var payload = new APIDataAccParms { ProcID = "GET_PROJECTS", parm04 = userId, parm05 = role, ComCod = tenantId };
+        var tempProjects = new List<JsonElement>();
+        string targetComCod = isAdmin ? "" : tenantId;
+        var payload = new APIDataAccParms { ProcID = "GET_PROJECTS", parm04 = userId, parm05 = role, ComCod = targetComCod };
         var result = await BackendApi.FetchDataAsync(payload);
         
         if (result.HasValue)
         {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
+            ExtractItems(result.Value, el =>
+            {
+                if (el.ValueKind == JsonValueKind.Object)
                 {
-                    foreach (var el in result.Value.EnumerateArray())
+                    var pid = GetPropString(el, "project_id", "id");
+                    var code = GetPropString(el, "code");
+                    var name = GetPropString(el, "name");
+                    if (!string.IsNullOrEmpty(pid) || !string.IsNullOrEmpty(code) || !string.IsNullOrEmpty(name))
                     {
-                        if (el.TryGetProperty("project_id", out _) || el.TryGetProperty("code", out _))
-                            projectList.Add(el);
+                        if (!tempProjects.Any(p => 
+                            (!string.IsNullOrEmpty(pid) && GetPropString(p, "project_id", "id") == pid) ||
+                            (!string.IsNullOrEmpty(code) && GetPropString(p, "code") == code)))
+                        {
+                            tempProjects.Add(el);
+                        }
                     }
                 }
-                else if (result.Value.ValueKind == JsonValueKind.Object && 
-                        (result.Value.TryGetProperty("project_id", out _) || result.Value.TryGetProperty("code", out _)))
-                {
-                    projectList.Add(result.Value);
-                }
-            } catch {}
+            });
         }
+        projectList = tempProjects;
         isLoading = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     private void ToggleAddMode() 
@@ -680,7 +754,7 @@
             editProjectId = null;
             newProjectCode = "";
             newProjectName = "";
-            newTenantId = "";
+            newTenantId = tenantList.Count > 0 ? GetPropString(tenantList[0], "tenant_id", "id") : "";
         }
     }
     
@@ -700,8 +774,8 @@
         projectErrorMessage = "";
         
         string targetTenant = isAdmin 
-            ? (string.IsNullOrEmpty(newTenantId) ? "00000000-0000-0000-0000-000000000000" : newTenantId) 
-            : (string.IsNullOrEmpty(tenantId) ? "00000000-0000-0000-0000-000000000000" : tenantId);
+            ? (string.IsNullOrEmpty(newTenantId) ? "" : newTenantId) 
+            : (string.IsNullOrEmpty(tenantId) ? "" : tenantId);
 
         var payload = new APIDataAccParms 
         { 
@@ -716,7 +790,8 @@
 
         var result = await BackendApi.FetchDataAsync(payload);
         
-        if (result.HasValue && result.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+        var resEl = result.HasValue ? (result.Value.ValueKind == JsonValueKind.Array && result.Value.GetArrayLength() > 0 ? result.Value[0] : result.Value) : default;
+        if (result.HasValue && resEl.ValueKind == JsonValueKind.Object && resEl.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
         {
             projectErrorMessage = err.GetString()!;
             isSubmitting = false;
@@ -738,8 +813,10 @@
         selectedProjectName = projName;
         selectedUserId = "";
         selectedModuleForAssign = "";
+        teamModalMessage = "";
         showTeamModal = true;
         await LoadProjectModules(projectId);
+        await LoadUsers();
         await LoadProjectMembers(projectId);
     }
     
@@ -747,6 +824,7 @@
     {
         showTeamModal = false;
         selectedProjectId = null;
+        teamModalMessage = "";
     }
 
     private async Task OpenModulesModal(string projectId, string projName)
@@ -780,16 +858,13 @@
         var result = await BackendApi.FetchDataAsync(payload);
         if (result.HasValue)
         {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
+            ExtractItems(result.Value, el =>
+            {
+                if (!string.IsNullOrEmpty(GetPropString(el, "module_id", "id", "code", "name")))
                 {
-                    foreach (var el in result.Value.EnumerateArray()) projectModulesList.Add(el);
+                    projectModulesList.Add(el);
                 }
-                else if (result.Value.TryGetProperty("module_id", out _))
-                {
-                    projectModulesList.Add(result.Value);
-                }
-            } catch {}
+            });
         }
     }
 
@@ -808,16 +883,18 @@
         {
             ProcID = "CREATE_PROJECT_MODULE",
             parm01 = selectedProjectId,
-            parm02 = newModuleName.Trim(),
-            parm03 = newModuleCode.Trim().ToUpper(),
+            parm02 = newModuleCode.Trim().ToUpper(),
+            parm03 = newModuleName.Trim(),
             parm04 = newModuleDesc.Trim(),
+            parm06 = newModuleDesc.Trim(),
             parm05 = role
         };
 
         var result = await BackendApi.FetchDataAsync(payload);
         isSubmittingModule = false;
 
-        if (result.HasValue && result.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+        var resEl = result.HasValue ? (result.Value.ValueKind == JsonValueKind.Array && result.Value.GetArrayLength() > 0 ? result.Value[0] : result.Value) : default;
+        if (result.HasValue && resEl.ValueKind == JsonValueKind.Object && resEl.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
         {
             moduleErrorMessage = err.GetString()!;
             return;
@@ -884,68 +961,131 @@
         var result = await BackendApi.FetchDataAsync(payload);
         if (result.HasValue)
         {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
+            ExtractItems(result.Value, el =>
+            {
+                var uid = GetPropString(el, "user_id", "id", "UserId");
+                if (!string.IsNullOrEmpty(uid) && !projectMembers.Any(m => GetPropString(m, "user_id", "id", "UserId") == uid))
                 {
-                    foreach (var el in result.Value.EnumerateArray())
+                    projectMembers.Add(el);
+                }
+            });
+        }
+
+        // Cross-reference fallback & augmentation from userList
+        // Any user whose primary project or assigned projects list matches selectedProjectId
+        foreach (var u in userList)
+        {
+            var uid = GetPropString(u, "user_id", "id", "UserId");
+            if (string.IsNullOrEmpty(uid) || projectMembers.Any(m => GetPropString(m, "user_id", "id", "UserId") == uid))
+                continue;
+
+            var userProjId = GetPropString(u, "project_id", "ProjectId");
+            bool assigned = (!string.IsNullOrEmpty(userProjId) && (userProjId == projectId || userProjId.Equals(selectedProjectName, StringComparison.OrdinalIgnoreCase)));
+
+            if (!assigned && u.TryGetProperty("projects", out var projsEl) && projsEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var p in projsEl.EnumerateArray())
+                {
+                    var pstr = p.ValueKind == JsonValueKind.String ? p.GetString() : GetPropString(p, "project_id", "id", "code", "name");
+                    if (!string.IsNullOrEmpty(pstr) && (pstr == projectId || pstr.Equals(selectedProjectName, StringComparison.OrdinalIgnoreCase)))
                     {
-                        if (el.TryGetProperty("user_id", out _) || el.TryGetProperty("full_name", out _))
-                            projectMembers.Add(el);
+                        assigned = true;
+                        break;
                     }
                 }
-                else if (result.Value.ValueKind == JsonValueKind.Object && 
-                        (result.Value.TryGetProperty("user_id", out _) || result.Value.TryGetProperty("full_name", out _)))
-                {
-                    projectMembers.Add(result.Value);
-                }
-            } catch {}
+            }
+
+            if (assigned)
+            {
+                projectMembers.Add(u);
+            }
         }
     }
 
     private async Task AssignTeamMember()
     {
-        if (string.IsNullOrEmpty(selectedProjectId) || string.IsNullOrEmpty(selectedUserId)) return;
-        
-        var payload = new APIDataAccParms 
-        { 
-            ProcID = "ASSIGN_TEAM_MEMBER",
-            parm01 = selectedProjectId,
-            parm02 = selectedUserId,
-            parm04 = userId,
-            parm05 = role
-        };
-        await BackendApi.FetchDataAsync(payload);
-
-        // Also assign module if selected
-        if (!string.IsNullOrEmpty(selectedModuleForAssign))
+        if (string.IsNullOrEmpty(selectedProjectId) || string.IsNullOrEmpty(selectedUserId))
         {
-            await AssignUserToModuleDirect(selectedUserId, selectedModuleForAssign);
+            teamModalMessage = "Please select a user from the dropdown.";
+            return;
         }
         
-        selectedUserId = "";
-        selectedModuleForAssign = "";
-        await LoadProjectMembers(selectedProjectId);
-        await LoadProjects();
+        isAssigningTeam = true;
+        teamModalMessage = "";
+        try
+        {
+            var selectedUser = userList.FirstOrDefault(u => GetPropString(u, "user_id", "id", "UserId") == selectedUserId);
+            var userRole = selectedUser.ValueKind == JsonValueKind.Object ? GetPropString(selectedUser, "role", "Role") : "";
+
+            var payload = new APIDataAccParms 
+            { 
+                ProcID = "ASSIGN_TEAM_MEMBER",
+                parm01 = selectedProjectId,
+                parm02 = selectedUserId,
+                parm03 = userRole,
+                parm04 = userId,
+                parm05 = role
+            };
+            await BackendApi.FetchDataAsync(payload);
+
+            // Also assign module if selected
+            if (!string.IsNullOrEmpty(selectedModuleForAssign))
+            {
+                await AssignUserToModuleDirect(selectedUserId, selectedModuleForAssign);
+            }
+            
+            selectedUserId = "";
+            selectedModuleForAssign = "";
+            teamModalMessage = "Member successfully assigned to project!";
+            await LoadProjectMembers(selectedProjectId);
+            await LoadProjects();
+        }
+        catch (Exception ex)
+        {
+            teamModalMessage = "Error assigning member: " + ex.Message;
+        }
+        finally
+        {
+            isAssigningTeam = false;
+        }
     }
 
     private async Task AssignProjectManager()
     {
-        if (string.IsNullOrEmpty(selectedProjectId) || string.IsNullOrEmpty(selectedUserId)) return;
+        if (string.IsNullOrEmpty(selectedProjectId) || string.IsNullOrEmpty(selectedUserId))
+        {
+            teamModalMessage = "Please select a user from the dropdown.";
+            return;
+        }
         
-        var payload = new APIDataAccParms 
-        { 
-            ProcID = "ASSIGN_PM",
-            parm01 = selectedProjectId,
-            parm02 = selectedUserId,
-            parm04 = userId,
-            parm05 = role
-        };
-        await BackendApi.FetchDataAsync(payload);
-        
-        selectedUserId = "";
-        selectedModuleForAssign = "";
-        await LoadProjectMembers(selectedProjectId);
-        await LoadProjects();
+        isAssigningTeam = true;
+        teamModalMessage = "";
+        try
+        {
+            var payload = new APIDataAccParms 
+            { 
+                ProcID = "ASSIGN_PM",
+                parm01 = selectedProjectId,
+                parm02 = selectedUserId,
+                parm04 = userId,
+                parm05 = role
+            };
+            await BackendApi.FetchDataAsync(payload);
+            
+            selectedUserId = "";
+            selectedModuleForAssign = "";
+            teamModalMessage = "Project Manager assigned successfully!";
+            await LoadProjectMembers(selectedProjectId);
+            await LoadProjects();
+        }
+        catch (Exception ex)
+        {
+            teamModalMessage = "Error setting PM: " + ex.Message;
+        }
+        finally
+        {
+            isAssigningTeam = false;
+        }
     }
 
     private async Task RemoveTeamMember(string? memberUserId)
@@ -974,11 +1114,13 @@
         var result = await BackendApi.FetchDataAsync(payload);
         if (result.HasValue)
         {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
-                    foreach (var el in result.Value.EnumerateArray()) allTickets.Add(el);
-                else if (result.Value.TryGetProperty("ticket_number", out _)) allTickets.Add(result.Value);
-            } catch {}
+            ExtractItems(result.Value, el =>
+            {
+                if (!string.IsNullOrEmpty(GetPropString(el, "ticket_number", "id")))
+                {
+                    allTickets.Add(el);
+                }
+            });
         }
     }
 

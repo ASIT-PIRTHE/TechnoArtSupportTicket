@@ -1,0 +1,650 @@
+@page "/attendance/leaves"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@inject ApiService BackendApi
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Leave Management - TechnoArt</PageTitle>
+
+<div class="container-fluid py-2 py-md-4 px-2 px-md-3" style="max-width: 100%; overflow-x: hidden;">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-3">
+        <div>
+            <h4 class="fw-bold mb-1 text-primary">
+                <i class="bi bi-calendar2-range me-2"></i> Leave Management
+            </h4>
+            <p class="text-muted small mb-0">Apply for leaves, view balance quotas, and manage staff leave approvals</p>
+        </div>
+        <div>
+            <button class="btn btn-primary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="() => showApplyModal = true">
+                <i class="bi bi-plus-lg me-1"></i> Apply For Leave
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi @(isSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i> @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    <!-- Leave Balances -->
+    <div class="row g-2 g-sm-3 mb-4">
+        <div class="col-12 col-sm-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-light">
+                <div class="text-muted small fw-bold text-uppercase">Casual Leave</div>
+                <div class="fs-3 fw-bold text-primary my-1">10 <span class="fs-6 fw-normal text-muted">/ 14 Days</span></div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: 71%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-light">
+                <div class="text-muted small fw-bold text-uppercase">Sick Leave</div>
+                <div class="fs-3 fw-bold text-warning my-1">12 <span class="fs-6 fw-normal text-muted">/ 14 Days</span></div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: 85%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-light">
+                <div class="text-muted small fw-bold text-uppercase">Annual / Earned</div>
+                <div class="fs-3 fw-bold text-success my-1">18 <span class="fs-6 fw-normal text-muted">/ 20 Days</span></div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 90%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-light">
+                <div class="text-muted small fw-bold text-uppercase">Pending Requests</div>
+                <div class="fs-3 fw-bold text-info my-1">@pendingLeavesCount</div>
+                <div class="small text-muted">Awaiting supervisor sign-off</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaves List -->
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white border-bottom py-3 px-3 px-md-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h6 class="fw-bold mb-0"><i class="bi bi-list-check me-2 text-primary"></i> Leave Applications & History</h6>
+            <div class="d-flex gap-2">
+                <select class="form-select form-select-sm" @bind="selectedTab">
+                    <option value="ALL">All Requests</option>
+                    <option value="PENDING">Pending Only</option>
+                    <option value="APPROVED">Approved Only</option>
+                    <option value="REJECTED">Rejected Only</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="min-width: 800px;">
+                <thead class="table-light small text-uppercase text-nowrap">
+                    <tr>
+                        <th class="ps-4">Employee</th>
+                        <th>Leave Type</th>
+                        <th>Dates & Duration</th>
+                        <th>Reason</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filteredLeaves.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-calendar2-x fs-2 d-block mb-2"></i> No leave requests found in this category.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var leave in filteredLeaves)
+                        {
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark">@leave.EmployeeName</div>
+                                    <div class="small text-muted">@leave.Designation</div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                        @leave.LeaveType
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">@leave.FromDate.ToString("MMM dd, yyyy") - @leave.ToDate.ToString("MMM dd, yyyy")</div>
+                                    <div class="small text-muted">@leave.TotalDays Day(s)</div>
+                                </td>
+                                <td>
+                                    <span class="text-truncate d-inline-block" style="max-width: 250px;" title="@leave.Reason">@leave.Reason</span>
+                                    @if (!string.IsNullOrEmpty(leave.Remarks))
+                                    {
+                                        <div class="small text-info"><i class="bi bi-chat-quote me-1"></i> HR: @leave.Remarks</div>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge @GetBadge(leave.Status)">@leave.Status</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => OpenViewModal(leave)" title="View Application">
+                                        <i class="bi bi-eye"></i> View
+                                    </button>
+                                    <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,HRManager">
+                                        <Authorized>
+                                            @if (leave.Status == "PENDING")
+                                            {
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-success" @onclick="() => UpdateLeaveStatus(leave.Id, true)">
+                                                        <i class="bi bi-check-lg me-1"></i> Approve
+                                                    </button>
+                                                    <button class="btn btn-outline-danger" @onclick="() => UpdateLeaveStatus(leave.Id, false)">
+                                                        <i class="bi bi-x-lg me-1"></i> Reject
+                                                    </button>
+                                                </div>
+                                            }
+                                        </Authorized>
+                                    </AuthorizeView>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Apply Leave Modal -->
+    @if (showApplyModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-bottom">
+                        <h5 class="modal-title fw-bold">Apply For Leave</h5>
+                        <button type="button" class="btn-close" @onclick="() => showApplyModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Leave Type <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="formLeaveType">
+                                <option value="Casual Leave">Casual Leave (Personal / Urgent)</option>
+                                <option value="Sick Leave">Sick Leave (Medical / Illness)</option>
+                                <option value="Annual Leave">Annual Leave</option>
+                                <option value="Maternity / Paternity">Maternity / Paternity</option>
+                                <option value="Unpaid Leave">Unpaid Leave</option>
+                            </select>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">From Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" @bind="formFromDate" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">To Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" @bind="formToDate" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold mb-0">Reason for Absence <span class="text-danger">*</span></label>
+                                <span class="small text-muted">@formReason.Length / 500 chars</span>
+                            </div>
+                            <textarea class="form-control" rows="3" placeholder="Provide details regarding your leave request..." @bind="formReason" @bind:event="oninput" maxlength="500"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top">
+                        <button type="button" class="btn btn-light" @onclick="() => showApplyModal = false">Cancel</button>
+                        <button type="button" class="btn btn-primary px-4" @onclick="SubmitLeaveApplication">
+                            <i class="bi bi-send me-1"></i> Submit Application
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- View Leave Details Modal -->
+    @if (viewingLeave != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-bottom">
+                        <div>
+                            <h5 class="modal-title fw-bold">Leave Application Details</h5>
+                            <span class="badge @GetBadge(viewingLeave.Status) mt-1">@viewingLeave.Status</span>
+                        </div>
+                        <button type="button" class="btn-close" @onclick="() => viewingLeave = null"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <small class="text-muted text-uppercase fw-bold" style="font-size: 10px;">Applicant</small>
+                                <div class="fw-bold text-dark">@viewingLeave.EmployeeName</div>
+                                <div class="small text-muted">@viewingLeave.Designation</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <small class="text-muted text-uppercase fw-bold" style="font-size: 10px;">Leave Category</small>
+                                <div class="fw-bold text-primary">@viewingLeave.LeaveType</div>
+                                <div class="small text-muted">@viewingLeave.TotalDays Day(s) Total</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-light p-3 rounded-3 border mb-3">
+                            <div class="d-flex justify-content-between text-muted small mb-1">
+                                <span>From: <strong>@viewingLeave.FromDate.ToString("dd MMM yyyy")</strong></span>
+                                <span>To: <strong>@viewingLeave.ToDate.ToString("dd MMM yyyy")</strong></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-muted text-uppercase" style="font-size: 10px;">Reason for Leave</label>
+                            <div class="p-3 bg-light rounded-3 border text-dark small" style="white-space: pre-wrap; line-height: 1.6;">
+                                @viewingLeave.Reason
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(viewingLeave.Remarks))
+                        {
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-muted text-uppercase" style="font-size: 10px;">Supervisor / HR Remarks</label>
+                                <div class="p-2 bg-light border-start border-3 border-primary rounded small text-muted">
+                                    @viewingLeave.Remarks
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer border-top d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary btn-sm" @onclick="() => viewingLeave = null">Close</button>
+                        <AuthorizeView Roles="SuperAdmin,MD,SupportManager,ProjectManager,HRManager">
+                            <Authorized>
+                                @if (viewingLeave.Status == "PENDING")
+                                {
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-success" @onclick="() => { UpdateLeaveStatus(viewingLeave.Id, true); viewingLeave = null; }">
+                                            <i class="bi bi-check-lg me-1"></i> Approve Leave
+                                        </button>
+                                        <button class="btn btn-danger" @onclick="() => { UpdateLeaveStatus(viewingLeave.Id, false); viewingLeave = null; }">
+                                            <i class="bi bi-x-lg me-1"></i> Reject Leave
+                                        </button>
+                                    </div>
+                                }
+                            </Authorized>
+                        </AuthorizeView>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool showApplyModal = false;
+    private LeaveItem? viewingLeave;
+    private void OpenViewModal(LeaveItem l) => viewingLeave = l;
+    private string selectedTab = "ALL";
+    private int pendingLeavesCount = 0;
+
+    private string formLeaveType = "Casual Leave";
+    private DateTime formFromDate = DateTime.Today.AddDays(1);
+    private DateTime formToDate = DateTime.Today.AddDays(1);
+    private string formReason = "";
+
+    private string? statusMessage;
+    private bool isSuccess = true;
+
+    public class LeaveItem
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+
+        [System.Text.Json.Serialization.JsonPropertyName("employee_name")]
+        public string EmployeeName { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("designation")]
+        public string Designation { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("project_id")]
+        public string ProjectId { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("project_name")]
+        public string ProjectName { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("applicant_user_id")]
+        public string ApplicantUserId { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("leave_type")]
+        public string LeaveType { get; set; } = "Casual Leave";
+
+        [System.Text.Json.Serialization.JsonPropertyName("from_date")]
+        public DateTime FromDate { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("to_date")]
+        public DateTime ToDate { get; set; }
+
+        public int TotalDays => Math.Max(1, (int)(ToDate - FromDate).TotalDays + 1);
+
+        [System.Text.Json.Serialization.JsonPropertyName("reason")]
+        public string Reason { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("status")]
+        public string Status { get; set; } = "PENDING";
+
+        [System.Text.Json.Serialization.JsonPropertyName("remarks")]
+        public string? Remarks { get; set; }
+    }
+
+    private List<LeaveItem> leaves = new();
+    private string currentUserRole = "";
+    private string currentUserId = "";
+    private string currentUserName = "";
+    private string currentUserDesignation = "";
+    private HashSet<string> pmProjectIds = new();
+
+    private List<LeaveItem> filteredLeaves
+    {
+        get
+        {
+            var list = leaves.AsEnumerable();
+            if (selectedTab != "ALL")
+            {
+                list = list.Where(x => x.Status == selectedTab);
+            }
+
+            if (currentUserRole == "SuperAdmin" || currentUserRole == "MD" || currentUserRole == "HRManager" || currentUserRole == "SupportManager")
+            {
+                // Full company-wide leave visibility
+            }
+            else if (currentUserRole == "ProjectManager")
+            {
+                // PM can see and approve all leave applications from their assigned teams/projects
+                list = list.Where(x => 
+                    string.Equals(x.EmployeeName, currentUserName, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrEmpty(x.ProjectId) && pmProjectIds.Contains(x.ProjectId)) ||
+                    pmProjectIds.Count == 0); // If no project filter, allow PM to review team leaves
+            }
+            else
+            {
+                // Regular employees only see their own leave requests
+                if (!string.IsNullOrEmpty(currentUserName))
+                {
+                    list = list.Where(x => string.Equals(x.EmployeeName, currentUserName, StringComparison.OrdinalIgnoreCase)
+                        || (!string.IsNullOrEmpty(x.ApplicantUserId) && string.Equals(x.ApplicantUserId, currentUserId, StringComparison.OrdinalIgnoreCase)));
+                }
+            }
+
+            return list.OrderByDescending(x => x.FromDate).ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        currentUserRole = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+        currentUserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+            ?? user.FindFirst("nameid")?.Value 
+            ?? user.FindFirst("id")?.Value 
+            ?? "";
+        currentUserName = user.Identity?.Name ?? "";
+        currentUserDesignation = user.FindFirst("Designation")?.Value ?? (currentUserRole == "ProjectManager" ? "Project Manager" : "Software Team");
+
+        if (currentUserRole == "ProjectManager")
+        {
+            try
+            {
+                var projReq = new APIDataAccParms
+                {
+                    ProcID = "GET_PROJECTS",
+                    parm04 = currentUserId,
+                    parm05 = currentUserRole
+                };
+                var projRes = await BackendApi.FetchDataAsync(projReq);
+                if (projRes.HasValue)
+                {
+                    void AddPmProj(JsonElement el)
+                    {
+                        if (el.ValueKind == JsonValueKind.Array)
+                            foreach (var s in el.EnumerateArray()) AddPmProj(s);
+                        else if (el.ValueKind == JsonValueKind.Object)
+                        {
+                            if (el.TryGetProperty("Table", out var t) && t.ValueKind == JsonValueKind.Array)
+                                foreach (var s in t.EnumerateArray()) AddPmProj(s);
+                            else if (el.TryGetProperty("data", out var d) && d.ValueKind == JsonValueKind.Array)
+                                foreach (var s in d.EnumerateArray()) AddPmProj(s);
+                            else if (el.TryGetProperty("project_id", out var pid))
+                            {
+                                var pStr = pid.GetString();
+                                if (!string.IsNullOrEmpty(pStr)) pmProjectIds.Add(pStr);
+                            }
+                        }
+                    }
+                    AddPmProj(projRes.Value);
+                }
+            }
+            catch { }
+        }
+
+        await LoadLeaves();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && (leaves == null || leaves.Count == 0))
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            currentUserRole = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+            currentUserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                ?? user.FindFirst("nameid")?.Value 
+                ?? user.FindFirst("id")?.Value 
+                ?? "";
+            currentUserName = user.Identity?.Name ?? "";
+            currentUserDesignation = user.FindFirst("Designation")?.Value ?? (currentUserRole == "ProjectManager" ? "Project Manager" : "Software Team");
+
+            await LoadLeaves();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadLeaves()
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
+                ProcID = "GET_LEAVES",
+                parm04 = currentUserId,
+                parm05 = currentUserRole
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue)
+            {
+                var loaded = new List<LeaveItem>();
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+                void ExtractLeaves(JsonElement el)
+                {
+                    if (el.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var sub in el.EnumerateArray()) ExtractLeaves(sub);
+                    }
+                    else if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        if (el.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var sub in tbl.EnumerateArray()) ExtractLeaves(sub);
+                        }
+                        else if (el.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var sub in dt.EnumerateArray()) ExtractLeaves(sub);
+                        }
+                        else
+                        {
+                            try
+                            {
+                                var item = JsonSerializer.Deserialize<LeaveItem>(el.GetRawText(), opts);
+                                if (item != null && !string.IsNullOrEmpty(item.Id)) loaded.Add(item);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                ExtractLeaves(res.Value);
+                if (loaded.Count > 0)
+                {
+                    leaves = loaded;
+                }
+            }
+            if (leaves.Count == 0)
+            {
+                // Demo seed if database has zero leaves
+                leaves = new List<LeaveItem>
+                {
+                    new LeaveItem
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        EmployeeName = "Shuvo TAS",
+                        Designation = "Software Engineer",
+                        LeaveType = "Casual Leave",
+                        FromDate = DateTime.Today.AddDays(3),
+                        ToDate = DateTime.Today.AddDays(4),
+                        Reason = "Family commitment and personal travel.",
+                        Status = "PENDING"
+                    },
+                    new LeaveItem
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        EmployeeName = "Tariqul Islam",
+                        Designation = "Database Admin",
+                        LeaveType = "Sick Leave",
+                        FromDate = DateTime.Today.AddDays(-5),
+                        ToDate = DateTime.Today.AddDays(-4),
+                        Reason = "Severe viral fever and prescription rest.",
+                        Status = "APPROVED",
+                        Remarks = "Approved by HR. Medical cert received."
+                    }
+                };
+            }
+
+            pendingLeavesCount = leaves.Count(x => x.Status == "PENDING");
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Leaves load error: " + ex.Message;
+            isSuccess = false;
+        }
+    }
+
+    private async Task SubmitLeaveApplication()
+    {
+        if (string.IsNullOrWhiteSpace(formReason))
+        {
+            statusMessage = "Please describe the reason for your leave.";
+            isSuccess = false;
+            return;
+        }
+
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var username = authState.User.Identity?.Name ?? "Employee";
+
+            var newLeave = new LeaveItem
+            {
+                Id = Guid.NewGuid().ToString(),
+                EmployeeName = username,
+                ApplicantUserId = currentUserId,
+                Designation = currentUserDesignation,
+                ProjectId = pmProjectIds.FirstOrDefault() ?? "",
+                LeaveType = formLeaveType,
+                FromDate = formFromDate,
+                ToDate = formToDate,
+                Reason = formReason,
+                Status = "PENDING"
+            };
+
+            leaves.Insert(0, newLeave);
+
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
+                ProcID = "APPLY_LEAVE",
+                parm01 = newLeave.Id,
+                parm02 = username,
+                parm03 = formLeaveType,
+                parm04 = formFromDate.ToString("yyyy-MM-dd"),
+                parm05 = formToDate.ToString("yyyy-MM-dd"),
+                parm06 = formReason,
+                parm07 = newLeave.ProjectId,
+                parm08 = currentUserId,
+                parm09 = currentUserRole
+            };
+
+            await BackendApi.FetchDataAsync(req);
+            showApplyModal = false;
+            formReason = "";
+            pendingLeavesCount = leaves.Count(x => x.Status == "PENDING");
+            statusMessage = "Leave application submitted successfully!";
+            isSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Application error: " + ex.Message;
+            isSuccess = false;
+        }
+    }
+
+    private async Task UpdateLeaveStatus(string id, bool isApprove)
+    {
+        var target = leaves.FirstOrDefault(x => x.Id == id);
+        if (target != null)
+        {
+            var approverTitle = currentUserRole switch
+            {
+                "ProjectManager" => "Project Manager",
+                "HRManager" => "HR Manager",
+                "MD" => "Managing Director",
+                "SuperAdmin" => "Super Admin",
+                _ => "Supervisor"
+            };
+            var newStatus = isApprove ? "APPROVED" : "REJECTED";
+            target.Status = newStatus;
+            target.Remarks = isApprove ? $"Approved by {approverTitle}" : $"Rejected by {approverTitle}";
+
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
+                ProcID = "UPDATE_LEAVE_STATUS",
+                parm01 = id.ToString(),
+                parm02 = newStatus,
+                parm03 = target.Remarks,
+                parm04 = currentUserId,
+                parm05 = currentUserRole
+            };
+
+            await BackendApi.FetchDataAsync(req);
+            pendingLeavesCount = leaves.Count(x => x.Status == "PENDING");
+            statusMessage = $"Leave request has been {newStatus.ToLower()} by {approverTitle}!";
+            isSuccess = true;
+        }
+    }
+
+    private string GetBadge(string status) => status switch
+    {
+        "APPROVED" => "bg-success",
+        "REJECTED" => "bg-danger",
+        _ => "bg-warning text-dark"
+    };
+}

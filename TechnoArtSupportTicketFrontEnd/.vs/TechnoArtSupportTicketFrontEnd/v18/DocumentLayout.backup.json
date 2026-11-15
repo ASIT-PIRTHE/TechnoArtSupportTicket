@@ -1,42 +1,14 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\",
+  "WorkspaceRootPath": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticket\\technoartsupportticketfrontend\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
       "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\components\\pages\\projects.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:components\\pages\\projects.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\auth\\customauthstateprovider.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:auth\\customauthstateprovider.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\services\\apiservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:services\\apiservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\components\\layout\\mainlayout.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:components\\layout\\mainlayout.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\components\\pages\\home.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:components\\pages\\home.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\components\\pages\\ticketdetails.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:components\\pages\\ticketdetails.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticketfrontend\\components\\pages\\login.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:components\\pages\\login.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+      "AbsoluteMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|d:\\ticket\\technoartsupportticket\\technoartsupportticket\\technoartsupportticketfrontend\\components\\pages\\attendance\\branches.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{43248DB0-A1E2-4D97-9ED7-FE80C7A1BB05}|TechnoArtSupportTicketFrontEnd.csproj|solutionrelative:components\\pages\\attendance\\branches.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     }
   ],
   "DocumentGroupContainers": [
@@ -46,7 +18,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 38,
+          "SelectedChildIndex": 35,
           "Children": [
             {
               "$type": "Bookmark",
@@ -190,118 +162,29 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "ApiService.cs",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Services\\ApiService.cs",
-              "RelativeDocumentMoniker": "Services\\ApiService.cs",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Services\\ApiService.cs",
-              "RelativeToolTip": "Services\\ApiService.cs",
-              "ViewState": "AgIAADoAAAAAAAAAAAAqwEgAAAAQAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-10T16:25:39.93Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "MainLayout.razor",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Layout\\MainLayout.razor",
-              "RelativeDocumentMoniker": "Components\\Layout\\MainLayout.razor",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Layout\\MainLayout.razor",
-              "RelativeToolTip": "Components\\Layout\\MainLayout.razor",
-              "ViewState": "AgIAAHkAAAAAAAAAAAAqwIkAAAAMAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-03T12:29:50.469Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "Projects.razor",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\Projects.razor",
-              "RelativeDocumentMoniker": "Components\\Pages\\Projects.razor",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\Projects.razor",
-              "RelativeToolTip": "Components\\Pages\\Projects.razor",
-              "ViewState": "AgIAACwBAAAAAAAAAAAAADkBAAAEAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-09-29T16:48:29.6Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
               "DocumentIndex": 0,
               "Title": "appsettings.json",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\appsettings.json",
+              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\appsettings.json",
               "RelativeDocumentMoniker": "appsettings.json",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\appsettings.json",
+              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\appsettings.json",
               "RelativeToolTip": "appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAACAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAAlAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-09-29T16:46:18.339Z",
+              "WhenOpened": "2026-11-15T20:22:29.58Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "Program.cs",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Program.cs",
-              "RelativeDocumentMoniker": "Program.cs",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Program.cs",
-              "RelativeToolTip": "Program.cs",
-              "ViewState": "AgIAAD0AAAAAAAAAAADgv0cAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-26T12:34:01.948Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "CustomAuthStateProvider.cs",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Auth\\CustomAuthStateProvider.cs",
-              "RelativeDocumentMoniker": "Auth\\CustomAuthStateProvider.cs",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Auth\\CustomAuthStateProvider.cs",
-              "RelativeToolTip": "Auth\\CustomAuthStateProvider.cs",
-              "ViewState": "AgIAAB4AAAAAAAAAAADgvycAAAAIAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-16T21:18:02.661Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "Home.razor",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\Home.razor",
-              "RelativeDocumentMoniker": "Components\\Pages\\Home.razor",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\Home.razor",
-              "RelativeToolTip": "Components\\Pages\\Home.razor",
-              "ViewState": "AgIAAPEAAAAAAAAAAAAqwAIBAAAbAAAAAAAAAA==",
+              "Title": "Branches.razor",
+              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\Attendance\\Branches.razor",
+              "RelativeDocumentMoniker": "Components\\Pages\\Attendance\\Branches.razor",
+              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\Attendance\\Branches.razor",
+              "RelativeToolTip": "Components\\Pages\\Attendance\\Branches.razor",
+              "ViewState": "AgIAAB8AAAAAAAAAAAAwwCsAAAAMAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-10T11:20:50.436Z",
+              "WhenOpened": "2026-11-15T18:02:11.319Z",
               "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "TicketDetails.razor",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\TicketDetails.razor",
-              "RelativeDocumentMoniker": "Components\\Pages\\TicketDetails.razor",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\TicketDetails.razor",
-              "RelativeToolTip": "Components\\Pages\\TicketDetails.razor",
-              "ViewState": "AgIAADcAAAAAAAAAAAAqwEgAAAALAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-14T19:49:17.753Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "Login.razor",
-              "DocumentMoniker": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\Login.razor",
-              "RelativeDocumentMoniker": "Components\\Pages\\Login.razor",
-              "ToolTip": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicketFrontEnd\\Components\\Pages\\Login.razor",
-              "RelativeToolTip": "Components\\Pages\\Login.razor",
-              "ViewState": "AgIAACsBAAAAAAAAAAAAAEgAAAARAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-09-16T21:17:28.388Z"
             }
           ]
         }

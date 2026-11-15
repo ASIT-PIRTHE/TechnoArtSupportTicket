@@ -1,0 +1,432 @@
+@page "/profile"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
+@inject ApiService BackendApi
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Personnel Profile & Identity - TechnoArt</PageTitle>
+
+<div class="container-fluid py-2 py-md-4 px-2 px-md-3" style="max-width: 1200px;">
+    <!-- Header -->
+    <div class="mb-4">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle text-uppercase fw-bold px-2 py-1" style="font-size: 10px; letter-spacing: 1.5px;">
+                Personnel Profile Control
+            </span>
+        </div>
+        <h3 class="fw-black text-dark mb-1">System Identity</h3>
+        <p class="text-muted small mb-0">Verify and synchronize your authentication credentials, personnel records, and biometric parameters</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show shadow-sm rounded-4" role="alert">
+            <i class="bi @(isSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i> @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <!-- Left: Identity Overview & Service Record -->
+        <div class="col-lg-4">
+            <!-- Profile Avatar Card -->
+            <div class="card border-0 shadow-sm rounded-4 text-center p-3 p-md-4 mb-4 position-relative overflow-hidden">
+                <div class="position-absolute top-0 start-0 w-100" style="height: 6px; background: linear-gradient(90deg, #2b3990 0%, #3b82f6 100%);"></div>
+                
+                <div class="avatar-wrapper mx-auto my-3 position-relative">
+                    <div class="rounded-circle bg-light border border-4 border-white shadow-sm d-flex align-items-center justify-content-center mx-auto overflow-hidden" style="width: 110px; height: 110px;">
+                        @if (!string.IsNullOrEmpty(photoUrl))
+                        {
+                            <img src="@photoUrl" alt="Avatar" class="w-100 h-100 object-fit-cover" />
+                        }
+                        else
+                        {
+                            <i class="bi bi-person-fill text-primary display-4"></i>
+                        }
+                    </div>
+                    <span class="position-absolute bottom-0 end-0 translate-middle p-2 bg-success border border-white rounded-circle">
+                        <span class="visually-hidden">Online</span>
+                    </span>
+                </div>
+
+                <h5 class="fw-bold text-dark mb-1">@fullName</h5>
+                <div class="text-primary small fw-bold text-uppercase mb-3" style="letter-spacing: 1px;">@(designation ?? "Engineering Staff")</div>
+
+                <div class="d-inline-flex align-items-center gap-2 px-3 py-1 bg-light text-dark rounded-pill small fw-semibold border mx-auto">
+                    <i class="bi bi-shield-check text-danger"></i>
+                    Role: <span class="badge bg-primary">@userRole</span>
+                </div>
+            </div>
+
+            <!-- Service Record Card -->
+            <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                    <i class="bi bi-briefcase text-primary fs-5"></i>
+                    <h6 class="fw-bold mb-0 text-dark text-uppercase small" style="letter-spacing: 1px;">Service Record</h6>
+                </div>
+
+                <div class="vstack gap-3">
+                    <div class="d-flex align-items-start gap-3 p-3 rounded-3 bg-light border">
+                        <div class="rounded-3 bg-white border p-2 text-primary">
+                            <i class="bi bi-geo-alt"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted text-uppercase fw-bold" style="font-size: 10px;">Assigned Hub</div>
+                            <div class="fw-bold text-dark small">@(branchName ?? "Dhaka Main Office")</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-start gap-3 p-3 rounded-3 bg-light border">
+                        <div class="rounded-3 bg-white border p-2 text-primary">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted text-uppercase fw-bold" style="font-size: 10px;">Shift Schedule</div>
+                            <div class="fw-bold text-dark small">@(shiftSchedule ?? "09:30 AM - 06:30 PM")</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-start gap-3 p-3 rounded-3 bg-light border">
+                        <div class="rounded-3 bg-white border p-2 text-primary">
+                            <i class="bi bi-card-heading"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted text-uppercase fw-bold" style="font-size: 10px;">Personnel Index ID</div>
+                            <div class="fw-bold text-dark font-monospace small">@(employeeCode ?? "TAS-104")</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-start gap-3 p-3 rounded-3 bg-light border">
+                        <div class="rounded-3 bg-white border p-2 text-primary">
+                            <i class="bi bi-calendar-check"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted text-uppercase fw-bold" style="font-size: 10px;">Commission Date</div>
+                            <div class="fw-bold text-dark small">@(joiningDate ?? "15 Jan 2024")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Edit Form & Security Encryption -->
+        <div class="col-lg-8">
+            <form @onsubmit="SaveProfile">
+                <!-- Identity Core -->
+                <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mb-4">
+                    <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+                        <div class="rounded-3 bg-primary-subtle text-primary p-2">
+                            <i class="bi bi-person-lines-fill fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">Identity Core</h5>
+                            <small class="text-muted">Primary personnel credentials and biological parameters</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold text-dark">Full Legal Name <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                                <input type="text" class="form-control" @bind="fullName" required placeholder="Your full name" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold text-dark">Official Email (Read-Only)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                                <input type="email" class="form-control bg-light" @bind="email" disabled />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold text-dark">Communication Phone</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-telephone"></i></span>
+                                <input type="tel" class="form-control" @bind="phone" placeholder="+880 17XXXXXXXX" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold text-dark">National ID / Passport Ref</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-credit-card"></i></span>
+                                <input type="text" class="form-control" @bind="nationalId" placeholder="NID Number" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold text-dark">Bio-Vector (Blood Group)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-droplet text-danger"></i></span>
+                                <select class="form-select fw-semibold" @bind="bloodGroup">
+                                    <option value="">Not Disclosed</option>
+                                    <option value="A+">A+ (A Positive)</option>
+                                    <option value="A-">A- (A Negative)</option>
+                                    <option value="B+">B+ (B Positive)</option>
+                                    <option value="B-">B- (B Negative)</option>
+                                    <option value="O+">O+ (O Positive)</option>
+                                    <option value="O-">O- (O Negative)</option>
+                                    <option value="AB+">AB+ (AB Positive)</option>
+                                    <option value="AB-">AB- (AB Negative)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold text-dark">Profile Photo</label>
+                            <div class="d-flex gap-2">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="bi bi-image"></i></span>
+                                    <input type="text" class="form-control" @bind="photoUrl" placeholder="Image URL or upload below..." />
+                                </div>
+                                <label class="btn btn-outline-primary d-flex align-items-center shadow-sm" title="Upload local image">
+                                    <i class="bi bi-upload"></i>
+                                    <InputFile OnChange="HandleProfilePhotoUpload" accept="image/*" class="d-none" />
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Encryption -->
+                <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mb-4">
+                    <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+                        <div class="rounded-3 bg-danger-subtle text-danger p-2">
+                            <i class="bi bi-key fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">Security Encryption</h5>
+                            <small class="text-muted">Authorization override & password cipher updates</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold text-dark">New Password Cipher</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                                <input type="password" class="form-control" @bind="newPassword" placeholder="Enter new password (min 6 chars)" minlength="6" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold text-dark">Validate Cipher</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-shield-lock"></i></span>
+                                <input type="password" class="form-control" @bind="confirmPassword" placeholder="Confirm new password" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-flex justify-content-stretch justify-content-sm-end gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg w-100 w-sm-auto px-sm-5 rounded-3 shadow-sm fw-bold" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Synchronizing...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-check2-circle me-2"></i>
+                            <span>Synchronize Profile</span>
+                        }
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isSubmitting = false;
+    private string? statusMessage;
+    private bool isSuccess = true;
+
+    // Profile form state
+    private string fullName = "";
+    private string email = "";
+    private string phone = "";
+    private string nationalId = "";
+    private string bloodGroup = "B+";
+    private string? photoUrl;
+    private string userRole = "TeamMember";
+    private string designation = "Engineering Staff";
+    private string branchName = "Dhaka Office";
+    private string shiftSchedule = "09:30 AM - 06:30 PM";
+    private string employeeCode = "";
+    private string joiningDate = "";
+
+    private string newPassword = "";
+    private string confirmPassword = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/login?returnUrl=profile");
+            return;
+        }
+
+        var un = user.FindFirst(ClaimTypes.Name)?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.Identity?.Name ?? "";
+        fullName = user.FindFirst("FullName")?.Value ?? un;
+        email = user.FindFirst(ClaimTypes.Email)?.Value ?? (un.Contains("@") ? un : "");
+        userRole = user.FindFirst(ClaimTypes.Role)?.Value ?? "TeamMember";
+        await LoadProfile();
+    }
+
+    private static string GetProp(JsonElement el, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (el.TryGetProperty(name, out var p))
+            {
+                return p.ValueKind switch
+                {
+                    JsonValueKind.String => p.GetString() ?? "",
+                    JsonValueKind.Number => p.ToString(),
+                    _ => p.ToString()
+                };
+            }
+        }
+        return "";
+    }
+
+    private async Task LoadProfile()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var username = user.FindFirst(ClaimTypes.Name)?.Value 
+                        ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                        ?? user.Identity?.Name 
+                        ?? "";
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "GET_USER_PROFILE",
+                parm01 = username,
+                parm04 = userId
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue)
+            {
+                var root = res.Value;
+                if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0) root = root[0];
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    var n = GetProp(root, "name", "full_name");
+                    if (!string.IsNullOrEmpty(n)) fullName = n;
+                    var e = GetProp(root, "email", "username");
+                    if (!string.IsNullOrEmpty(e)) email = e;
+                    var p = GetProp(root, "phone");
+                    if (!string.IsNullOrEmpty(p)) phone = p;
+                    var nid = GetProp(root, "national_id");
+                    if (!string.IsNullOrEmpty(nid)) nationalId = nid;
+                    var bg = GetProp(root, "blood_group");
+                    if (!string.IsNullOrEmpty(bg)) bloodGroup = bg;
+                    var ph = GetProp(root, "photo_url");
+                    if (!string.IsNullOrEmpty(ph)) photoUrl = ph;
+                    var d = GetProp(root, "designation");
+                    if (!string.IsNullOrEmpty(d)) designation = d;
+                    var r = GetProp(root, "role");
+                    if (!string.IsNullOrEmpty(r)) userRole = r;
+                    var bn = GetProp(root, "branch_name");
+                    if (!string.IsNullOrEmpty(bn)) branchName = bn;
+                    var st = GetProp(root, "shift_timing");
+                    if (!string.IsNullOrEmpty(st)) shiftSchedule = st;
+                    var ec = GetProp(root, "employee_code");
+                    if (!string.IsNullOrEmpty(ec)) employeeCode = ec;
+                    var jd = GetProp(root, "join_date", "created_at");
+                    if (!string.IsNullOrEmpty(jd)) joiningDate = jd;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Profile load error: " + ex.Message);
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        if (!string.IsNullOrEmpty(newPassword) && newPassword != confirmPassword)
+        {
+            statusMessage = "Validation Error: Password cipher does not match confirmation.";
+            isSuccess = false;
+            return;
+        }
+
+        isSubmitting = true;
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var lookup = !string.IsNullOrEmpty(email) ? email : (user.FindFirst(ClaimTypes.Name)?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "");
+
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "UPDATE_USER_PROFILE",
+                parm01 = lookup,
+                parm02 = fullName,
+                parm03 = phone,
+                parm04 = nationalId,
+                parm05 = bloodGroup,
+                parm06 = photoUrl ?? "",
+                parm07 = string.IsNullOrEmpty(newPassword) ? "" : newPassword
+            };
+
+            await BackendApi.FetchDataAsync(req);
+            statusMessage = "Profile identity synchronized successfully!";
+            isSuccess = true;
+            newPassword = "";
+            confirmPassword = "";
+            await LoadProfile();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Update Error: " + ex.Message;
+            isSuccess = false;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task HandleProfilePhotoUpload(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file != null && file.Size <= 1024 * 1024 * 3)
+            {
+                using var stream = file.OpenReadStream(1024 * 1024 * 3);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                photoUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Photo upload error: " + ex.Message;
+            isSuccess = false;
+        }
+    }
+}

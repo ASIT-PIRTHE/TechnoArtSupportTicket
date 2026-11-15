@@ -1,4 +1,5 @@
 @page "/raise-ticket"
+@attribute [Authorize]
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
 @using System.Security.Claims
@@ -10,7 +11,7 @@
 
 <PageTitle>Raise New Ticket - SupportHub</PageTitle>
 
-<div class="container-fluid py-4">
+<div class="container-fluid py-2 py-md-4 px-2 px-md-3" style="max-width: 100%; overflow-x: hidden;">
     <div class="row justify-content-center">
         <div class="col-lg-9 col-xl-8">
             <!-- Modern Header -->
@@ -25,7 +26,7 @@
             </div>
 
             <div class="card glass-card rounded-4 overflow-hidden mb-5">
-                <div class="card-body p-4 p-md-5">
+                <div class="card-body p-3 p-md-5">
                     
                     @if (isSuccess)
                     {
@@ -52,22 +53,35 @@
 
                     <form @onsubmit="SubmitTicket">
                         <div class="row g-3 mb-4">
-                            <div class="col-md-5">
+                            <div class="col-12 col-sm-6 @(isClient ? "col-md-4" : "col-md-3")">
                                 <label class="form-label fw-bold text-dark small mb-2">Project <span class="text-danger">*</span></label>
-                                <select class="form-select form-select-lg bg-light border-0" value="@ticketModel.ProjectId" @onchange="OnProjectSelected" required>
-                                    <option value="" disabled selected>-- Select a Project --</option>
-                                    @foreach(var project in projects)
-                                    {
-                                        var pId = project.TryGetProperty("project_id", out var pidp) ? pidp.GetString() ?? "" : "";
-                                        var pNm = project.TryGetProperty("name", out var pnmp) ? pnmp.GetString() ?? "" : "";
-                                        var pCd = project.TryGetProperty("code", out var pcdp) ? pcdp.GetString() ?? "" : "";
-                                        <option value="@pId">@pNm (@pCd)</option>
-                                    }
-                                </select>
+                                @if (isClient && projects.Count == 1)
+                                {
+                                    var onlyP = projects[0];
+                                    var pNm = onlyP.TryGetProperty("name", out var pnmp) ? pnmp.GetString() ?? "" : "";
+                                    var pCd = onlyP.TryGetProperty("code", out var pcdp) ? pcdp.GetString() ?? "" : "";
+                                    <div class="form-control form-control-lg bg-light border-0 fw-semibold text-primary d-flex align-items-center">
+                                        <i class="bi bi-folder-check me-2"></i> @pNm @(!string.IsNullOrEmpty(pCd) ? $"({pCd})" : "")
+                                    </div>
+                                    <input type="hidden" value="@ticketModel.ProjectId" />
+                                }
+                                else
+                                {
+                                    <select class="form-select form-select-lg bg-light border-0" value="@ticketModel.ProjectId" @onchange="OnProjectSelected" required>
+                                        <option value="" disabled selected>-- Select a Project --</option>
+                                        @foreach(var project in projects)
+                                        {
+                                            var pId = project.TryGetProperty("project_id", out var pidp) ? pidp.GetString() ?? "" : "";
+                                            var pNm = project.TryGetProperty("name", out var pnmp) ? pnmp.GetString() ?? "" : "";
+                                            var pCd = project.TryGetProperty("code", out var pcdp) ? pcdp.GetString() ?? "" : "";
+                                            <option value="@pId">@pNm (@pCd)</option>
+                                        }
+                                    </select>
+                                }
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-12 col-sm-6 @(isClient ? "col-md-4" : "col-md-3")">
                                 <label class="form-label fw-bold text-dark small mb-2">
-                                    <i class="bi bi-diagram-3 text-primary me-1"></i> Module / Department
+                                    <i class="bi bi-diagram-3 text-primary me-1"></i> Module / Dept
                                 </label>
                                 <select class="form-select form-select-lg bg-light border-0" @bind="ticketModel.ModuleId">
                                     <option value="">-- General / Whole Project --</option>
@@ -80,7 +94,25 @@
                                     }
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            @if (!isClient)
+                            {
+                                <div class="col-12 col-sm-6 col-md-3">
+                                    <label class="form-label fw-bold text-dark small mb-2">
+                                        <i class="bi bi-person-check text-success me-1"></i> Assign To User / PM
+                                    </label>
+                                    <select class="form-select form-select-lg bg-light border-0" @bind="ticketModel.AssignedToUserId">
+                                        <option value="">-- Unassigned / Auto-Route --</option>
+                                        @foreach(var u in assignableUsers)
+                                        {
+                                            var uId = u.TryGetProperty("user_id", out var uidp) ? uidp.GetString() : (u.TryGetProperty("id", out var idp) ? idp.GetString() : "");
+                                            var uNm = u.TryGetProperty("full_name", out var unmp) ? unmp.GetString() : (u.TryGetProperty("name", out var nmp) ? nmp.GetString() : "");
+                                            var uRole = u.TryGetProperty("role", out var urlp) ? urlp.GetString() : "";
+                                            <option value="@uId">@uNm (@uRole)</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            <div class="col-12 col-sm-6 @(isClient ? "col-md-4" : "col-md-3")">
                                 <label class="form-label fw-bold text-dark small mb-2">Priority <span class="text-danger">*</span></label>
                                 <select class="form-select form-select-lg bg-light border-0" @bind="ticketModel.Priority" required>
                                     <option value="LOW">🔵 Low</option>
@@ -106,12 +138,18 @@
                         </div>
                         
                         <div class="mb-5">
-                            <label class="form-label fw-bold text-dark small mb-2"><i class="bi bi-image me-1"></i> Screenshot (Optional)</label>
-                            <InputFile class="form-control form-control-lg bg-light border-0" OnChange="HandleFileSelected" accept="image/*" />
-                            <div class="form-text mt-2"><small>Max size: 5MB</small></div>
+                            <label class="form-label fw-bold text-dark small mb-2"><i class="bi bi-image me-1"></i> Screenshot / Attachments (Optional)</label>
+                            <InputFile class="form-control form-control-lg bg-light border-0" OnChange="HandleFilesSelected" accept="image/*" multiple />
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <div class="form-text"><small>Max 5 files, 5MB each</small></div>
+                                @if (selectedAttachments.Count > 0)
+                                {
+                                    <span class="badge bg-primary">@selectedAttachments.Count file(s) attached</span>
+                                }
+                            </div>
                         </div>
 
-                        <div class="d-flex align-items-center justify-content-between pt-3 border-top">
+                        <div class="d-flex flex-column-reverse flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3 pt-3 border-top">
                             <button type="button" class="btn btn-link text-muted text-decoration-none fw-semibold" @onclick='() => NavigationManager.NavigateTo("/")'>
                                 <i class="bi bi-arrow-left me-1"></i> Cancel
                             </button>
@@ -177,14 +215,18 @@
     private string errorMessage = "";
     private string generatedTicketNum = "";
 
-    private IBrowserFile? selectedFile;
-    private string base64File = "";
-    private string fileName = "";
-    private string mimeType = "";
+    public class SelectedFileAttachment
+    {
+        public string FileName { get; set; } = "";
+        public string MimeType { get; set; } = "";
+        public string Base64Data { get; set; } = "";
+    }
+    private List<SelectedFileAttachment> selectedAttachments = new();
 
     private string tenantId = "";
     private string userId = "";
     private string role = "";
+    private bool isClient => role == "ClientUser" || role == "ClientAdmin";
 
     public class TicketCreateModel
     {
@@ -193,6 +235,47 @@
         public string Subject { get; set; } = "";
         public string Priority { get; set; } = "";
         public string Description { get; set; } = "";
+        public string AssignedToUserId { get; set; } = "";
+    }
+
+    private List<JsonElement> assignableUsers = new();
+
+    private async Task LoadAssignableUsers(string projId)
+    {
+        assignableUsers.Clear();
+        try
+        {
+            var payload = new APIDataAccParms
+            {
+                ProcID = "GET_USERS",
+                ComCod = string.IsNullOrEmpty(tenantId) ? "0000" : tenantId,
+                parm01 = projId,
+                parm04 = userId,
+                parm05 = role
+            };
+            var res = await BackendApi.FetchDataAsync(payload);
+            if (res.HasValue)
+            {
+                void AddUser(JsonElement el)
+                {
+                    if (el.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var s in el.EnumerateArray()) AddUser(s);
+                    }
+                    else if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        if (el.TryGetProperty("Table", out var t) && t.ValueKind == JsonValueKind.Array)
+                            foreach (var s in t.EnumerateArray()) AddUser(s);
+                        else if (el.TryGetProperty("data", out var d) && d.ValueKind == JsonValueKind.Array)
+                            foreach (var s in d.EnumerateArray()) AddUser(s);
+                        else if (el.TryGetProperty("user_id", out _) || el.TryGetProperty("id", out _) || el.TryGetProperty("username", out _))
+                            assignableUsers.Add(el);
+                    }
+                }
+                AddUser(res.Value);
+            }
+        }
+        catch { }
     }
 
     protected override async Task OnInitializedAsync()
@@ -203,12 +286,20 @@
         if (user.Identity?.IsAuthenticated == true)
         {
             role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
-            tenantId = user.FindFirst("TenantId")?.Value ?? "";
-            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+            tenantId = user.FindFirst("TenantId")?.Value 
+                ?? user.FindFirst("tenant_id")?.Value 
+                ?? "";
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                ?? user.FindFirst("id")?.Value 
+                ?? user.FindFirst("userId")?.Value 
+                ?? user.FindFirst(ClaimTypes.Name)?.Value 
+                ?? user.Identity?.Name 
+                ?? "";
 
+            projects.Clear();
             var payload = new APIDataAccParms 
             { 
-                ComCod = tenantId,
+                ComCod = (role == "SuperAdmin" || role == "MD" || role == "SupportManager" || role == "ProjectManager") ? "" : tenantId,
                 ProcID = "GET_PROJECTS",
                 parm04 = userId,
                 parm05 = role
@@ -218,14 +309,23 @@
             if (result.HasValue)
             {
                 try {
-                    if (result.Value.ValueKind == JsonValueKind.Array)
+                    void ExtractProjects(JsonElement el)
                     {
-                        foreach (var el in result.Value.EnumerateArray()) projects.Add(el);
+                        if (el.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var s in el.EnumerateArray()) ExtractProjects(s);
+                        }
+                        else if (el.ValueKind == JsonValueKind.Object)
+                        {
+                            if (el.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+                                foreach (var s in tbl.EnumerateArray()) ExtractProjects(s);
+                            else if (el.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+                                foreach (var s in dt.EnumerateArray()) ExtractProjects(s);
+                            else if (el.TryGetProperty("project_id", out _) || el.TryGetProperty("id", out _) || el.TryGetProperty("name", out _))
+                                projects.Add(el);
+                        }
                     }
-                    else if (result.Value.TryGetProperty("project_id", out _))
-                    {
-                        projects.Add(result.Value);
-                    }
+                    ExtractProjects(result.Value);
                 } catch { } 
                 
                 if (projects.Count > 0 && string.IsNullOrEmpty(ticketModel.ProjectId))
@@ -234,7 +334,14 @@
                     if (!string.IsNullOrEmpty(ticketModel.ProjectId))
                     {
                         await LoadProjectModules(ticketModel.ProjectId);
+                        await LoadAssignableUsers(ticketModel.ProjectId);
                     }
+                }
+
+                var userMod = user.FindFirst("ModuleId")?.Value ?? user.FindFirst("module_id")?.Value ?? "";
+                if (!string.IsNullOrEmpty(userMod))
+                {
+                    ticketModel.ModuleId = userMod;
                 }
             }
         }
@@ -244,7 +351,9 @@
     {
         ticketModel.ProjectId = e.Value?.ToString() ?? "";
         ticketModel.ModuleId = "";
+        ticketModel.AssignedToUserId = "";
         await LoadProjectModules(ticketModel.ProjectId);
+        await LoadAssignableUsers(ticketModel.ProjectId);
     }
 
     private async Task LoadProjectModules(string projId)
@@ -325,13 +434,15 @@
             {
                 detailed_description = ticketModel.Description,
                 module_id = ticketModel.ModuleId,
+                assigned_to = ticketModel.AssignedToUserId,
                 environment = "Dynamic Client UI",
                 submitted_from = "SupportHub Client Portal"
             });
 
+            var effectiveComCod = string.IsNullOrEmpty(tenantId) ? "0000" : tenantId;
             var param = new APIDataAccParms
             {
-                ComCod = tenantId,
+                ComCod = effectiveComCod,
                 ProcID = "CREATE_TICKET",            
                 parmJson1 = jsonbExtendedData,       
                 parm01 = ticketModel.ProjectId,      
@@ -340,37 +451,104 @@
                 parm04 = userId,
                 parm05 = role,
                 parm06 = ticketModel.Description,
-                parm07 = ticketModel.ModuleId
+                parm07 = ticketModel.ModuleId,
+                parm08 = ticketModel.AssignedToUserId
             };
 
             var result = await BackendApi.FetchDataAsync(param);
 
-            if (result != null && result.Value.TryGetProperty("success", out var successEl) && successEl.GetBoolean())
+            JsonElement rootEl = default;
+            if (result.HasValue)
             {
-                generatedTicketNum = result.Value.TryGetProperty("ticket_number", out var numEl) ? numEl.GetString() ?? "Unknown" : "N/A";
+                var val = result.Value;
+                if (val.ValueKind == JsonValueKind.Object)
+                {
+                    if (val.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array && tbl.GetArrayLength() > 0)
+                        rootEl = tbl[0];
+                    else if (val.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array && dt.GetArrayLength() > 0)
+                        rootEl = dt[0];
+                    else
+                        rootEl = val;
+                }
+                else if (val.ValueKind == JsonValueKind.Array && val.GetArrayLength() > 0)
+                {
+                    rootEl = val[0];
+                }
+            }
+
+            bool isOpSuccess = false;
+            if (rootEl.ValueKind == JsonValueKind.Object)
+            {
+                if (rootEl.TryGetProperty("success", out var successEl))
+                {
+                    isOpSuccess = successEl.ValueKind switch
+                    {
+                        JsonValueKind.True => true,
+                        JsonValueKind.Number => successEl.GetInt64() != 0,
+                        JsonValueKind.String => successEl.GetString() == "1" || string.Equals(successEl.GetString(), "true", StringComparison.OrdinalIgnoreCase),
+                        _ => false
+                    };
+                }
+                else if (rootEl.TryGetProperty("ticket_number", out _) || rootEl.TryGetProperty("ticket_id", out _) || rootEl.TryGetProperty("id", out _) || rootEl.TryGetProperty("number", out _))
+                {
+                    isOpSuccess = true;
+                }
+            }
+
+            if (isOpSuccess)
+            {
+                generatedTicketNum = rootEl.TryGetProperty("ticket_number", out var numEl) 
+                    ? (numEl.GetString() ?? "TIC-" + DateTime.Now.ToString("yyyyMMddHHmmss")) 
+                    : (rootEl.TryGetProperty("ticket_id", out var tidEl) 
+                        ? (tidEl.GetString() ?? "TIC-" + DateTime.Now.ToString("yyyyMMddHHmmss")) 
+                        : "TIC-" + DateTime.Now.ToString("yyyyMMddHHmmss"));
                 
-                // Upload Attachment if exists
-                if (selectedFile != null && !string.IsNullOrEmpty(base64File))
+                // If user/PM assignment was selected, trigger explicit assignment
+                if (!string.IsNullOrEmpty(ticketModel.AssignedToUserId))
+                {
+                    try
+                    {
+                        var assignPayload = new APIDataAccParms
+                        {
+                            ComCod = effectiveComCod,
+                            ProcID = "ASSIGN_TICKET",
+                            parm01 = generatedTicketNum,
+                            parm02 = ticketModel.AssignedToUserId,
+                            parm04 = userId,
+                            parm05 = role
+                        };
+                        await BackendApi.FetchDataAsync(assignPayload);
+                    }
+                    catch { }
+                }
+
+                // Upload all selected attachments
+                foreach (var att in selectedAttachments)
                 {
                     try {
                         var filePayload = new APIDataAccParms
                         {
-                            ComCod = tenantId, ProcID = "UPLOAD_FILE", ProcName = "support.sp_ticket_files", 
-                            parmJson1 = base64File, parm01 = generatedTicketNum, parm02 = fileName, parm03 = mimeType,
+                            ComCod = effectiveComCod, ProcID = "UPLOAD_FILE", ProcName = "support.sp_ticket_files", 
+                            parmJson1 = att.Base64Data, parm06 = att.Base64Data, parm01 = generatedTicketNum, parm02 = att.FileName, parm03 = att.MimeType,
                             parm04 = userId, parm05 = role
                         };
                         await BackendApi.FetchDataAsync(filePayload);
-                    } catch { /* Silent fail if attachment errors */ }
+                    } catch { }
                 }
+                selectedAttachments.Clear();
 
                 isSuccess = true;
-                ticketModel = new() { Priority = "MEDIUM", ProjectId = "", ModuleId = "", Subject = "", Description = "" };
-                selectedFile = null;
-                base64File = "";
+                ticketModel = new() { Priority = "MEDIUM", ProjectId = "", ModuleId = "", Subject = "", Description = "", AssignedToUserId = "" };
             }
             else
             {
-                var serverError = result != null && result.Value.TryGetProperty("error", out var e) ? e.GetString() : "API rejected the operation.";
+                var serverError = "API rejected the operation.";
+                if (rootEl.ValueKind == JsonValueKind.Object)
+                {
+                    if (rootEl.TryGetProperty("error", out var e) && !string.IsNullOrEmpty(e.GetString())) serverError = e.GetString()!;
+                    else if (rootEl.TryGetProperty("errormessage", out var em) && !string.IsNullOrEmpty(em.GetString())) serverError = em.GetString()!;
+                    else if (rootEl.TryGetProperty("message", out var msg) && !string.IsNullOrEmpty(msg.GetString())) serverError = msg.GetString()!;
+                }
                 errorMessage = "Failed to create the ticket. " + serverError;
             }
         }
@@ -382,19 +560,23 @@
         isSubmitting = false;
     }
 
-    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    private async Task HandleFilesSelected(InputFileChangeEventArgs e)
     {
-        var file = e.File;
-        if (file != null && file.Size <= 1024 * 1024 * 5) // 5MB limit
+        selectedAttachments.Clear();
+        foreach (var file in e.GetMultipleFiles(5))
         {
-            selectedFile = file;
-            fileName = file.Name;
-            mimeType = file.ContentType;
-            
-            using var stream = file.OpenReadStream(1024 * 1024 * 5);
-            using var ms = new System.IO.MemoryStream();
-            await stream.CopyToAsync(ms);
-            base64File = Convert.ToBase64String(ms.ToArray());
+            if (file != null && file.Size <= 1024 * 1024 * 5)
+            {
+                using var stream = file.OpenReadStream(1024 * 1024 * 5);
+                using var ms = new System.IO.MemoryStream();
+                await stream.CopyToAsync(ms);
+                selectedAttachments.Add(new SelectedFileAttachment
+                {
+                    FileName = file.Name,
+                    MimeType = file.ContentType,
+                    Base64Data = Convert.ToBase64String(ms.ToArray())
+                });
+            }
         }
     }
 }

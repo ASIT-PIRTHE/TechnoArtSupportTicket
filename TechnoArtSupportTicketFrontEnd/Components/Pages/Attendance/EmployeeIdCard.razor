@@ -1,0 +1,259 @@
+@* Route handled canonically by Components/Pages/EmployeeIdCard.razor to avoid ambiguous route conflict *@
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@inject ApiService BackendApi
+
+<PageTitle>Employee Identity Card - TechnoArt Software</PageTitle>
+
+<div class="container py-4 no-print">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h4 class="fw-bold mb-1 text-primary">
+                <i class="bi bi-person-badge me-2"></i> Official Corporate Identity Card
+            </h4>
+            <p class="text-muted small mb-0">High-resolution print-ready CR80 security badge for TechnoArt personnel</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="history.back()">
+                <i class="bi bi-arrow-left me-1"></i> Back to Directory
+            </button>
+            <button class="btn btn-primary btn-sm px-4 shadow-sm" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Print / Save as PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ID Card Container -->
+<div class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-5 my-4 print-container">
+    
+    <!-- FRONT SIDE -->
+    <div class="id-card-wrapper shadow-lg">
+        <div class="id-card-front position-relative d-flex flex-column text-center">
+            <!-- Header Brand Strip -->
+            <div class="card-top-header p-3 text-white">
+                <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+                    <i class="bi bi-cpu-fill fs-4 text-warning"></i>
+                    <h6 class="fw-black mb-0 tracking-wider">TECHNOART</h6>
+                </div>
+                <div class="tiny-sub text-white-50 text-uppercase fw-semibold" style="font-size: 8px; letter-spacing: 2px;">Software & Technology Solutions</div>
+            </div>
+
+            <!-- Profile Photo Section -->
+            <div class="photo-container mx-auto my-3">
+                <div class="photo-frame">
+                    <img src="@(string.IsNullOrEmpty(photoUrl) ? "favicon.png" : photoUrl)" alt="Employee" class="emp-photo" />
+                </div>
+                <div class="blood-group-badge">
+                    <i class="bi bi-droplet-fill text-danger me-1"></i>@(bloodGroup ?? "O+")
+                </div>
+            </div>
+
+            <!-- Identity Info -->
+            <div class="px-3 pb-3 flex-grow-1 d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0 employee-name">@employeeName</h5>
+                    <div class="text-primary fw-semibold small designation-text">@designation</div>
+                    <div class="text-muted small">Department: <strong>@department</strong></div>
+                </div>
+
+                <div class="emp-meta-box py-2 px-3 mx-2 rounded-3 bg-light border mt-2">
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-muted">ID No:</span>
+                        <strong class="font-monospace text-dark">@employeeCode</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-muted">Joined:</span>
+                        <strong class="text-dark">@joiningDate</strong>
+                    </div>
+                </div>
+
+                <!-- Footer Bar -->
+                <div class="card-bottom-bar mt-2 pt-2 border-top">
+                    <div class="text-uppercase fw-bold text-muted" style="font-size: 8px; letter-spacing: 1.5px;">Authorized Identity Pass</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BACK SIDE -->
+    <div class="id-card-wrapper shadow-lg">
+        <div class="id-card-back position-relative d-flex flex-column justify-content-between p-4 text-center">
+            <div>
+                <div class="text-uppercase fw-bold text-primary mb-2" style="font-size: 11px; letter-spacing: 1.5px;">Terms & Authorization</div>
+                <p class="terms-text text-muted mb-3">
+                    This credential remains the exclusive property of TechnoArt Software & Technology Solutions.
+                    If found, please surrender to the corporate headquarters or notify via contacts below.
+                </p>
+
+                <div class="emergency-box text-start p-2 bg-light rounded-3 border mb-3">
+                    <div class="small fw-bold text-danger mb-1"><i class="bi bi-shield-exclamation me-1"></i> Emergency Contact:</div>
+                    <div class="tiny-text text-muted"><strong>Contact:</strong> +880 1700-000000</div>
+                    <div class="tiny-text text-muted"><strong>Hub Address:</strong> Gulshan Corporate Tower, Dhaka, Bangladesh</div>
+                    <div class="tiny-text text-muted"><strong>Website:</strong> www.technoartsoftware.com</div>
+                </div>
+            </div>
+
+            <!-- QR Code Verification Block -->
+            <div class="qr-block text-center my-1">
+                <div class="qr-frame mx-auto mb-1 p-2 bg-white border rounded">
+                    <!-- Scalable SVG QR code representation -->
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="#2b3990">
+                        <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm14 0h4v4h-4v-4zm-4 4h4v4h-4v-4zm0-4h4v4h-4v-4zm4 4h2v2h-2v-2z" />
+                    </svg>
+                </div>
+                <div class="text-muted font-monospace" style="font-size: 9px;">Scan to Verify Identity</div>
+            </div>
+
+            <!-- Signature & Seal -->
+            <div class="d-flex justify-content-between align-items-end pt-2 border-top">
+                <div class="text-start">
+                    <div class="font-monospace text-muted" style="font-size: 8px;">VALID UNTIL: DEC 2028</div>
+                </div>
+                <div class="text-end">
+                    <div class="sign-line text-dark fw-bold fst-italic" style="font-size: 12px; font-family: cursive;">Managing Director</div>
+                    <div class="text-muted" style="font-size: 8px; text-transform: uppercase;">Authorized Signatory</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* CR80 Standard Dimensions: 85.6mm × 53.98mm (or approx 324px x 504px at 96 DPI) */
+    .id-card-wrapper {
+        width: 320px;
+        height: 500px;
+        border-radius: 18px;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+    }
+
+    .id-card-front, .id-card-back {
+        width: 100%;
+        height: 100%;
+    }
+
+    .card-top-header {
+        background: linear-gradient(135deg, #2b3990 0%, #172054 100%);
+    }
+
+    .photo-container {
+        position: relative;
+        width: 120px;
+        height: 120px;
+    }
+
+    .photo-frame {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 4px solid #2b3990;
+        overflow: hidden;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .emp-photo {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .blood-group-badge {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: #ffffff;
+        border: 2px solid #ef4444;
+        color: #1e293b;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .terms-text {
+        font-size: 10px;
+        line-height: 1.4;
+    }
+
+    .tiny-text {
+        font-size: 10px;
+    }
+
+    @@media print {
+        body {
+            background: #ffffff !important;
+        }
+        .no-print, nav, header, aside, .sidebar-menu, .sidebar-logo {
+            display: none !important;
+        }
+        .print-container {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 20px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .id-card-wrapper {
+            box-shadow: none !important;
+            border: 1px solid #cbd5e1 !important;
+            page-break-inside: avoid;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public string? EmployeeId { get; set; }
+
+    private string employeeName = "Shuvo TAS";
+    private string employeeCode = "TAS-104";
+    private string designation = "Full Stack Engineer";
+    private string department = "Software & Product Engineering";
+    private string bloodGroup = "B+";
+    private string joiningDate = "15 Jan 2024";
+    private string? photoUrl = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeeData();
+    }
+
+    private async Task LoadEmployeeData()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(EmployeeId))
+            {
+                var req = new APIDataAccParms
+                {
+                    ProcName = "sp_attendance_operations",
+                    ProcID = "GET_EMPLOYEE_CARD",
+                    parm01 = EmployeeId
+                };
+
+                var res = await BackendApi.FetchDataAsync(req);
+                if (res.HasValue && res.Value.ValueKind == JsonValueKind.Object)
+                {
+                    var root = res.Value;
+                    if (root.TryGetProperty("name", out var n)) employeeName = n.GetString() ?? employeeName;
+                    if (root.TryGetProperty("code", out var c)) employeeCode = c.GetString() ?? employeeCode;
+                    if (root.TryGetProperty("designation", out var d)) designation = d.GetString() ?? designation;
+                    if (root.TryGetProperty("blood_group", out var b)) bloodGroup = b.GetString() ?? bloodGroup;
+                    if (root.TryGetProperty("join_date", out var j)) joiningDate = j.GetString() ?? joiningDate;
+                    if (root.TryGetProperty("photo_url", out var p)) photoUrl = p.GetString();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Card load err: " + ex.Message);
+        }
+    }
+}

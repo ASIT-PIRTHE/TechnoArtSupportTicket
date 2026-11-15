@@ -1,0 +1,354 @@
+@page "/admin/employees/{Id}/appointment-letter"
+@page "/attendance/appointment-letter/{Id}"
+@page "/attendance/appointment-letter"
+@attribute [Authorize(Roles = "SuperAdmin,MD,HRManager,SupportManager,ProjectManager,ClientAdmin")]
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@inject ApiService BackendApi
+@inject NavigationManager NavigationManager
+
+<PageTitle>Employment Appointment Letter - @candidateName</PageTitle>
+
+<div class="container py-4 no-print">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <a href="admin/employees" class="btn btn-outline-secondary btn-sm rounded-pill mb-2">
+                <i class="bi bi-arrow-left me-1"></i> Back to User Directory
+            </a>
+            <h4 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-file-earmark-text text-success me-2"></i> Official Appointment Letter
+            </h4>
+            <small class="text-muted">Draft, review, and print customized corporate employment contracts</small>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn @(isEditMode ? "btn-outline-primary" : "btn-primary") btn-sm px-3 rounded-pill fw-semibold" @onclick="() => isEditMode = !isEditMode">
+                <i class="bi @(isEditMode ? "bi-eye" : "bi-pencil") me-1"></i> @(isEditMode ? "Switch to Preview" : "Edit Letter Text")
+            </button>
+            <button class="btn btn-success btn-sm px-4 rounded-pill fw-semibold shadow-sm" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Print Letter
+            </button>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center p-5 no-print"><div class="spinner-border text-success"></div></div>
+}
+else
+{
+    <div class="container my-2" style="max-width: 900px;">
+        @if (isEditMode)
+        {
+            <!-- EDITING FORM CONTROLS -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-light border-start border-4 border-primary no-print">
+                <h5 class="fw-bold text-primary mb-3"><i class="bi bi-pencil-square me-2"></i>Customize Appointment Letter Details</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Letter Reference No.</label>
+                        <input type="text" class="form-control" @bind="refNumber" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Date of Issuance</label>
+                        <input type="date" class="form-control" @bind="letterDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Candidate Full Name</label>
+                        <input type="text" class="form-control" @bind="candidateName" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Candidate Address</label>
+                        <input type="text" class="form-control" @bind="candidateAddress" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Designation</label>
+                        <input type="text" class="form-control" @bind="designation" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Department</label>
+                        <input type="text" class="form-control" @bind="department" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Monthly Gross Salary (BDT)</label>
+                        <input type="number" class="form-control" @bind="monthlySalary" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Joining Effective Date</label>
+                        <input type="date" class="form-control" @bind="joiningDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Probation Period</label>
+                        <input type="text" class="form-control" @bind="probationPeriod" placeholder="e.g. 6 (Six) Months" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">Terms & Scope of Work (Editable)</label>
+                        <textarea class="form-control" rows="5" @bind="termsBody"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Authorized Signatory Name</label>
+                        <input type="text" class="form-control" @bind="signatoryName" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Signatory Designation</label>
+                        <input type="text" class="form-control" @bind="signatoryTitle" />
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- ================= PRINTABLE LETTER CONTENT ================= -->
+        <div class="appointment-sheet bg-white shadow-lg p-5 rounded-3 border">
+            <!-- Corporate Letterhead Header -->
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-4 mb-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="letter-logo bg-primary text-white d-flex align-items-center justify-content-center rounded-3" style="width: 55px; height: 55px;">
+                        <i class="bi bi-shield-check fs-2"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-black mb-0 text-dark tracking-wide">TECHNOART SOFTWARE</h4>
+                        <small class="text-muted text-uppercase fw-semibold" style="letter-spacing: 1px;">Solutions Limited • Corporate HRM</small>
+                    </div>
+                </div>
+                <div class="text-end text-muted small" style="line-height: 1.4;">
+                    <div>Level 6, TAS Tower, Panthapath</div>
+                    <div>Dhaka-1205, Bangladesh</div>
+                    <div>contact@technoartsoftware.com</div>
+                </div>
+            </div>
+
+            <!-- Reference & Date -->
+            <div class="d-flex justify-content-between align-items-center mb-4 small">
+                <div><strong>Ref:</strong> <span class="font-monospace">@refNumber</span></div>
+                <div><strong>Date:</strong> @(letterDate?.ToString("MMMM dd, yyyy") ?? DateTime.Today.ToString("MMMM dd, yyyy"))</div>
+            </div>
+
+            <!-- Recipient Address -->
+            <div class="mb-4 small">
+                <div class="fw-bold text-dark">To,</div>
+                <div class="fw-bold text-primary fs-6">@candidateName</div>
+                <div class="text-muted">@candidateAddress</div>
+            </div>
+
+            <!-- Subject -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-dark text-uppercase border-bottom pb-2 d-inline-block">
+                    Subject: Letter of Appointment as @designation
+                </h6>
+            </div>
+
+            <!-- Letter Body -->
+            <div class="letter-body text-dark small" style="line-height: 1.8; text-align: justify;">
+                <p>Dear <strong>@candidateName</strong>,</p>
+
+                <p>
+                    Following your recent interview and assessment with our recruitment committee, we are pleased to offer you 
+                    employment with <strong>TechnoArt Software Solutions Ltd.</strong> in the position of 
+                    <strong class="text-primary">@designation</strong> within the <strong>@department</strong> department, effective from 
+                    <strong>@(joiningDate?.ToString("MMMM dd, yyyy") ?? "your date of joining")</strong>.
+                </p>
+
+                <div class="my-3 p-3 bg-light rounded-3 border">
+                    <h6 class="fw-bold mb-2 small text-uppercase text-muted">Compensation & Financial Terms:</h6>
+                    <div class="row g-2">
+                        <div class="col-sm-6">
+                            <span class="text-muted">Monthly Gross Remuneration:</span> 
+                            <strong class="text-success ms-1">BDT @monthlySalary.ToString("N0") /-</strong>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="text-muted">Probation Duration:</span> 
+                            <strong class="ms-1">@probationPeriod</strong>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="text-muted">Office Working Hours:</span> 
+                            <span class="ms-1 font-monospace">09:30 AM – 06:30 PM (Sun–Thu)</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="text-muted">Annual Leave Entitlement:</span> 
+                            <span class="ms-1">14 Days Casual + 14 Days Sick</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="terms-paragraph my-3" style="white-space: pre-line;">
+                    @termsBody
+                </div>
+
+                <p>
+                    Please sign and return the duplicate copy of this letter as a token of your formal acceptance of our terms. 
+                    We warmly welcome you to the TechnoArt family and look forward to your valuable contributions to our engineering vision.
+                </p>
+
+                <p class="mt-4 mb-0">Yours sincerely,</p>
+            </div>
+
+            <!-- Signatures Section -->
+            <div class="d-flex justify-content-between align-items-end mt-5 pt-4">
+                <div>
+                    <div class="signature-line border-bottom border-dark pb-1" style="width: 180px; height: 35px;">
+                        <span class="font-monospace text-muted fst-italic">Signed / HR Dept.</span>
+                    </div>
+                    <div class="fw-bold small text-dark mt-1">@signatoryName</div>
+                    <div class="text-muted small">@signatoryTitle</div>
+                    <div class="text-muted small">TechnoArt Software Solutions Ltd.</div>
+                </div>
+
+                <div class="text-end">
+                    <div class="signature-line border-bottom border-dark pb-1 ms-auto" style="width: 180px; height: 35px;"></div>
+                    <div class="fw-bold small text-dark mt-1">Candidate Acceptance Signature</div>
+                    <div class="text-muted small">Date: ________________________</div>
+                </div>
+            </div>
+
+            <!-- Footer Strip -->
+            <div class="border-top mt-5 pt-3 text-center text-muted" style="font-size: 9px;">
+                TechnoArt Software Solutions Ltd. • Confidential Employment Contract • Page 1 of 1
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .appointment-sheet {
+        min-height: 1000px;
+        background: #ffffff;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    @@media print {
+        body {
+            background: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .no-print, header, nav, .sidebar-wrapper, .top-header {
+            display: none !important;
+        }
+
+        .appointment-sheet {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    private bool isLoading = true;
+    private bool isEditMode = false;
+
+    private string refNumber = "TAS/HR/APP/2026/089";
+    private DateTime? letterDate = DateTime.Today;
+    private string candidateName = "Candidate Name";
+    private string candidateAddress = "House 12, Road 4, Dhanmondi, Dhaka";
+    private string designation = "Software Engineer";
+    private string department = "Engineering & Software Architecture";
+    private decimal monthlySalary = 65000;
+    private DateTime? joiningDate = DateTime.Today;
+    private string probationPeriod = "6 (Six) Months";
+    private string signatoryName = "Tanvir Ahmed";
+    private string signatoryTitle = "Managing Director & CEO";
+
+    private string termsBody = 
+        "1. Duties & Responsibilities: You shall faithfully and diligently perform your assigned software development and project management tasks.\n" +
+        "2. Confidentiality & Non-Disclosure: You agree to keep confidential all intellectual property, source code, and client records.\n" +
+        "3. Separation & Notice: During probation, employment may be terminated by either party with 15 days written notice; following confirmation, a 30-day notice is mandatory.\n" +
+        "4. Code of Conduct: You agree to abide by TechnoArt corporate policies, security directives, and attendance regulations.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeeDetails();
+    }
+
+    private async Task LoadEmployeeDetails()
+    {
+        isLoading = true;
+        try
+        {
+            refNumber = $"TAS/HR/APP/2026/E{Id.TrimStart('U', 'E')}";
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "GET_USERS",
+                parm01 = Id
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue)
+            {
+                void ExtractUser(JsonElement el)
+                {
+                    if (el.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var sub in el.EnumerateArray()) ExtractUser(sub);
+                    }
+                    else if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        if (el.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var sub in tbl.EnumerateArray()) ExtractUser(sub);
+                        }
+                        else
+                        {
+                            var uid = GetStr(el, "user_id", "id", "UserId");
+                            var ucode = GetStr(el, "employee_code", "username");
+                            if (string.Equals(uid, Id, StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(ucode, Id, StringComparison.OrdinalIgnoreCase) ||
+                                (candidateName == "Candidate Name" && !string.IsNullOrEmpty(uid)))
+                            {
+                                var n = GetStr(el, "full_name", "name");
+                                if (!string.IsNullOrEmpty(n)) candidateName = n;
+                                var d = GetStr(el, "designation", "role");
+                                if (!string.IsNullOrEmpty(d)) designation = d;
+                                var dept = GetStr(el, "department");
+                                if (!string.IsNullOrEmpty(dept)) department = dept;
+                                var p = GetStr(el, "phone");
+                                var nid = GetStr(el, "national_id");
+                                candidateAddress = $"Phone: {p} | NID: {nid}";
+                                
+                                if (el.TryGetProperty("gross_salary", out var salProp))
+                                {
+                                    if (salProp.ValueKind == JsonValueKind.Number && salProp.TryGetDecimal(out var sal)) monthlySalary = sal;
+                                    else if (salProp.ValueKind == JsonValueKind.String && decimal.TryParse(salProp.GetString(), out var salD)) monthlySalary = salD;
+                                }
+
+                                var jd = GetStr(el, "joining_date");
+                                if (!string.IsNullOrEmpty(jd) && DateTime.TryParse(jd, out var parsedJd)) joiningDate = parsedJd;
+                            }
+                        }
+                    }
+                }
+                ExtractUser(res.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Appointment load error: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStr(JsonElement el, params string[] names)
+    {
+        foreach (var n in names)
+        {
+            if (el.TryGetProperty(n, out var prop) && prop.ValueKind == JsonValueKind.String)
+            {
+                var val = prop.GetString();
+                if (!string.IsNullOrEmpty(val)) return val;
+            }
+        }
+        return "";
+    }
+}

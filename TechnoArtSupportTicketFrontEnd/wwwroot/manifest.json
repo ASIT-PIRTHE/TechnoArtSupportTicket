@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "TechnoArt Support & Attendance Management",
+  "short_name": "TAS Support & HR",
+  "description": "Smart Unified Support Ticket, Attendance, Leave & HR Management System",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2b3990",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "favicon.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}

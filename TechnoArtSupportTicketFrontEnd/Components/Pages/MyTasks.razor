@@ -1,4 +1,5 @@
 @page "/my-tasks"
+@attribute [Authorize]
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
 @using System.Security.Claims
@@ -9,7 +10,7 @@
 
 <PageTitle>My Tasks - SupportHub</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3">
     <div>
         <h5 class="fw-bold m-0"><i class="bi bi-list-task text-primary me-2"></i>My Assigned Tasks</h5>
         <small class="text-muted">Work on tasks assigned by your Project Manager. Completing tasks automatically advances the ticket progress.</small>
@@ -25,7 +26,7 @@ else
 {
     <div class="row g-4 pt-2">
         <!-- To Do Column -->
-        <div class="col-md-4">
+        <div class="col-12 col-md-4 mb-3 mb-md-0">
             <div class="bg-light-surface border rounded-3 p-3 h-100 shadow-sm bg-light">
                 <h6 class="fw-bold mb-3 text-secondary d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-circle me-2"></i>To Do</span>
@@ -39,10 +40,10 @@ else
 
                 @foreach (var task in todoTasks)
                 {
-                    var taskId = task.TryGetProperty("task_id", out var tip) ? tip.GetString() ?? "" : "";
-                    var tName = task.TryGetProperty("name", out var tnp) ? tnp.GetString() ?? "" : "";
-                    var tNum = task.TryGetProperty("ticket_number", out var tnum) ? tnum.GetString() ?? "" : "";
-                    var asgn = task.TryGetProperty("assigned_to", out var asp) ? asp.GetString() ?? "" : "";
+                    var taskId = GetPropString(task, "task_id", "TaskId", "id", "Id");
+                    var tName = GetPropString(task, "name", "Name", "task_name");
+                    var tNum = GetPropString(task, "ticket_number", "TicketNumber", "ticket_num");
+                    var asgn = GetPropString(task, "assigned_to", "AssignedTo");
                     var initials = asgn.Length >= 2 ? asgn[..2].ToUpper() : "ME";
 
                     <div class="card shadow-sm border-0 mb-3 border-start border-4 border-secondary task-card">
@@ -65,7 +66,7 @@ else
         </div>
 
         <!-- In Progress Column -->
-        <div class="col-md-4">
+        <div class="col-12 col-md-4 mb-3 mb-md-0">
             <div class="bg-light-surface border rounded-3 p-3 h-100 shadow-sm bg-light">
                 <h6 class="fw-bold mb-3 text-primary d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-play-circle-fill me-2"></i>In Progress</span>
@@ -79,10 +80,10 @@ else
 
                 @foreach (var task in inProgressTasks)
                 {
-                    var taskId = task.TryGetProperty("task_id", out var tip) ? tip.GetString() ?? "" : "";
-                    var tName = task.TryGetProperty("name", out var tnp) ? tnp.GetString() ?? "" : "";
-                    var tNum = task.TryGetProperty("ticket_number", out var tnum) ? tnum.GetString() ?? "" : "";
-                    var asgn = task.TryGetProperty("assigned_to", out var asp) ? asp.GetString() ?? "" : "";
+                    var taskId = GetPropString(task, "task_id", "TaskId", "id", "Id");
+                    var tName = GetPropString(task, "name", "Name", "task_name");
+                    var tNum = GetPropString(task, "ticket_number", "TicketNumber", "ticket_num");
+                    var asgn = GetPropString(task, "assigned_to", "AssignedTo");
                     var initials = asgn.Length >= 2 ? asgn[..2].ToUpper() : "ME";
 
                     <div class="card shadow-sm border-0 mb-3 border-start border-4 border-primary task-card">
@@ -105,7 +106,7 @@ else
         </div>
 
         <!-- Done Column -->
-        <div class="col-md-4">
+        <div class="col-12 col-md-4 mb-3 mb-md-0">
             <div class="bg-light-surface border rounded-3 p-3 h-100 shadow-sm bg-light">
                 <h6 class="fw-bold mb-3 text-success d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-check-circle-fill me-2"></i>Completed</span>
@@ -119,9 +120,9 @@ else
 
                 @foreach (var task in doneTasks)
                 {
-                    var taskId = task.TryGetProperty("task_id", out var tip) ? tip.GetString() ?? "" : "";
-                    var tName = task.TryGetProperty("name", out var tnp) ? tnp.GetString() ?? "" : "";
-                    var tNum = task.TryGetProperty("ticket_number", out var tnum) ? tnum.GetString() ?? "" : "";
+                    var taskId = GetPropString(task, "task_id", "TaskId", "id", "Id");
+                    var tName = GetPropString(task, "name", "Name", "task_name");
+                    var tNum = GetPropString(task, "ticket_number", "TicketNumber", "ticket_num");
 
                     <div class="card border-0 mb-3 bg-white opacity-85 shadow-sm task-card">
                         <div class="card-body p-3 text-muted">
@@ -199,18 +200,30 @@ else
         {
             try {
                 List<JsonElement> allTasks = new();
-                if (result.Value.ValueKind == JsonValueKind.Array)
+                ExtractItems(result.Value, el =>
                 {
-                    foreach (var el in result.Value.EnumerateArray()) allTasks.Add(el);
-                }
-                else if (result.Value.TryGetProperty("task_id", out _))
-                {
-                    allTasks.Add(result.Value);
-                }
+                    if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        var tid = GetPropString(el, "task_id", "id");
+                        if (!string.IsNullOrEmpty(tid))
+                        {
+                            if (!allTasks.Any(t => GetPropString(t, "task_id", "id") == tid))
+                            {
+                                allTasks.Add(el);
+                            }
+                        }
+                        else
+                        {
+                            allTasks.Add(el);
+                        }
+                    }
+                });
 
                 foreach(var task in allTasks)
                 {
-                    var status = task.TryGetProperty("status", out var sp) ? sp.GetString() ?? "TODO" : "TODO";
+                    var status = GetPropString(task, "status", "Status").ToUpperInvariant();
+                    if (string.IsNullOrEmpty(status)) status = "TODO";
+
                     if (status == "TODO" || status == "REJECTED") todoTasks.Add(task);
                     else if (status == "IN_PROGRESS") inProgressTasks.Add(task);
                     else doneTasks.Add(task);
@@ -220,6 +233,55 @@ else
         
         isLoading = false;
         await InvokeAsync(StateHasChanged);
+    }
+
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) ExtractItems(item, onObject);
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("Table1", out var tbl1) && tbl1.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl1.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("error", out var er) && !string.IsNullOrEmpty(er.GetString()))
+            {
+                // ignore
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
+    }
+
+    private static string GetPropString(JsonElement el, params string[] names)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return "";
+        foreach (var name in names)
+        {
+            if (el.TryGetProperty(name, out var p))
+            {
+                return p.ValueKind switch
+                {
+                    JsonValueKind.String => p.GetString() ?? "",
+                    JsonValueKind.Number => p.ToString(),
+                    _ => p.ToString()
+                };
+            }
+        }
+        return "";
     }
 
     private async Task QuickUpdateStatus(string taskId, string newStatus)

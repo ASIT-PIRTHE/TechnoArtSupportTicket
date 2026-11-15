@@ -1,121 +1,414 @@
 @page "/admin/employees"
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
 @using System.Text.Json
-@attribute [Authorize(Roles = "SuperAdmin,MD,ClientAdmin")]
+@attribute [Authorize(Roles = "SuperAdmin,MD,ClientAdmin,ProjectManager,HRManager,SupportManager,Admin,AccountsOfficer")]
 @inject ApiService BackendApi
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IConfiguration Config
 
-<PageTitle>User & Employee Management</PageTitle>
+<PageTitle>User & Employee Management - TechnoArt</PageTitle>
 
-<div class="custom-card p-4 h-100">
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 flex-wrap gap-2">
+<div class="custom-card p-3 p-md-4 h-100" style="max-width: 100%; overflow-x: hidden;">
+    <!-- Header Section with Dynamic Context Scope -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 border-bottom pb-3 gap-3">
         <div>
-            <h5 class="fw-bold m-0"><i class="bi bi-people text-primary me-2"></i> User & Employee Directory</h5>
-            <small class="text-muted">Manage internal engineering staff and client organization users mapped to projects & modules.</small>
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <h5 class="fw-bold m-0"><i class="bi bi-people text-primary me-2"></i> User & Employee Directory</h5>
+                @if (IsClientAdmin || !IsInternalUser)
+                {
+                    <span class="badge bg-info-subtle text-dark border border-info-subtle">
+                        <i class="bi bi-building me-1"></i>@(string.IsNullOrEmpty(CurrentTenantName) ? "Client Tenant" : CurrentTenantName)
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                        <i class="bi bi-globe me-1"></i>Enterprise Global Scope
+                    </span>
+                }
+            </div>
+            <small class="text-muted d-block mt-1">Manage internal engineering staff, multi-project rosters, multi-tenant operators, and client users with button-level permissions.</small>
         </div>
-        <AuthorizeView Roles="SuperAdmin,ClientAdmin">
-            <button class="btn btn-primary btn-sm fw-semibold shadow-sm" @onclick="ToggleAddMode">
-                <i class="bi @(isAddMode ? "bi-x-lg" : "bi-plus-lg") me-1"></i> @(isAddMode ? "Cancel" : "Add New User")
-            </button>
-        </AuthorizeView>
+        
+        <!-- Button-Level Permission: Add New User / Employee -->
+        @if (CanCreateUser)
+        {
+            <div>
+                <button class="btn btn-primary btn-sm rounded-pill px-3 py-2 fw-semibold shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="ToggleAddMode">
+                    <i class="bi @(isAddMode ? "bi-x-lg" : "bi-plus-lg") me-1"></i> @(isAddMode ? "Cancel" : "Add New User / Employee")
+                </button>
+            </div>
+        }
     </div>
 
-    @if (isAddMode)
+    <!-- Tenant Context Banner for Client Scope -->
+    @if (!IsInternalUser && !string.IsNullOrEmpty(CurrentUserTenantId))
+    {
+        <div class="alert alert-info py-2 small d-flex align-items-center mb-3">
+            <i class="bi bi-info-circle-fill fs-5 me-2 text-info"></i>
+            <div>
+                <strong>Tenant Organization Scope:</strong> You have access to users, projects, and modules for <strong>@(string.IsNullOrEmpty(CurrentTenantName) ? "Your Company" : CurrentTenantName)</strong>. Internal engineering credentials and salary records are securely protected.
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(userErrorMessage) && !isAddMode)
+    {
+        <div class="alert alert-danger py-2 small d-flex align-items-center mb-3">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>@userErrorMessage</div>
+        </div>
+    }
+
+    <!-- Add / Edit User Form Card -->
+    @if (isAddMode && CanCreateUser)
     {
         <div class="card bg-light border-primary mb-4 shadow-sm border-0 border-start border-4">
             <div class="card-body p-4">
-                <h6 class="fw-bold mb-3 text-primary">@(string.IsNullOrEmpty(editUserId) ? "Register New User / Employee" : "Edit User / Employee")</h6>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold m-0 text-primary">
+                        <i class="bi @(string.IsNullOrEmpty(editUserId) ? "bi-person-plus" : "bi-pencil-square") me-1"></i>
+                        @(string.IsNullOrEmpty(editUserId) ? "Register New User / Employee" : "Edit User / Employee Profile")
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="ToggleAddMode"></button>
+                </div>
+
                 @if (!string.IsNullOrEmpty(userErrorMessage))
                 {
-                    <div class="alert alert-danger py-2 small mb-3">@userErrorMessage</div>
+                    <div class="alert alert-danger py-2 small mb-3">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>@userErrorMessage
+                    </div>
                 }
-                <form @onsubmit="CreateUser">
+
+                <form @onsubmit="CreateUser" @onsubmit:preventDefault="true">
+                    <!-- Basic Information Row -->
                     <div class="row g-3 mb-3">
-                        <div class="col-md-6">
+                        <div class="col-12 col-md-6">
                             <label class="form-label small fw-semibold">Full Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" @bind="newFullName" required placeholder="e.g. John Doe" />
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Identifier (Username) @(!string.IsNullOrEmpty(editUserId) ? "(Read-only)" : "<span class='text-danger'>*</span>")</label>
-                            <input type="text" class="form-control" @bind="newUsername" required="@(string.IsNullOrEmpty(editUserId))" disabled="@(!string.IsNullOrEmpty(editUserId))" placeholder="e.g. jdoe123" />
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold">
+                                Identifier (Username / Email)
+                                @if (!string.IsNullOrEmpty(editUserId))
+                                {
+                                    <span class="text-muted">(Read-only)</span>
+                                }
+                                else
+                                {
+                                    <span class="text-danger">*</span>
+                                }
+                            </label>
+                            <input type="text" class="form-control" @bind="newUsername" required="@(string.IsNullOrEmpty(editUserId))" disabled="@(!string.IsNullOrEmpty(editUserId))" placeholder="e.g. jdoe123 or shuvo@tas.com" />
                         </div>
                     </div>
+
+                    <!-- Credentials & Dynamic Role Row -->
                     <div class="row g-3 mb-3">
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold">Password @(!string.IsNullOrEmpty(editUserId) ? "(Optional)" : "<span class='text-danger'>*</span>")</label>
-                            <input type="password" class="form-control" @bind="newPassword" required="@(string.IsNullOrEmpty(editUserId))" placeholder="@(string.IsNullOrEmpty(editUserId) ? "Temporary Password" : "Leave blank to keep unchanged")" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold">Role <span class="text-danger">*</span></label>
-                            <select class="form-select" @bind="newRole" required>
-                                <option value="">-- Select Role --</option>
-                                @if (CurrentUserRole == "SuperAdmin" || CurrentUserRole == "MD")
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <label class="form-label small fw-semibold">
+                                Password
+                                @if (!string.IsNullOrEmpty(editUserId))
                                 {
-                                    <option value="SuperAdmin">Super Admin</option>
-                                    <option value="MD">Managing Director</option>
-                                    <option value="SupportManager">Support Manager</option>
-                                    <option value="ProjectManager">Project Manager</option>
-                                    <option value="TeamMember">Team Member</option>
-                                    <option value="ClientAdmin">Client Admin</option>
+                                    <span class="text-muted">(Optional)</span>
                                 }
-                                <option value="ClientUser">Client User</option>
+                                else
+                                {
+                                    <span class="text-danger">*</span>
+                                }
+                            </label>
+                            <div class="input-group">
+                                <input type="@(showPassword ? "text" : "password")" class="form-control" @bind="newPassword" required="@(string.IsNullOrEmpty(editUserId))" placeholder="@(string.IsNullOrEmpty(editUserId) ? "Password" : "Unchanged")" />
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showPassword = !showPassword" tabindex="-1">
+                                    <i class="bi @(showPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <label class="form-label small fw-semibold">
+                                Confirm Password
+                                @if (string.IsNullOrEmpty(editUserId))
+                                {
+                                    <span class="text-danger">*</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">(If changing)</span>
+                                }
+                            </label>
+                            <div class="input-group">
+                                <input type="@(showConfirmPassword ? "text" : "password")" class="form-control" @bind="confirmPassword" required="@(string.IsNullOrEmpty(editUserId) || !string.IsNullOrEmpty(newPassword))" placeholder="Confirm Password" />
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showConfirmPassword = !showConfirmPassword" tabindex="-1">
+                                    <i class="bi @(showConfirmPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <label class="form-label small fw-semibold">Dynamic Role <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="newRole" required>
+                                <option value="">-- Select Dynamic Role --</option>
+                                @foreach (var r in FilteredAvailableRoles)
+                                {
+                                    <option value="@r.Key">@r.DisplayName</option>
+                                }
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold">Tenant / Company</label>
-                            <select class="form-select" @bind="newTenantId" disabled="@(CurrentUserRole == "ClientAdmin")">
-                                <option value="">-- Global / Internal --</option>
-                                @foreach (var tenant in tenantList)
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <label class="form-label small fw-semibold">Primary Tenant / Company</label>
+                            <select class="form-select" value="@newTenantId" @onchange="OnTenantChanged" disabled="@(!IsInternalUser)">
+                                @if (IsInternalUser)
                                 {
-                                    var tId = tenant.TryGetProperty("tenant_id", out var tidp) ? tidp.GetString() : "";
-                                    var tNm = tenant.TryGetProperty("name", out var tnmp) ? tnmp.GetString() : "";
+                                    <option value="">-- Internal / Global TAS --</option>
+                                }
+                                @foreach (var tenant in AccessibleTenants)
+                                {
+                                    var tId = GetPropString(tenant, "tenant_id", "id");
+                                    var tNm = GetPropString(tenant, "name", "tenant_name");
                                     <option value="@tId">@tNm</option>
                                 }
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold">Assign to Project</label>
-                            <select class="form-select" value="@newProjectId" @onchange="OnProjectChanged">
-                                <option value="">-- Select Project (Optional) --</option>
-                                @foreach (var proj in projectList)
-                                {
-                                    var pId = proj.TryGetProperty("project_id", out var pidp) ? pidp.GetString() : "";
-                                    var pNm = proj.TryGetProperty("name", out var pnmp) ? pnmp.GetString() : "";
-                                    <option value="@pId">@pNm</option>
-                                }
-                            </select>
-                        </div>
                     </div>
-                    
-                    <!-- Dynamic Module Selection -->
-                    @if (!string.IsNullOrEmpty(newProjectId))
+
+                    @if (IsClientUserRole(newRole))
                     {
+                        <!-- Compact Contact Info for Client Roles -->
                         <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-semibold text-primary">
-                                    <i class="bi bi-diagram-3 me-1"></i> Assigned Project Module / Department
-                                </label>
-                                <select class="form-select border-primary" @bind="newModuleId">
-                                    <option value="">-- General / All Modules --</option>
-                                    @foreach (var mod in projectModules)
-                                    {
-                                        var mId = mod.TryGetProperty("module_id", out var midp) ? midp.GetString() : "";
-                                        var mNm = mod.TryGetProperty("name", out var mnmp) ? mnmp.GetString() : "";
-                                        var mCd = mod.TryGetProperty("code", out var mcdp) ? mcdp.GetString() : "";
-                                        <option value="@mId">@mNm (@mCd)</option>
-                                    }
-                                </select>
-                                <div class="form-text small">e.g. For client users working specifically in HRM, Payroll, Inventory, CPF, etc.</div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold"><i class="bi bi-telephone me-1 text-primary"></i> Contact Phone Number</label>
+                                <input type="text" class="form-control" @bind="newPhone" placeholder="017xxxxxxxx" />
                             </div>
                         </div>
                     }
 
-                    <div class="d-flex justify-content-end gap-2 mt-3">
+                    <!-- Multi-Tenant Selection (For Internal Staff with Multiple Company Access) -->
+                    @if (IsInternalUser && tenantList.Count > 1 && !IsClientUserRole(newRole))
+                    {
+                        <div class="card bg-white border rounded-3 p-3 mb-3 shadow-sm">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label small fw-bold text-secondary mb-0">
+                                    <i class="bi bi-building-check me-1"></i> Multi-Tenant Access (Employee can access multiple companies)
+                                </label>
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">@selectedTenantIds.Count company/companies selected</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var t in tenantList)
+                                {
+                                    var tId = GetPropString(t, "tenant_id", "id");
+                                    var tNm = GetPropString(t, "name", "tenant_name");
+                                    if (!string.IsNullOrEmpty(tId))
+                                    {
+                                        var isChecked = selectedTenantIds.Contains(tId);
+                                        <div class="form-check form-check-inline bg-light px-3 py-2 rounded-2 border">
+                                            <input class="form-check-input" type="checkbox" id="tenant_@tId" checked="@isChecked" @onchange="(e) => ToggleTenantSelection(tId, e.Value)" />
+                                            <label class="form-check-label small fw-semibold cursor-pointer" for="tenant_@tId">@tNm</label>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Multi-Project Assignment Section -->
+                    <div class="card bg-white border rounded-3 p-3 mb-3 shadow-sm">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label small fw-bold text-primary mb-0">
+                                <i class="bi bi-kanban me-1"></i> Multi-Project Assignment (Employee can work on multiple projects simultaneously)
+                            </label>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">@selectedProjectIds.Count project(s) assigned</span>
+                        </div>
+                        <p class="text-muted small mb-2">Select all projects this user/engineer is assigned to:</p>
+                        @if (FilteredProjects.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var proj in FilteredProjects)
+                                {
+                                    var pId = GetPropString(proj, "project_id", "id");
+                                    var pNm = GetPropString(proj, "name", "project_name");
+                                    var pCd = GetPropString(proj, "code");
+                                    if (!string.IsNullOrEmpty(pId))
+                                    {
+                                        var isChecked = selectedProjectIds.Contains(pId);
+                                        <div class="form-check form-check-inline bg-light px-3 py-2 rounded-2 border shadow-sm">
+                                            <input class="form-check-input" type="checkbox" id="proj_@pId" checked="@isChecked" @onchange="(e) => ToggleProjectSelection(pId, e.Value)" />
+                                            <label class="form-check-label small fw-semibold cursor-pointer" for="proj_@pId">
+                                                @pNm @(!string.IsNullOrEmpty(pCd) ? $"({pCd})" : "")
+                                            </label>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted small">No projects registered for this tenant yet.</div>
+                        }
+                    </div>
+
+                    <!-- Multi-Module Assignment Section (Modules across Selected Projects) -->
+                    <div class="card bg-white border rounded-3 p-3 mb-3 shadow-sm">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label small fw-bold text-info mb-0">
+                                <i class="bi bi-diagram-3 me-1"></i> Multi-Module Assignment (e.g. HRM, Payroll, Inventory, CPF)
+                            </label>
+                            <span class="badge bg-info-subtle text-dark border border-info-subtle">@selectedModuleIds.Count module(s) assigned</span>
+                        </div>
+                        <p class="text-muted small mb-2">Select all software modules this team member has operational permissions for:</p>
+                        @if (projectModules.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var mod in projectModules)
+                                {
+                                    var mId = GetPropString(mod, "module_id", "id");
+                                    var mNm = GetPropString(mod, "name", "module_name");
+                                    var mCd = GetPropString(mod, "code");
+                                    if (!string.IsNullOrEmpty(mId))
+                                    {
+                                        var isChecked = selectedModuleIds.Contains(mId);
+                                        <div class="form-check form-check-inline bg-light px-3 py-2 rounded-2 border shadow-sm">
+                                            <input class="form-check-input" type="checkbox" id="mod_@mId" checked="@isChecked" @onchange="(e) => ToggleModuleSelection(mId, e.Value)" />
+                                            <label class="form-check-label small fw-semibold cursor-pointer" for="mod_@mId">
+                                                @mNm @(!string.IsNullOrEmpty(mCd) ? $"({mCd})" : "")
+                                            </label>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted small fst-italic">Select projects above to load and check available modules.</div>
+                        }
+                    </div>
+
+                    @if (!IsClientUserRole(newRole))
+                    {
+                        <!-- HR Profile & Family Identity (Internal Staff Only) -->
+                        <div class="border-top pt-3 mt-3">
+                            <div class="fw-bold text-primary mb-2 small text-uppercase tracking-wider">
+                                <i class="bi bi-person-vcard me-1"></i> Official Identity & HR Details
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Phone Number</label>
+                                    <input type="text" class="form-control" @bind="newPhone" placeholder="017xxxxxxxx" />
+                                </div>
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">National ID (NID No.)</label>
+                                    <input type="text" class="form-control" @bind="newNationalId" placeholder="e.g. 1990xxxxxxxxxx" />
+                                </div>
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Father's Name</label>
+                                    <input type="text" class="form-control" @bind="newFatherName" placeholder="Father's full name" />
+                                </div>
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Mother's Name</label>
+                                    <input type="text" class="form-control" @bind="newMotherName" placeholder="Mother's full name" />
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Emergency Contact</label>
+                                    <input type="text" class="form-control" @bind="newEmergencyContact" placeholder="018xxxxxxxx" />
+                                </div>
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Emergency Relation</label>
+                                    <input type="text" class="form-control" @bind="newEmergencyRelation" placeholder="e.g. Brother, Spouse" />
+                                </div>
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Office Branch / Hub</label>
+                                    <select class="form-select" @bind="newBranchId">
+                                        <option value="">-- Main Hub / Default --</option>
+                                        @foreach (var b in branchList)
+                                        {
+                                            var bid = GetPropString(b, "id", "branch_id");
+                                            var bnm = GetPropString(b, "name", "branch_name");
+                                            <option value="@bid">@bnm</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Joining Date</label>
+                                    <input type="date" class="form-control" @bind="newJoiningDate" />
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label small fw-semibold text-primary"><i class="bi bi-briefcase me-1"></i> Official Designation</label>
+                                    <input type="text" list="designationOptions" class="form-control" @bind="newDesignation" placeholder="Select or type designation..." />
+                                    <datalist id="designationOptions">
+                                        @foreach (var desig in designationList)
+                                        {
+                                            <option value="@desig">@desig</option>
+                                        }
+                                    </datalist>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label small fw-semibold text-primary"><i class="bi bi-building-gear me-1"></i> Department</label>
+                                    <input type="text" class="form-control" @bind="newDepartment" placeholder="e.g. Engineering, Quality Assurance, HR, Accounts" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Attendance, Shifts & Payroll Configuration (Internal Staff Only) -->
+                        <div class="border-top pt-3 mt-3">
+                            <div class="fw-bold text-primary mb-2 small text-uppercase tracking-wider">
+                                <i class="bi bi-clock-history me-1"></i> Shift Timing & Roster
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Shift In-Time</label>
+                                    <input type="time" class="form-control" @bind="newShiftInTime" />
+                                </div>
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">Shift Out-Time</label>
+                                    <input type="time" class="form-control" @bind="newShiftOutTime" />
+                                </div>
+                                <div class="col-12 col-sm-6 col-lg-3">
+                                    <label class="form-label small fw-semibold"><i class="bi bi-droplet text-danger me-1"></i> Blood Group</label>
+                                    <select class="form-select" @bind="newBloodGroup">
+                                        <option value="A+">A+</option>
+                                        <option value="A-">A-</option>
+                                        <option value="B+">B+</option>
+                                        <option value="B-">B-</option>
+                                        <option value="O+">O+</option>
+                                        <option value="O-">O-</option>
+                                        <option value="AB+">AB+</option>
+                                        <option value="AB-">AB-</option>
+                                    </select>
+                                </div>
+
+                                <!-- Button-Level Permission: Salary Field Visible ONLY to HR / SuperAdmin / MD -->
+                                @if (CanViewSalary)
+                                {
+                                    <div class="col-12 col-sm-6 col-lg-3">
+                                        <label class="form-label small fw-semibold"><i class="bi bi-cash text-success me-1"></i> Gross Salary (BDT)</label>
+                                        <input type="number" class="form-control" @bind="newMonthlySalary" placeholder="e.g. 0.00" onwheel="this.blur()" />
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-12">
+                                    <div class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" id="wfhAllowedSwitch" @bind="newIsWfhAllowed">
+                                        <label class="form-check-label small fw-semibold" for="wfhAllowedSwitch">
+                                            <i class="bi bi-laptop me-1 text-primary"></i> Allow Work From Home (WFH) Attendance Geofence Bypass
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
                         <button type="button" class="btn btn-light border" @onclick="ToggleAddMode">Cancel</button>
-                        <button type="submit" class="btn btn-success fw-semibold" disabled="@isSubmitting">
-                            @if(isSubmitting) { <span class="spinner-border spinner-border-sm me-2"></span> }
-                            @(string.IsNullOrEmpty(editUserId) ? "Save User" : "Update User")
+                        <button type="submit" class="btn btn-success fw-semibold shadow-sm" disabled="@isSubmitting">
+                            @if (isSubmitting) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            <i class="bi bi-check2-circle me-1"></i>
+                            @(string.IsNullOrEmpty(editUserId) ? "Save User & Employee" : "Update Profile")
                         </button>
                     </div>
                 </form>
@@ -123,71 +416,487 @@
         </div>
     }
 
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="bg-light text-muted small text-uppercase">
-                <tr>
-                    <th>Full Name</th>
-                    <th>Username</th>
-                    <th>Role</th>
-                    <th>Tenant</th>
-                    <th>Project</th>
-                    <th>Module / Dept</th>
-                    <th>Status</th>
-                    <th class="text-end">Action</th>
-                </tr>
-            </thead>
+    <!-- Search & Filter Controls Bar -->
+    <div class="card border-0 bg-light p-3 rounded-3 mb-3 shadow-sm">
+        <div class="row g-2 align-items-center">
+            <!-- Search Input -->
+            <div class="col-12 col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0" placeholder="Search by name, email, username, phone..." @bind="searchQuery" @bind:event="oninput" />
+                    @if (!string.IsNullOrEmpty(searchQuery))
+                    {
+                        <button class="btn btn-outline-secondary" type="button" @onclick="() => searchQuery = string.Empty"><i class="bi bi-x"></i></button>
+                    }
+                </div>
+            </div>
+
+            <!-- Tenant Filter (If user has multiple tenant access or internal) -->
+            @if (IsInternalUser && tenantList.Count > 1)
+            {
+                <div class="col-12 col-sm-6 col-md-3">
+                    <select class="form-select form-select-sm" @bind="selectedFilterTenant">
+                        <option value="">🏢 All Companies / Tenants</option>
+                        <option value="INTERNAL">TAS Internal Staff</option>
+                        @foreach (var t in tenantList)
+                        {
+                            var tid = GetPropString(t, "tenant_id", "id");
+                            var tnm = GetPropString(t, "name", "tenant_name");
+                            <option value="@tid">@tnm</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            <!-- Project Filter -->
+            <div class="col-12 col-sm-6 @(IsInternalUser && tenantList.Count > 1 ? "col-md-3" : "col-md-4")">
+                <select class="form-select form-select-sm" @bind="selectedFilterProject">
+                    <option value="">📂 All Projects</option>
+                    @foreach (var p in FilteredProjects)
+                    {
+                        var pid = GetPropString(p, "project_id", "id");
+                        var pnm = GetPropString(p, "name", "project_name");
+                        <option value="@pid">@pnm</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Role Filter -->
+            <div class="col-12 col-sm-6 @(IsInternalUser && tenantList.Count > 1 ? "col-md-2" : "col-md-4")">
+                <select class="form-select form-select-sm" @bind="selectedFilterRole">
+                    <option value="">👥 All Roles</option>
+                    @foreach (var r in FilteredAvailableRoles)
+                    {
+                        <option value="@r.Key">@r.DisplayName</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Always-visible clean scrollbar at bottom of table container */
+        .employee-table-container {
+            overflow-x: auto !important;
+            overflow-y: auto !important;
+            max-height: calc(100vh - 280px);
+            min-height: 380px;
+            position: relative;
+            background: #ffffff;
+        }
+        
+        /* Modern, prominent, easy-to-use scrollbar at bottom of table */
+        .employee-table-container::-webkit-scrollbar {
+            height: 12px;
+            width: 8px;
+        }
+        .employee-table-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 6px;
+        }
+        .employee-table-container::-webkit-scrollbar-thumb {
+            background: #0d6efd;
+            border-radius: 6px;
+            border: 2px solid #f1f5f9;
+        }
+        .employee-table-container::-webkit-scrollbar-thumb:hover {
+            background: #0b5ed7;
+        }
+        
+        /* Firefox scrollbar */
+        .employee-table-container {
+            scrollbar-width: auto;
+            scrollbar-color: #0d6efd #f1f5f9;
+        }
+
+        /* Sticky table header when scrolling vertically */
+        .employee-table-container thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa !important;
+            z-index: 10;
+            box-shadow: inset 0 -1px 0 #dee2e6;
+        }
+
+        /* Sticky actions column pinned to the right edge */
+        .sticky-action-col {
+            position: sticky;
+            right: 0;
+            background-color: #ffffff;
+            z-index: 8;
+            box-shadow: -3px 0 6px rgba(0, 0, 0, 0.06);
+        }
+        thead th.sticky-action-col {
+            background-color: #f8f9fa !important;
+            z-index: 12;
+        }
+        tr:hover td.sticky-action-col {
+            background-color: #f8f9fa !important;
+        }
+    </style>
+
+    <!-- Desktop & Tablet View: Full Width Responsive Table with Visible Bottom Scrollbar -->
+    <div class="shadow-sm rounded-3 border d-none d-md-block bg-white overflow-hidden mb-3">
+        <div class="employee-table-container">
+            <table class="table table-hover align-middle mb-0" style="min-width: 1050px; width: 100%;">
+                <thead class="table-light text-muted small text-uppercase text-nowrap">
+                    <tr>
+                        <th style="min-width: 170px;">Full Name & Role</th>
+                        <th style="min-width: 160px;">Identifier</th>
+                        <th style="min-width: 150px;">Shift Timing</th>
+                        <th style="min-width: 140px;">Tenant / Company</th>
+                        <th style="min-width: 160px;">Assigned Projects</th>
+                        <th style="min-width: 160px;">Assigned Modules</th>
+                        <th style="min-width: 90px;">Status</th>
+                        <th style="min-width: 140px;" class="text-end sticky-action-col">Actions</th>
+                    </tr>
+                </thead>
             <tbody>
                 @if (isLoading)
                 {
-                    <tr><td colspan="8" class="text-center p-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr>
+                        <td colspan="8" class="text-center p-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <div class="text-muted small mt-2">Loading user and employee directory...</div>
+                        </td>
+                    </tr>
                 }
-                else if (userList != null && userList.Count > 0)
+                else if (DisplayedUserList != null && DisplayedUserList.Any())
                 {
-                    foreach (var user in userList)
+                    foreach (var user in DisplayedUserList)
                     {
-                        var uId = user.TryGetProperty("user_id", out var uidp) ? uidp.GetString() ?? "" : "";
-                        var uFullName = user.TryGetProperty("full_name", out var ufn) ? ufn.GetString() ?? "" : "";
-                        var uName = user.TryGetProperty("username", out var unm) ? unm.GetString() ?? "" : "";
-                        var uRole = user.TryGetProperty("role", out var url) ? url.GetString() ?? "" : "";
-                        var uTenantId = user.TryGetProperty("tenant_id", out var utid) ? utid.GetString() ?? "" : "";
-                        var uProjectId = user.TryGetProperty("project_id", out var upid) ? upid.GetString() ?? "" : "";
-                        var uProjectName = user.TryGetProperty("project_name", out var upn) ? upn.GetString() ?? "—" : "—";
-                        var uModuleId = user.TryGetProperty("module_id", out var umid) ? umid.GetString() ?? "" : "";
-                        var uModuleName = user.TryGetProperty("module_name", out var umn) ? umn.GetString() ?? "" : "";
-                        var tName = user.TryGetProperty("tenant_name", out var tn) ? tn.GetString() ?? "Internal" : "Internal";
+                        var uId = GetPropString(user, "user_id", "id", "UserId", "Id");
+                        var uFullName = GetPropString(user, "full_name", "name", "FullName", "Name");
+                        var uName = GetPropString(user, "username", "userName", "UserName", "email", "Email");
+                        var uRole = GetPropString(user, "role", "Role");
+                        var uDesig = GetPropString(user, "designation", "Designation");
+                        var shiftTimingDisplay = FormatShiftTiming(user);
+                        var isAct = GetPropBool(user, true, "is_active", "IsActive");
+                        var userSalary = GetPropDecimal(user, 0, "gross_salary", "GrossSalary", "salary");
 
                         <tr>
-                            <td class="fw-bold">@uFullName</td>
-                            <td class="small text-muted font-monospace">@uName</td>
-                            <td><span class="badge @(uRole.StartsWith("Client") ? "bg-info text-dark" : "bg-primary")">@uRole</span></td>
-                            <td class="small">@tName</td>
-                            <td class="small fw-semibold text-dark">@uProjectName</td>
                             <td>
-                                @if (!string.IsNullOrEmpty(uModuleName))
+                                <div class="fw-bold text-dark">@uFullName</div>
+                                @if (!string.IsNullOrEmpty(uDesig))
                                 {
-                                    <span class="badge bg-primary-subtle text-primary border"><i class="bi bi-diagram-3 me-1"></i>@uModuleName</span>
+                                    <div class="small text-muted"><i class="bi bi-briefcase me-1"></i>@uDesig</div>
+                                }
+                                <span class="badge @(uRole.StartsWith("Client") ? "bg-info text-dark" : "bg-primary") mt-1">@uRole</span>
+                            </td>
+                            <td>
+                                <span class="small font-monospace text-muted">@uName</span>
+                                @{
+                                    var uPhone = GetPropString(user, "phone", "Phone");
+                                }
+                                @if (!string.IsNullOrEmpty(uPhone))
+                                {
+                                    <div class="small text-secondary"><i class="bi bi-telephone me-1"></i>@uPhone</div>
+                                }
+                            </td>
+                            <td>
+                                @if (uRole.StartsWith("Client", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="text-muted small fst-italic">N/A (Client)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-dark border">
+                                        <i class="bi bi-clock me-1 text-primary"></i>@shiftTimingDisplay
+                                    </span>
+                                }
+                            </td>
+                            <!-- Multi-Tenant Badges -->
+                            <td>
+                                @{
+                                    var tBadges = GetUserTenantNames(user);
+                                }
+                                @if (tBadges.Any())
+                                {
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var tBadge in tBadges)
+                                        {
+                                            <span class="badge bg-light text-secondary border small">
+                                                <i class="bi bi-building me-1"></i>@tBadge
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-primary border small"><i class="bi bi-shield-check me-1"></i>Internal</span>
+                                }
+                            </td>
+                            <!-- Multi-Project Badges -->
+                            <td>
+                                @{
+                                    var pBadges = GetUserProjectNames(user);
+                                }
+                                @if (pBadges.Any())
+                                {
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var pBadge in pBadges)
+                                        {
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle small fw-semibold">
+                                                <i class="bi bi-kanban me-1"></i>@pBadge
+                                            </span>
+                                        }
+                                    </div>
                                 }
                                 else
                                 {
                                     <span class="text-muted small">—</span>
                                 }
                             </td>
-                            <td><span class="dot dot-green me-1"></span> Active</td>
-                            <td class="text-end">
-                                <AuthorizeView Roles="SuperAdmin,ClientAdmin">
-                                    <button class="btn btn-sm btn-outline-primary" @onclick='() => StartEditUser(uId, uFullName, uName, uRole, uTenantId, uProjectId, uModuleId)' title="Edit Employee"><i class="bi bi-pencil"></i></button>
-                                </AuthorizeView>
+                            <!-- Multi-Module Badges -->
+                            <td>
+                                @{
+                                    var mBadges = GetUserModuleNames(user);
+                                }
+                                @if (mBadges.Any())
+                                {
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var mBadge in mBadges)
+                                        {
+                                            <span class="badge bg-info-subtle text-dark border border-info-subtle small">
+                                                <i class="bi bi-diagram-3 me-1 text-info"></i>@mBadge
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">—</span>
+                                }
+                            </td>
+                            <!-- Status Column -->
+                            <td>
+                                @if (isAct)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <span class="dot dot-green me-1"></span> Active
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Inactive</span>
+                                }
+                            </td>
+                            <!-- Button-Level Permission Action Buttons (Sticky Right) -->
+                            <td class="text-end text-nowrap sticky-action-col">
+                                <div class="btn-group btn-group-sm">
+                                    <!-- Print ID Card Button (HR / Admin only) -->
+                                    @if (CanViewIdCard(user))
+                                    {
+                                        <a href="@($"/admin/employees/{(string.IsNullOrEmpty(uId) ? "U1000000001" : uId)}/id-card")" class="btn btn-outline-info" title="Corporate Identity Card">
+                                            <i class="bi bi-person-badge"></i>
+                                        </a>
+                                    }
+
+                                    <!-- Appointment Letter Button (HR / Admin only) -->
+                                    @if (CanViewAppointmentLetter(user))
+                                    {
+                                        <a href="@($"/admin/employees/{(string.IsNullOrEmpty(uId) ? "U1000000001" : uId)}/appointment-letter")" class="btn btn-outline-success" title="Appointment Letter">
+                                            <i class="bi bi-file-earmark-text"></i>
+                                        </a>
+                                    }
+
+                                    <!-- Edit User Button (Authorized Users Only) -->
+                                    @if (CanEditUser(user))
+                                    {
+                                        <button class="btn btn-outline-primary" @onclick='() => StartEditUser(user)' title="Edit Profile">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    }
+
+                                    <!-- Toggle Active/Inactive Status Button -->
+                                    @if (CanToggleUserStatus(user))
+                                    {
+                                        <button class="btn @(isAct ? "btn-outline-warning" : "btn-outline-success")" @onclick="() => ToggleUserActiveStatus(user)" title="@(isAct ? "Deactivate User" : "Activate User")">
+                                            <i class="bi @(isAct ? "bi-slash-circle" : "bi-check2-circle")"></i>
+                                        </button>
+                                    }
+                                </div>
                             </td>
                         </tr>
                     }
                 }
                 else
                 {
-                    <tr><td colspan="8" class="text-center text-muted p-4">No users registered yet.</td></tr>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted p-5">
+                            <i class="bi bi-people fs-1 text-secondary opacity-50 d-block mb-2"></i>
+                            <div>No users registered matching your criteria.</div>
+                            @if (!string.IsNullOrEmpty(searchQuery) || !string.IsNullOrEmpty(selectedFilterTenant) || !string.IsNullOrEmpty(selectedFilterProject) || !string.IsNullOrEmpty(selectedFilterRole))
+                            {
+                                <button class="btn btn-outline-secondary btn-sm mt-2" @onclick="ResetFilters">Reset Filters</button>
+                            }
+                        </td>
+                    </tr>
                 }
             </tbody>
         </table>
+        </div>
+        <!-- Table Bottom Status & Scroll Helper Bar -->
+        <div class="d-flex justify-content-between align-items-center py-2 px-3 bg-light border-top small text-muted">
+            <div>
+                <i class="bi bi-people me-1 text-primary"></i> Total: <strong>@(DisplayedUserList?.Count() ?? 0)</strong> users / employees
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace">
+                    <i class="bi bi-arrow-left-right me-1"></i> Scroll horizontally to view all columns
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Card View: Clean Stacked Cards for Smartphone Viewports (< 768px) -->
+    <div class="d-md-none">
+        @if (isLoading)
+        {
+            <div class="card border-0 p-4 text-center">
+                <div class="spinner-border text-primary mx-auto" role="status"></div>
+                <div class="text-muted small mt-2">Loading user directory...</div>
+            </div>
+        }
+        else if (DisplayedUserList != null && DisplayedUserList.Any())
+        {
+            <div class="d-flex flex-column gap-3">
+                @foreach (var user in DisplayedUserList)
+                {
+                    var uId = GetPropString(user, "user_id", "id", "UserId", "Id");
+                    var uFullName = GetPropString(user, "full_name", "name", "FullName", "Name");
+                    var uName = GetPropString(user, "username", "userName", "UserName", "email", "Email");
+                    var uRole = GetPropString(user, "role", "Role");
+                    var uDesig = GetPropString(user, "designation", "Designation");
+                    var shiftTiming = GetPropString(user, "shift_timing", "ShiftTiming");
+                    if (string.IsNullOrEmpty(shiftTiming)) shiftTiming = "09:30 AM";
+                    var isAct = GetPropBool(user, true, "is_active", "IsActive");
+                    var userSalary = GetPropDecimal(user, 0, "gross_salary", "GrossSalary", "salary");
+                    var uPhone = GetPropString(user, "phone", "Phone");
+                    var tBadges = GetUserTenantNames(user);
+                    var pBadges = GetUserProjectNames(user);
+                    var mBadges = GetUserModuleNames(user);
+
+                    <div class="card border rounded-3 shadow-sm">
+                        <div class="card-body p-3">
+                            <!-- Card Header: Name, Role & Status -->
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-dark">@uFullName</h6>
+                                    @if (!string.IsNullOrEmpty(uDesig))
+                                    {
+                                        <div class="text-muted small"><i class="bi bi-briefcase me-1"></i>@uDesig</div>
+                                    }
+                                </div>
+                                <span class="badge @(isAct ? "bg-success-subtle text-success border border-success-subtle" : "bg-secondary-subtle text-secondary border border-secondary-subtle")">
+                                    @(isAct ? "Active" : "Inactive")
+                                </span>
+                            </div>
+
+                            <div class="mb-2">
+                                <span class="badge @(uRole.StartsWith("Client") ? "bg-info text-dark" : "bg-primary") me-1">@uRole</span>
+                                @if (!uRole.StartsWith("Client", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="badge bg-light text-dark border">
+                                        <i class="bi bi-clock me-1 text-primary"></i>@FormatShiftTiming(user)
+                                    </span>
+                                }
+                            </div>
+
+                            <!-- Contact / Identifier -->
+                            <div class="small text-muted mb-2">
+                                <div><i class="bi bi-person-circle me-1"></i><span class="font-monospace">@uName</span></div>
+                                @if (!string.IsNullOrEmpty(uPhone))
+                                {
+                                    <div><i class="bi bi-telephone me-1"></i><span>@uPhone</span></div>
+                                }
+                            </div>
+
+                            <!-- Tenants / Company -->
+                            @if (tBadges.Any())
+                            {
+                                <div class="mb-2">
+                                    <div class="small fw-semibold text-secondary mb-1"><i class="bi bi-building me-1"></i>Company:</div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var tBadge in tBadges)
+                                        {
+                                            <span class="badge bg-light text-secondary border small">@tBadge</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- Assigned Projects -->
+                            @if (pBadges.Any())
+                            {
+                                <div class="mb-2">
+                                    <div class="small fw-semibold text-primary mb-1"><i class="bi bi-kanban me-1"></i>Projects:</div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var pBadge in pBadges)
+                                        {
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle small fw-semibold">@pBadge</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- Assigned Modules -->
+                            @if (mBadges.Any())
+                            {
+                                <div class="mb-2">
+                                    <div class="small fw-semibold text-info mb-1"><i class="bi bi-diagram-3 me-1"></i>Modules:</div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var mBadge in mBadges)
+                                        {
+                                            <span class="badge bg-info-subtle text-dark border border-info-subtle small">@mBadge</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- Action Buttons -->
+                            <div class="d-flex flex-wrap justify-content-end gap-1 pt-2 border-top mt-2">
+                                @if (CanViewIdCard(user))
+                                {
+                                    <a href="@($"/admin/employees/{(string.IsNullOrEmpty(uId) ? "U1000000001" : uId)}/id-card")" class="btn btn-sm btn-outline-info" title="ID Card">
+                                        <i class="bi bi-person-badge me-1"></i>ID Card
+                                    </a>
+                                }
+                                @if (CanViewAppointmentLetter(user))
+                                {
+                                    <a href="@($"/admin/employees/{(string.IsNullOrEmpty(uId) ? "U1000000001" : uId)}/appointment-letter")" class="btn btn-sm btn-outline-success" title="Appointment Letter">
+                                        <i class="bi bi-file-earmark-text me-1"></i>Letter
+                                    </a>
+                                }
+                                @if (CanEditUser(user))
+                                {
+                                    <button class="btn btn-sm btn-outline-primary" @onclick='() => StartEditUser(user)' title="Edit Profile">
+                                        <i class="bi bi-pencil me-1"></i>Edit
+                                    </button>
+                                }
+                                @if (CanToggleUserStatus(user))
+                                {
+                                    <button class="btn btn-sm @(isAct ? "btn-outline-warning" : "btn-outline-success")" @onclick="() => ToggleUserActiveStatus(user)">
+                                        <i class="bi @(isAct ? "bi-slash-circle" : "bi-check2-circle") me-1"></i>@(isAct ? "Deactivate" : "Activate")
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="card border rounded-3 p-4 text-center text-muted">
+                <i class="bi bi-people fs-1 text-secondary opacity-50 d-block mb-2"></i>
+                <div>No users registered matching your criteria.</div>
+                @if (!string.IsNullOrEmpty(searchQuery) || !string.IsNullOrEmpty(selectedFilterTenant) || !string.IsNullOrEmpty(selectedFilterProject) || !string.IsNullOrEmpty(selectedFilterRole))
+                {
+                    <button class="btn btn-outline-secondary btn-sm mt-2" @onclick="ResetFilters">Reset Filters</button>
+                }
+            </div>
+        }
     </div>
 </div>
 
@@ -197,15 +906,63 @@
     private List<JsonElement> projectList = new();
     private List<JsonElement> projectModules = new();
 
+    public class RoleOption
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("Key")]
+        public string Key { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("DisplayName")]
+        public string DisplayName { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("key_name")]
+        public string KeyName { set => Key = value; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("RoleKey")]
+        public string RoleKey { set => Key = value; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("display_name")]
+        public string DispName { set => DisplayName = value; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("Name")]
+        public string Name { set => DisplayName = value; }
+    }
+
+    private List<RoleOption> availableRoles = new()
+    {
+        new RoleOption { Key = "SuperAdmin", DisplayName = "Super Admin" },
+        new RoleOption { Key = "MD", DisplayName = "Managing Director" },
+        new RoleOption { Key = "SupportManager", DisplayName = "Support Manager" },
+        new RoleOption { Key = "ProjectManager", DisplayName = "Project Manager" },
+        new RoleOption { Key = "TeamMember", DisplayName = "Team Member (Engineer / Staff)" },
+        new RoleOption { Key = "HRManager", DisplayName = "HR Manager" },
+        new RoleOption { Key = "AccountsOfficer", DisplayName = "Accounts Officer" },
+        new RoleOption { Key = "ClientAdmin", DisplayName = "Client Admin" },
+        new RoleOption { Key = "ClientUser", DisplayName = "Client User" }
+    };
+
     private bool isLoading = true;
     private bool isAddMode = false;
     private bool isSubmitting = false;
+
+    // Logged in user claims context
     private string CurrentUserRole = "";
     private string CurrentUserTenantId = "";
+    private string CurrentUserId = "";
+    private string CurrentTenantName = "";
 
+    // Filters & Search
+    private string searchQuery = "";
+    private string selectedFilterTenant = "";
+    private string selectedFilterProject = "";
+    private string selectedFilterRole = "";
+
+    // Form Binding
     private string newFullName = "";
     private string newUsername = "";
     private string newPassword = "";
+    private string confirmPassword = "";
+    private bool showPassword = false;
+    private bool showConfirmPassword = false;
     private string newRole = "";
     private string newTenantId = "";
     private string newProjectId = "";
@@ -213,16 +970,380 @@
     private string? editUserId = null;
     private string userErrorMessage = "";
 
+    // Multi-Selection State
+    private HashSet<string> selectedProjectIds = new();
+    private HashSet<string> selectedTenantIds = new();
+    private HashSet<string> selectedModuleIds = new();
+
+    // Shift & Attendance properties
+    private TimeOnly? newShiftInTime = new TimeOnly(9, 30);
+    private TimeOnly? newShiftOutTime = new TimeOnly(18, 30);
+    private string newBloodGroup = "B+";
+    private decimal newMonthlySalary = 0;
+    private bool newIsWfhAllowed = true;
+
+    // HR & Family Identity fields
+    private string newPhone = "";
+    private string newNationalId = "";
+    private string newFatherName = "";
+    private string newMotherName = "";
+    private string newEmergencyContact = "";
+    private string newEmergencyRelation = "";
+    private string newDepartment = "Engineering";
+    private string newDesignation = "";
+    private DateTime? newJoiningDate = DateTime.Today;
+    private string newBranchId = "";
+    private List<JsonElement> branchList = new();
+    private List<string> designationList = new();
+
+    // -------------------------------------------------------------
+    // BUTTON-LEVEL PERMISSIONS (Role & Tenant access based)
+    // -------------------------------------------------------------
+    private bool IsSuperAdmin => CurrentUserRole.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) || CurrentUserRole.Equals("Admin", StringComparison.OrdinalIgnoreCase);
+    private bool IsMD => CurrentUserRole.Equals("MD", StringComparison.OrdinalIgnoreCase);
+    private bool IsHR => CurrentUserRole.Equals("HRManager", StringComparison.OrdinalIgnoreCase);
+    private bool IsPM => CurrentUserRole.Equals("ProjectManager", StringComparison.OrdinalIgnoreCase);
+    private bool IsClientAdmin => CurrentUserRole.Equals("ClientAdmin", StringComparison.OrdinalIgnoreCase);
+    private bool IsInternalUser => !IsClientAdmin && !CurrentUserRole.Equals("ClientUser", StringComparison.OrdinalIgnoreCase);
+    private bool IsClientUserRole(string? role) =>
+        !string.IsNullOrEmpty(role) && 
+        (string.Equals(role, "ClientAdmin", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(role, "ClientUser", StringComparison.OrdinalIgnoreCase));
+
+    private bool CanCreateUser => IsSuperAdmin || IsMD || IsHR || (IsClientAdmin && !string.IsNullOrEmpty(CurrentUserTenantId));
+
+    private bool CanEditUser(JsonElement user)
+    {
+        if (IsSuperAdmin || IsMD || IsHR) return true;
+        if (IsClientAdmin)
+        {
+            var tid = GetPropString(user, "tenant_id", "TenantId");
+            return !string.IsNullOrEmpty(tid) && string.Equals(tid, CurrentUserTenantId, StringComparison.OrdinalIgnoreCase);
+        }
+        return false;
+    }
+
+    private bool CanViewIdCard(JsonElement user)
+    {
+        var r = GetPropString(user, "role", "Role");
+        bool isClient = r.StartsWith("Client", StringComparison.OrdinalIgnoreCase);
+        return (IsSuperAdmin || IsMD || IsHR) && !isClient;
+    }
+
+    private bool CanViewAppointmentLetter(JsonElement user)
+    {
+        var r = GetPropString(user, "role", "Role");
+        bool isClient = r.StartsWith("Client", StringComparison.OrdinalIgnoreCase);
+        return (IsSuperAdmin || IsMD || IsHR) && !isClient;
+    }
+
+    private bool CanToggleUserStatus(JsonElement user)
+    {
+        if (IsSuperAdmin || IsMD || IsHR) return true;
+        if (IsClientAdmin)
+        {
+            var tid = GetPropString(user, "tenant_id", "TenantId");
+            return !string.IsNullOrEmpty(tid) && string.Equals(tid, CurrentUserTenantId, StringComparison.OrdinalIgnoreCase);
+        }
+        return false;
+    }
+
+    private bool CanViewSalary => IsSuperAdmin || IsMD || IsHR;
+
+    // -------------------------------------------------------------
+    // ACCESSIBLE ENTITY COLLECTIONS
+    // -------------------------------------------------------------
+    private IEnumerable<JsonElement> AccessibleTenants =>
+        IsInternalUser
+            ? tenantList
+            : tenantList.Where(t => string.Equals(GetPropString(t, "tenant_id", "id"), CurrentUserTenantId, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<RoleOption> FilteredAvailableRoles =>
+        IsClientAdmin
+            ? availableRoles.Where(r => r.Key == "ClientUser")
+            : availableRoles;
+
+    private IEnumerable<JsonElement> FilteredProjects
+    {
+        get
+        {
+            var activeTenants = new HashSet<string>(selectedTenantIds, StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(newTenantId)) activeTenants.Add(newTenantId);
+
+            if (activeTenants.Count > 0)
+            {
+                return projectList.Where(p => {
+                    var tid = GetPropString(p, "tenant_id", "TenantId");
+                    return string.IsNullOrEmpty(tid) || activeTenants.Contains(tid);
+                });
+            }
+
+            return IsInternalUser 
+                ? projectList 
+                : projectList.Where(p => string.Equals(GetPropString(p, "tenant_id", "TenantId"), CurrentUserTenantId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private IEnumerable<JsonElement> DisplayedUserList
+    {
+        get
+        {
+            var list = userList.AsEnumerable();
+
+            // 1. Follow User Tenant Access
+            if (!IsInternalUser && !string.IsNullOrEmpty(CurrentUserTenantId))
+            {
+                list = list.Where(u => {
+                    var tid = GetPropString(u, "tenant_id", "TenantId");
+                    if (!string.IsNullOrEmpty(tid) && string.Equals(tid, CurrentUserTenantId, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    // Check if assigned in user's tenant projects
+                    if (u.TryGetProperty("tenants", out var tArr) && tArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var el in tArr.EnumerateArray())
+                        {
+                            var tStr = el.ValueKind == JsonValueKind.String ? el.GetString() : GetPropString(el, "tenant_id", "id");
+                            if (string.Equals(tStr, CurrentUserTenantId, StringComparison.OrdinalIgnoreCase)) return true;
+                        }
+                    }
+                    return false;
+                });
+            }
+
+            // 2. Filter by Tenant Dropdown
+            if (!string.IsNullOrEmpty(selectedFilterTenant))
+            {
+                if (selectedFilterTenant == "INTERNAL")
+                {
+                    list = list.Where(u => {
+                        var tid = GetPropString(u, "tenant_id", "TenantId");
+                        return string.IsNullOrEmpty(tid) || tid == "00000000-0000-0000-0000-000000000000" || string.Equals(tid, "T001", StringComparison.OrdinalIgnoreCase);
+                    });
+                }
+                else
+                {
+                    list = list.Where(u => {
+                        var tid = GetPropString(u, "tenant_id", "TenantId");
+                        if (string.Equals(tid, selectedFilterTenant, StringComparison.OrdinalIgnoreCase)) return true;
+                        if (u.TryGetProperty("tenants", out var tArr) && tArr.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var el in tArr.EnumerateArray())
+                            {
+                                var tStr = el.ValueKind == JsonValueKind.String ? el.GetString() : GetPropString(el, "tenant_id", "id");
+                                if (string.Equals(tStr, selectedFilterTenant, StringComparison.OrdinalIgnoreCase)) return true;
+                            }
+                        }
+                        return false;
+                    });
+                }
+            }
+
+            // 3. Filter by Project Dropdown
+            if (!string.IsNullOrEmpty(selectedFilterProject))
+            {
+                list = list.Where(u => {
+                    var pid = GetPropString(u, "project_id", "ProjectId");
+                    if (string.Equals(pid, selectedFilterProject, StringComparison.OrdinalIgnoreCase)) return true;
+                    if (u.TryGetProperty("projects", out var pArr) && pArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var el in pArr.EnumerateArray())
+                        {
+                            var pStr = el.ValueKind == JsonValueKind.String ? el.GetString() : GetPropString(el, "project_id", "id");
+                            if (string.Equals(pStr, selectedFilterProject, StringComparison.OrdinalIgnoreCase)) return true;
+                        }
+                    }
+                    return false;
+                });
+            }
+
+            // 4. Filter by Role Dropdown
+            if (!string.IsNullOrEmpty(selectedFilterRole))
+            {
+                list = list.Where(u => string.Equals(GetPropString(u, "role", "Role"), selectedFilterRole, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // 5. Search Query Filter
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                var q = searchQuery.Trim();
+                list = list.Where(u => {
+                    var name = GetPropString(u, "full_name", "name", "FullName");
+                    var username = GetPropString(u, "username", "userName", "email");
+                    var phone = GetPropString(u, "phone", "Phone");
+                    var desig = GetPropString(u, "designation", "Designation");
+                    return name.Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || username.Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || phone.Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || desig.Contains(q, StringComparison.OrdinalIgnoreCase);
+                });
+            }
+
+            return list;
+        }
+    }
+
+    private void ResetFilters()
+    {
+        searchQuery = "";
+        selectedFilterTenant = "";
+        selectedFilterProject = "";
+        selectedFilterRole = "";
+    }
+
+    // -------------------------------------------------------------
+    // INITIALIZATION & LIFECYCLE
+    // -------------------------------------------------------------
     protected override async Task OnInitializedAsync()
+    {
+        await ResolveUserAuthContext();
+        try { await LoadDynamicRoles(); } catch {}
+        try { await LoadTenants(); } catch {}
+        try { await LoadProjects(); } catch {}
+        try { await LoadBranches(); } catch {}
+        try { LoadDesignations(); } catch {}
+        await LoadUsers();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && (string.IsNullOrEmpty(CurrentUserRole) || userList.Count == 0))
+        {
+            await ResolveUserAuthContext();
+            await LoadUsers();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ResolveUserAuthContext()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-        CurrentUserRole = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
-        CurrentUserTenantId = user.FindFirst("TenantId")?.Value ?? "";
+        CurrentUserRole = user.FindFirst(ClaimTypes.Role)?.Value 
+            ?? user.FindFirst("role")?.Value 
+            ?? user.FindFirst("Role")?.Value 
+            ?? "";
+        CurrentUserTenantId = user.FindFirst("TenantId")?.Value 
+            ?? user.FindFirst("tenant_id")?.Value 
+            ?? user.FindFirst("Tenant")?.Value 
+            ?? user.FindFirst("tenant")?.Value 
+            ?? "";
+        CurrentUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+            ?? user.FindFirst("nameid")?.Value 
+            ?? user.FindFirst("id")?.Value 
+            ?? user.FindFirst("user_id")?.Value 
+            ?? "";
 
-        await LoadTenants();
-        await LoadProjects();
-        await LoadUsers();
+        if (!string.IsNullOrEmpty(CurrentUserTenantId) && tenantList.Count > 0)
+        {
+            var match = tenantList.FirstOrDefault(t => string.Equals(GetPropString(t, "tenant_id", "id"), CurrentUserTenantId, StringComparison.OrdinalIgnoreCase));
+            CurrentTenantName = GetPropString(match, "name", "tenant_name");
+        }
+    }
+
+    private void LoadDesignations()
+    {
+        designationList = Config.GetSection("Designations").Get<List<string>>() ?? new List<string>
+        {
+            "Managing Director (MD)",
+            "Chief Executive Officer (CEO)",
+            "Chief Technology Officer (CTO)",
+            "Project Manager",
+            "Support Manager",
+            "Lead Software Engineer",
+            "Senior Full Stack Developer",
+            "Junior Software Engineer",
+            "QA & Test Automation Lead",
+            "UI/UX Product Designer",
+            "DevOps & Infrastructure Engineer",
+            "Database Administrator (DBA)",
+            "HR & Admin Lead",
+            "HR Officer",
+            "Chief Accounts Officer",
+            "Accounts Officer",
+            "Client Administrator",
+            "Client Representative",
+            "Technical Support Engineer"
+        };
+    }
+
+    // -------------------------------------------------------------
+    // DATA EXTRACTION & RESILIENT QUERYING
+    // -------------------------------------------------------------
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                ExtractItems(item, onObject);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("Table1", out var tbl1) && tbl1.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl1.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("error", out var er) && !string.IsNullOrEmpty(er.GetString()))
+            {
+                // Ignore error payload
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
+    }
+
+    private async Task LoadBranches()
+    {
+        branchList.Clear();
+        var payload = new APIDataAccParms { ProcName = "sp_attendance_operations", ProcID = "GET_BRANCHES" };
+        var result = await BackendApi.FetchDataAsync(payload);
+        if (result.HasValue)
+        {
+            ExtractItems(result.Value, el => branchList.Add(el));
+        }
+    }
+
+    private async Task LoadDynamicRoles()
+    {
+        try
+        {
+            var req = new APIDataAccParms { ProcName = "sp_permission_operations", ProcID = "GET_ROLES" };
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue)
+            {
+                var fetched = new List<RoleOption>();
+                ExtractItems(res.Value, el =>
+                {
+                    if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        var key = GetPropString(el, "Key", "key_name", "RoleKey", "key", "role");
+                        var name = GetPropString(el, "DisplayName", "display_name", "DisplayName", "Name", "name");
+                        if (string.IsNullOrEmpty(name)) name = key;
+                        if (!string.IsNullOrEmpty(key) && !fetched.Any(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            fetched.Add(new RoleOption { Key = key, DisplayName = name });
+                        }
+                    }
+                });
+
+                if (fetched.Count > 0)
+                {
+                    availableRoles = fetched;
+                }
+            }
+        }
+        catch {}
     }
 
     private async Task LoadTenants()
@@ -230,225 +1351,842 @@
         tenantList.Clear();
         var payload = new APIDataAccParms { ProcID = "GET_TENANTS" };
         var result = await BackendApi.FetchDataAsync(payload);
-        if (result.HasValue) {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var el in result.Value.EnumerateArray())
-                    {
-                        if (el.TryGetProperty("tenant_id", out _) || el.TryGetProperty("name", out _))
-                            tenantList.Add(el);
-                    }
-                }
-                else if (result.Value.ValueKind == JsonValueKind.Object && 
-                        (result.Value.TryGetProperty("tenant_id", out _) || result.Value.TryGetProperty("name", out _)))
-                {
-                    tenantList.Add(result.Value);
-                }
-            } catch {}
+        if (result.HasValue) 
+        {
+            ExtractItems(result.Value, el => tenantList.Add(el));
+        }
+        if (!string.IsNullOrEmpty(CurrentUserTenantId) && tenantList.Count > 0)
+        {
+            var match = tenantList.FirstOrDefault(t => string.Equals(GetPropString(t, "tenant_id", "id"), CurrentUserTenantId, StringComparison.OrdinalIgnoreCase));
+            CurrentTenantName = GetPropString(match, "name", "tenant_name");
         }
     }
 
     private async Task LoadProjects()
     {
         projectList.Clear();
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        var role = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
-        var tenantId = user.FindFirst("TenantId")?.Value ?? "";
-        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-
+        string targetComCod = IsInternalUser ? "" : CurrentUserTenantId;
         var payload = new APIDataAccParms { 
             ProcID = "GET_PROJECTS",
-            ComCod = tenantId,
-            parm04 = userId,
-            parm05 = role
+            ComCod = targetComCod,
+            parm04 = CurrentUserId,
+            parm05 = !string.IsNullOrEmpty(CurrentUserRole) ? CurrentUserRole : "SuperAdmin"
         };
         var result = await BackendApi.FetchDataAsync(payload);
-        if (result.HasValue) {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var el in result.Value.EnumerateArray())
-                    {
-                        if (el.TryGetProperty("project_id", out _) || el.TryGetProperty("code", out _))
-                            projectList.Add(el);
-                    }
-                }
-                else if (result.Value.ValueKind == JsonValueKind.Object && 
-                        (result.Value.TryGetProperty("project_id", out _) || result.Value.TryGetProperty("code", out _)))
-                {
-                    projectList.Add(result.Value);
-                }
-            } catch {}
-        }
-    }
-
-    private async Task LoadProjectModules(string projId)
-    {
-        projectModules.Clear();
-        if (string.IsNullOrEmpty(projId)) return;
-
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        var role = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
-        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-
-        var payload = new APIDataAccParms
+        if (result.HasValue) 
         {
-            ProcID = "GET_PROJECT_MODULES",
-            parm01 = projId,
-            parm04 = userId,
-            parm05 = role
-        };
-        var result = await BackendApi.FetchDataAsync(payload);
-        if (result.HasValue)
-        {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var el in result.Value.EnumerateArray()) projectModules.Add(el);
-                }
-                else if (result.Value.TryGetProperty("module_id", out _))
-                {
-                    projectModules.Add(result.Value);
-                }
-            } catch {}
+            ExtractItems(result.Value, el => projectList.Add(el));
         }
-    }
-
-    private async Task OnProjectChanged(ChangeEventArgs e)
-    {
-        newProjectId = e.Value?.ToString() ?? "";
-        newModuleId = "";
-        await LoadProjectModules(newProjectId);
     }
 
     private async Task LoadUsers()
     {
         isLoading = true;
-        userList.Clear();
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        var role = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
-        var tenantId = user.FindFirst("TenantId")?.Value ?? "";
-        
-        var payload = new APIDataAccParms { 
-            ProcID = "GET_USERS", 
-            ComCod = tenantId, 
-            parm05 = role 
-        };
-        var result = await BackendApi.FetchDataAsync(payload);
-        
-        if (result.HasValue)
+        userErrorMessage = "";
+        StateHasChanged();
+        try
         {
-            try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
+            await ResolveUserAuthContext();
+            string targetComCod = IsInternalUser ? "" : CurrentUserTenantId;
+            string targetRole = !string.IsNullOrEmpty(CurrentUserRole) ? CurrentUserRole : "SuperAdmin";
+
+            var payload = new APIDataAccParms { 
+                ProcName = "sp_ticket_operations",
+                ProcID = "GET_USERS", 
+                ComCod = targetComCod, 
+                parm04 = CurrentUserId,
+                parm05 = targetRole 
+            };
+            var result = await BackendApi.FetchDataAsync(payload);
+            
+            if (result.HasValue && result.Value.ValueKind == JsonValueKind.Object && result.Value.TryGetProperty("error", out var errEl) && !string.IsNullOrEmpty(errEl.GetString()))
+            {
+                userErrorMessage = errEl.GetString()!;
+            }
+
+            var tempList = new List<JsonElement>();
+            if (result.HasValue)
+            {
+                ExtractItems(result.Value, el =>
                 {
-                    foreach (var el in result.Value.EnumerateArray())
+                    var uid = GetPropString(el, "user_id", "id", "UserId", "Id");
+                    var unm = GetPropString(el, "username", "userName", "UserName", "email", "Email");
+                    if (!string.IsNullOrEmpty(uid) || !string.IsNullOrEmpty(unm))
                     {
-                        if (el.TryGetProperty("user_id", out _) || el.TryGetProperty("username", out _))
-                            userList.Add(el);
+                        if (!tempList.Any(x => GetPropString(x, "user_id", "id", "UserId", "Id") == uid && !string.IsNullOrEmpty(uid)))
+                        {
+                            tempList.Add(el);
+                        }
                     }
-                }
-                else if (result.Value.ValueKind == JsonValueKind.Object && 
-                        (result.Value.TryGetProperty("user_id", out _) || result.Value.TryGetProperty("username", out _)))
+                });
+            }
+
+            // Resilient Fallback 1: Try GET_TEAM_MEMBERS with global ComCod if GET_USERS returned 0
+            if (tempList.Count == 0)
+            {
+                var fbPayload = new APIDataAccParms
                 {
-                    userList.Add(result.Value);
+                    ProcName = "sp_ticket_operations",
+                    ProcID = "GET_TEAM_MEMBERS",
+                    ComCod = "",
+                    parm04 = CurrentUserId,
+                    parm05 = "SuperAdmin"
+                };
+                var fbResult = await BackendApi.FetchDataAsync(fbPayload);
+                if (fbResult.HasValue)
+                {
+                    ExtractItems(fbResult.Value, el =>
+                    {
+                        var uid = GetPropString(el, "user_id", "id", "UserId", "Id");
+                        var unm = GetPropString(el, "username", "userName", "UserName", "email", "Email");
+                        if (!string.IsNullOrEmpty(uid) || !string.IsNullOrEmpty(unm))
+                        {
+                            if (!tempList.Any(x => GetPropString(x, "user_id", "id", "UserId", "Id") == uid && !string.IsNullOrEmpty(uid)))
+                            {
+                                tempList.Add(el);
+                            }
+                        }
+                    });
                 }
-            } catch {}
+            }
+
+            // Resilient Fallback 2: Try GET_USERS without parameter restrictions
+            if (tempList.Count == 0)
+            {
+                var fb2Payload = new APIDataAccParms
+                {
+                    ProcName = "sp_ticket_operations",
+                    ProcID = "GET_USERS",
+                    ComCod = "",
+                    parm04 = "",
+                    parm05 = ""
+                };
+                var fb2Result = await BackendApi.FetchDataAsync(fb2Payload);
+                if (fb2Result.HasValue)
+                {
+                    ExtractItems(fb2Result.Value, el =>
+                    {
+                        var uid = GetPropString(el, "user_id", "id", "UserId", "Id");
+                        var unm = GetPropString(el, "username", "userName", "UserName", "email", "Email");
+                        if (!string.IsNullOrEmpty(uid) || !string.IsNullOrEmpty(unm))
+                        {
+                            if (!tempList.Any(x => GetPropString(x, "user_id", "id", "UserId", "Id") == uid && !string.IsNullOrEmpty(uid)))
+                            {
+                                tempList.Add(el);
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (tempList.Count > 0)
+            {
+                userList = tempList;
+            }
         }
-        isLoading = false;
+        catch (Exception ex)
+        {
+            userErrorMessage = "LoadUsers error: " + ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    // -------------------------------------------------------------
+    // MULTI-SELECTION HANDLERS
+    // -------------------------------------------------------------
+    private async Task ToggleProjectSelection(string projId, object? checkedVal)
+    {
+        bool isChecked = checkedVal is bool b && b;
+        if (isChecked)
+        {
+            selectedProjectIds.Add(projId);
+            if (string.IsNullOrEmpty(newProjectId)) newProjectId = projId;
+        }
+        else
+        {
+            selectedProjectIds.Remove(projId);
+            if (newProjectId == projId) newProjectId = selectedProjectIds.FirstOrDefault() ?? "";
+        }
+        await RefreshAvailableModules();
+        StateHasChanged();
+    }
+
+    private async Task ToggleTenantSelection(string tId, object? checkedVal)
+    {
+        bool isChecked = checkedVal is bool b && b;
+        if (isChecked)
+        {
+            selectedTenantIds.Add(tId);
+            if (string.IsNullOrEmpty(newTenantId)) newTenantId = tId;
+        }
+        else
+        {
+            selectedTenantIds.Remove(tId);
+            if (newTenantId == tId) newTenantId = selectedTenantIds.FirstOrDefault() ?? "";
+        }
+        await RefreshAvailableModules();
+        StateHasChanged();
+    }
+
+    private void ToggleModuleSelection(string modId, object? checkedVal)
+    {
+        bool isChecked = checkedVal is bool b && b;
+        if (isChecked)
+        {
+            selectedModuleIds.Add(modId);
+            if (string.IsNullOrEmpty(newModuleId)) newModuleId = modId;
+        }
+        else
+        {
+            selectedModuleIds.Remove(modId);
+            if (newModuleId == modId) newModuleId = selectedModuleIds.FirstOrDefault() ?? "";
+        }
+        StateHasChanged();
+    }
+
+    private async Task RefreshAvailableModules()
+    {
+        projectModules.Clear();
+        var projectsToLoad = selectedProjectIds.ToList();
+        if (!string.IsNullOrEmpty(newProjectId) && !projectsToLoad.Contains(newProjectId))
+        {
+            projectsToLoad.Add(newProjectId);
+        }
+
+        foreach (var pid in projectsToLoad)
+        {
+            try
+            {
+                var payload = new APIDataAccParms
+                {
+                    ProcID = "GET_PROJECT_MODULES",
+                    parm01 = pid,
+                    parm04 = CurrentUserId,
+                    parm05 = CurrentUserRole
+                };
+                var result = await BackendApi.FetchDataAsync(payload);
+                if (result.HasValue)
+                {
+                    ExtractItems(result.Value, el =>
+                    {
+                        var mid = GetPropString(el, "module_id", "id");
+                        if (!string.IsNullOrEmpty(mid) && !projectModules.Any(m => GetPropString(m, "module_id", "id") == mid))
+                        {
+                            projectModules.Add(el);
+                        }
+                    });
+                }
+            }
+            catch { }
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnTenantChanged(ChangeEventArgs e)
+    {
+        newTenantId = e.Value?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(newTenantId) && !selectedTenantIds.Contains(newTenantId))
+        {
+            selectedTenantIds.Add(newTenantId);
+        }
+        await RefreshAvailableModules();
+        StateHasChanged();
     }
 
     private void ToggleAddMode() 
     {
         isAddMode = !isAddMode;
         userErrorMessage = "";
-        if(isAddMode) {
+        if (isAddMode) {
             editUserId = null;
             newFullName = "";
             newUsername = "";
             newPassword = "";
-            newRole = "";
-            newTenantId = "";
+            confirmPassword = "";
+            showPassword = false;
+            showConfirmPassword = false;
+            newRole = IsClientAdmin ? "ClientUser" : "";
+            newTenantId = !IsInternalUser ? CurrentUserTenantId : "";
             newProjectId = "";
             newModuleId = "";
+            newPhone = "";
+            newNationalId = "";
+            newFatherName = "";
+            newMotherName = "";
+            newEmergencyContact = "";
+            newEmergencyRelation = "";
+            newDepartment = "Engineering";
+            newDesignation = "";
+            newJoiningDate = DateTime.Today;
+            newBranchId = "";
+            newShiftInTime = new TimeOnly(9, 30);
+            newShiftOutTime = new TimeOnly(18, 30);
+            newBloodGroup = "B+";
+            newMonthlySalary = 0;
+            newIsWfhAllowed = true;
+            selectedProjectIds.Clear();
+            selectedTenantIds.Clear();
+            selectedModuleIds.Clear();
+            if (!string.IsNullOrEmpty(newTenantId)) selectedTenantIds.Add(newTenantId);
             projectModules.Clear();
         }
+        StateHasChanged();
     }
 
-    private async void StartEditUser(string? id, string? name, string? username, string? role, string? tenantId, string? projectId, string? moduleId)
+    private async Task StartEditUser(JsonElement u)
     {
-        editUserId = id;
-        newFullName = name ?? "";
-        newUsername = username ?? "";
-        newRole = role ?? "";
-        newTenantId = tenantId ?? "";
-        newProjectId = projectId ?? "";
-        newModuleId = moduleId ?? "";
-        newPassword = "";
-        userErrorMessage = "";
-        isAddMode = true;
+        var id = GetPropString(u, "user_id", "id", "UserId", "Id");
+        var name = GetPropString(u, "full_name", "name", "FullName", "Name");
+        var username = GetPropString(u, "username", "userName", "UserName", "email", "Email");
+        var role = GetPropString(u, "role", "Role");
+        var tenantId = GetPropString(u, "tenant_id", "TenantId");
+        var projectId = GetPropString(u, "project_id", "ProjectId");
+        var moduleId = GetPropString(u, "module_id", "ModuleId");
 
-        if (!string.IsNullOrEmpty(newProjectId))
+        editUserId = id;
+        newFullName = name;
+        newUsername = username;
+        newRole = role;
+        newTenantId = tenantId;
+        newProjectId = projectId;
+        newModuleId = moduleId;
+        newPassword = "";
+        confirmPassword = "";
+        userErrorMessage = "";
+
+        selectedProjectIds.Clear();
+        if (!string.IsNullOrEmpty(newProjectId)) selectedProjectIds.Add(newProjectId);
+        if (u.ValueKind == JsonValueKind.Object && u.TryGetProperty("projects", out var projsEl) && projsEl.ValueKind == JsonValueKind.Array)
         {
-            await LoadProjectModules(newProjectId);
-            StateHasChanged();
+            foreach (var p in projsEl.EnumerateArray())
+            {
+                var pid = p.ValueKind == JsonValueKind.String ? p.GetString() : GetPropString(p, "project_id", "id");
+                if (!string.IsNullOrEmpty(pid)) selectedProjectIds.Add(pid);
+            }
         }
+
+        selectedTenantIds.Clear();
+        if (!string.IsNullOrEmpty(newTenantId)) selectedTenantIds.Add(newTenantId);
+        if (u.ValueKind == JsonValueKind.Object && u.TryGetProperty("tenants", out var tensEl) && tensEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var t in tensEl.EnumerateArray())
+            {
+                var tid = t.ValueKind == JsonValueKind.String ? t.GetString() : GetPropString(t, "tenant_id", "id");
+                if (!string.IsNullOrEmpty(tid)) selectedTenantIds.Add(tid);
+            }
+        }
+
+        selectedModuleIds.Clear();
+        if (!string.IsNullOrEmpty(newModuleId)) selectedModuleIds.Add(newModuleId);
+        if (u.ValueKind == JsonValueKind.Object && u.TryGetProperty("modules", out var modsEl) && modsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var m in modsEl.EnumerateArray())
+            {
+                var mid = m.ValueKind == JsonValueKind.String ? m.GetString() : GetPropString(m, "module_id", "id");
+                if (!string.IsNullOrEmpty(mid)) selectedModuleIds.Add(mid);
+            }
+        }
+
+        newPhone = GetPropString(u, "phone", "Phone");
+        newNationalId = GetPropString(u, "national_id", "NationalId");
+        newFatherName = GetPropString(u, "father_name", "FatherName");
+        newMotherName = GetPropString(u, "mother_name", "MotherName");
+        newEmergencyContact = GetPropString(u, "emergency_contact", "EmergencyContact");
+        newEmergencyRelation = GetPropString(u, "emergency_relation", "EmergencyContactRelation");
+        newDepartment = GetPropString(u, "department", "Department");
+        if (string.IsNullOrEmpty(newDepartment)) newDepartment = "Engineering";
+        newDesignation = GetPropString(u, "designation", "Designation");
+        var jd = GetPropString(u, "joining_date", "JoiningDate", "JoinDate");
+        if (!string.IsNullOrEmpty(jd) && DateTime.TryParse(jd, out var parsedJd)) newJoiningDate = parsedJd;
+        else newJoiningDate = DateTime.Today;
+
+        newBranchId = GetPropString(u, "branch_id", "BranchId");
+        var bg = GetPropString(u, "blood_group", "BloodGroup");
+        newBloodGroup = !string.IsNullOrEmpty(bg) ? bg : "B+";
+
+        newMonthlySalary = GetPropDecimal(u, 0, "gross_salary", "GrossSalary", "salary", "Salary");
+
+        var si = GetPropString(u, "shift_in", "CustomStartTime");
+        if (string.IsNullOrEmpty(si))
+        {
+            var st = GetPropString(u, "shift_timing", "ShiftTiming");
+            if (st.Contains('-')) si = st.Split('-')[0].Trim();
+            else si = st;
+        }
+        if (!string.IsNullOrEmpty(si))
+        {
+            if (TimeOnly.TryParse(si, out var parsedSi)) newShiftInTime = parsedSi;
+            else if (DateTime.TryParse(si, out var parsedSiDt)) newShiftInTime = TimeOnly.FromDateTime(parsedSiDt);
+            else newShiftInTime = new TimeOnly(9, 30);
+        }
+        else newShiftInTime = new TimeOnly(9, 30);
+
+        var so = GetPropString(u, "shift_out", "CustomEndTime");
+        if (string.IsNullOrEmpty(so))
+        {
+            var st = GetPropString(u, "shift_timing", "ShiftTiming");
+            if (st.Contains('-')) so = st.Split('-')[1].Trim();
+        }
+        if (!string.IsNullOrEmpty(so))
+        {
+            if (TimeOnly.TryParse(so, out var parsedSo)) newShiftOutTime = parsedSo;
+            else if (DateTime.TryParse(so, out var parsedSoDt)) newShiftOutTime = TimeOnly.FromDateTime(parsedSoDt);
+            else newShiftOutTime = new TimeOnly(18, 30);
+        }
+        else newShiftOutTime = new TimeOnly(18, 30);
+
+        newIsWfhAllowed = GetPropBool(u, true, "is_wfh_allowed", "IsWfhAllowed");
+
+        isAddMode = true;
+        await RefreshAvailableModules();
+        StateHasChanged();
     }
 
+    // -------------------------------------------------------------
+    // CREATE / UPDATE ACTION
+    // -------------------------------------------------------------
     private async Task CreateUser()
     {
         isSubmitting = true;
         userErrorMessage = "";
+        StateHasChanged();
         
-        string finalTenantId = newTenantId;
-        if (CurrentUserRole == "ClientAdmin" || CurrentUserRole == "ClientUser")
+        if (!string.IsNullOrEmpty(newPassword) && newPassword != confirmPassword)
         {
-            finalTenantId = CurrentUserTenantId;
-        }
-        if (string.IsNullOrEmpty(finalTenantId))
-        {
-            finalTenantId = "00000000-0000-0000-0000-000000000000";
-        }
-
-        var isEdit = !string.IsNullOrEmpty(editUserId);
-
-        var payload = new APIDataAccParms 
-        { 
-            ProcID = isEdit ? "UPDATE_USER" : "CREATE_USER",
-            parm01 = isEdit ? editUserId : newUsername,
-            parm02 = isEdit ? newFullName : newPassword,
-            parm03 = isEdit ? newRole : newFullName,
-            parm04 = isEdit ? "" : newRole,
-            parm05 = finalTenantId,
-            parm06 = isEdit ? (string.IsNullOrEmpty(newPassword) ? "" : newPassword) : newProjectId,
-            parm07 = isEdit ? newProjectId : newModuleId,
-            parm08 = isEdit ? newModuleId : "",
-            ComCod = CurrentUserTenantId
-        };
-
-        var result = await BackendApi.FetchDataAsync(payload);
-        
-        if (result.HasValue && result.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
-        {
-            userErrorMessage = err.GetString()!;
+            userErrorMessage = "Passwords do not match!";
             isSubmitting = false;
+            StateHasChanged();
             return;
         }
-        
-        // Reset form and reload
-        isAddMode = false;
-        newFullName = "";
-        newUsername = "";
-        newPassword = "";
-        newRole = "";
-        newTenantId = "";
-        newProjectId = "";
-        newModuleId = "";
-        editUserId = null;
-        isSubmitting = false;
-        await LoadUsers();
+
+        if (string.IsNullOrEmpty(editUserId) && string.IsNullOrEmpty(newPassword))
+        {
+            userErrorMessage = "Password is required for new users.";
+            isSubmitting = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            string finalTenantId = newTenantId;
+            if (!IsInternalUser)
+            {
+                finalTenantId = !string.IsNullOrEmpty(CurrentUserTenantId) ? CurrentUserTenantId : newTenantId;
+            }
+
+            var isEdit = !string.IsNullOrEmpty(editUserId);
+
+            if (string.IsNullOrEmpty(newProjectId) && selectedProjectIds.Count > 0)
+            {
+                newProjectId = selectedProjectIds.First();
+            }
+            if (string.IsNullOrEmpty(newModuleId) && selectedModuleIds.Count > 0)
+            {
+                newModuleId = selectedModuleIds.First();
+            }
+
+            bool isClient = IsClientUserRole(newRole);
+            var hrData = new
+            {
+                phone = newPhone,
+                national_id = isClient ? "" : newNationalId,
+                father_name = isClient ? "" : newFatherName,
+                mother_name = isClient ? "" : newMotherName,
+                emergency_contact = isClient ? "" : newEmergencyContact,
+                emergency_relation = isClient ? "" : newEmergencyRelation,
+                department = isClient ? "Client Operations" : newDepartment,
+                designation = isClient ? newRole : (string.IsNullOrEmpty(newDesignation) ? newRole : newDesignation),
+                joining_date = isClient ? DateTime.Today.ToString("yyyy-MM-dd") : (newJoiningDate?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd")),
+                branch_id = isClient ? "" : newBranchId,
+                shift_in = isClient ? "09:30" : (newShiftInTime?.ToString("HH:mm") ?? "09:30"),
+                shift_out = isClient ? "18:30" : (newShiftOutTime?.ToString("HH:mm") ?? "18:30"),
+                blood_group = isClient ? "B+" : newBloodGroup,
+                salary = isClient ? 0 : newMonthlySalary,
+                projects = selectedProjectIds.ToList(),
+                tenants = selectedTenantIds.ToList(),
+                modules = selectedModuleIds.ToList()
+            };
+
+            var payload = new APIDataAccParms 
+            { 
+                ProcID = isEdit ? "UPDATE_USER" : "CREATE_USER",
+                parm01 = isEdit ? editUserId : newUsername,
+                parm02 = newFullName,
+                parm03 = newRole,
+                parm04 = finalTenantId,
+                parm05 = newProjectId,
+                parm06 = newModuleId,
+                parm07 = string.IsNullOrEmpty(newPassword) ? "" : newPassword,
+                parm08 = newPhone,
+                parm09 = newNationalId,
+                parm10 = newBloodGroup,
+                parmJson1 = JsonSerializer.Serialize(hrData),
+                ComCod = finalTenantId
+            };
+
+            var result = await BackendApi.FetchDataAsync(payload);
+            string createdOrUpdatedUserId = isEdit ? editUserId! : "";
+            
+            if (result.HasValue)
+            {
+                var resEl = result.Value;
+                if (resEl.ValueKind == JsonValueKind.Array && resEl.GetArrayLength() > 0) resEl = resEl[0];
+
+                if (resEl.ValueKind == JsonValueKind.Object)
+                {
+                    if (resEl.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+                    {
+                        userErrorMessage = err.GetString()!;
+                        isSubmitting = false;
+                        StateHasChanged();
+                        return;
+                    }
+                    if (resEl.TryGetProperty("errormessage", out var em) && !string.IsNullOrEmpty(em.GetString()))
+                    {
+                        userErrorMessage = em.GetString()!;
+                        isSubmitting = false;
+                        StateHasChanged();
+                        return;
+                    }
+                    if (resEl.TryGetProperty("user_id", out var uid) && !string.IsNullOrEmpty(uid.GetString()))
+                    {
+                        createdOrUpdatedUserId = uid.GetString()!;
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(createdOrUpdatedUserId))
+            {
+                createdOrUpdatedUserId = isEdit ? editUserId! : newUsername;
+            }
+
+            // Sync Multi-Project Assignment
+            foreach (var pId in selectedProjectIds)
+            {
+                try
+                {
+                    var assignReq = new APIDataAccParms
+                    {
+                        ProcID = "ASSIGN_TEAM_MEMBER",
+                        parm01 = pId,
+                        parm02 = createdOrUpdatedUserId,
+                        parm03 = newRole
+                    };
+                    await BackendApi.FetchDataAsync(assignReq);
+                }
+                catch { }
+            }
+
+            // Sync Multi-Module Assignment
+            foreach (var mId in selectedModuleIds)
+            {
+                try
+                {
+                    var assignModReq = new APIDataAccParms
+                    {
+                        ProcID = "ASSIGN_USER_MODULE",
+                        parm01 = createdOrUpdatedUserId,
+                        parm02 = mId,
+                        parm03 = newProjectId
+                    };
+                    await BackendApi.FetchDataAsync(assignModReq);
+                }
+                catch { }
+            }
+
+            // Optimistic in-memory update so the UI immediately reflects changes without waiting
+            try
+            {
+                var targetTenantName = tenantList.FirstOrDefault(t => GetPropString(t, "tenant_id", "id") == finalTenantId) is JsonElement matchedTenant
+                    ? GetPropString(matchedTenant, "name", "tenant_name")
+                    : (string.IsNullOrEmpty(finalTenantId) ? "Internal" : finalTenantId);
+
+                var targetProjectName = projectList.FirstOrDefault(p => GetPropString(p, "project_id", "id") == newProjectId) is JsonElement matchedProj
+                    ? GetPropString(matchedProj, "name", "project_name")
+                    : "—";
+
+                var targetModuleName = projectModules.FirstOrDefault(m => GetPropString(m, "module_id", "id") == newModuleId) is JsonElement matchedMod
+                    ? GetPropString(matchedMod, "name", "module_name")
+                    : "";
+
+                var optimisticUserObj = new Dictionary<string, object?>
+                {
+                    ["user_id"] = createdOrUpdatedUserId,
+                    ["id"] = createdOrUpdatedUserId,
+                    ["full_name"] = newFullName,
+                    ["name"] = newFullName,
+                    ["username"] = newUsername,
+                    ["role"] = newRole,
+                    ["tenant_id"] = finalTenantId,
+                    ["tenant_name"] = targetTenantName,
+                    ["project_id"] = newProjectId,
+                    ["project_name"] = targetProjectName,
+                    ["module_id"] = newModuleId,
+                    ["module_name"] = targetModuleName,
+                    ["shift_in"] = newShiftInTime?.ToString("HH:mm") ?? "09:30",
+                    ["shift_out"] = newShiftOutTime?.ToString("HH:mm") ?? "18:30",
+                    ["shift_timing"] = $"{newShiftInTime?.ToString("hh:mm tt") ?? "09:30 AM"} - {newShiftOutTime?.ToString("hh:mm tt") ?? "06:30 PM"}",
+                    ["is_active"] = true,
+                    ["phone"] = newPhone,
+                    ["national_id"] = newNationalId,
+                    ["designation"] = string.IsNullOrEmpty(newDesignation) ? newRole : newDesignation,
+                    ["department"] = newDepartment,
+                    ["blood_group"] = newBloodGroup,
+                    ["gross_salary"] = newMonthlySalary,
+                    ["projects"] = selectedProjectIds.ToList(),
+                    ["tenants"] = selectedTenantIds.ToList(),
+                    ["modules"] = selectedModuleIds.ToList()
+                };
+
+                var optimisticJson = JsonSerializer.Serialize(optimisticUserObj);
+                using var optimisticDoc = JsonDocument.Parse(optimisticJson);
+                var optimisticEl = optimisticDoc.RootElement.Clone();
+
+                var existingIndex = userList.FindIndex(u => {
+                    var uid = GetPropString(u, "user_id", "id", "UserId", "Id");
+                    var unm = GetPropString(u, "username", "userName", "UserName", "email", "Email");
+                    return (!string.IsNullOrEmpty(uid) && uid == createdOrUpdatedUserId) ||
+                           (!string.IsNullOrEmpty(unm) && string.Equals(unm, newUsername, StringComparison.OrdinalIgnoreCase));
+                });
+
+                if (existingIndex >= 0) userList[existingIndex] = optimisticEl;
+                else userList.Insert(0, optimisticEl);
+            }
+            catch { }
+            
+            // Reset form state
+            isAddMode = false;
+            newFullName = "";
+            newUsername = "";
+            newPassword = "";
+            confirmPassword = "";
+            showPassword = false;
+            showConfirmPassword = false;
+            newRole = "";
+            newTenantId = "";
+            newProjectId = "";
+            newModuleId = "";
+            selectedProjectIds.Clear();
+            selectedTenantIds.Clear();
+            selectedModuleIds.Clear();
+            editUserId = null;
+            isSubmitting = false;
+            StateHasChanged();
+
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            userErrorMessage = "Error saving user: " + ex.Message;
+            isSubmitting = false;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    // -------------------------------------------------------------
+    // USER ACTIVE STATUS TOGGLE
+    // -------------------------------------------------------------
+    private async Task ToggleUserActiveStatus(JsonElement user)
+    {
+        var uId = GetPropString(user, "user_id", "id", "UserId", "Id");
+        var curActive = GetPropBool(user, true, "is_active", "IsActive");
+        bool newActive = !curActive;
+
+        try
+        {
+            var payload = new APIDataAccParms
+            {
+                ProcID = "UPDATE_USER_STATUS",
+                parm01 = uId,
+                parm02 = newActive ? "1" : "0"
+            };
+            await BackendApi.FetchDataAsync(payload);
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            userErrorMessage = "Error updating user status: " + ex.Message;
+        }
+    }
+
+    // -------------------------------------------------------------
+    // MULTI-BADGE DISPLAY HELPERS
+    // -------------------------------------------------------------
+    private List<string> GetUserProjectNames(JsonElement user)
+    {
+        var names = new List<string>();
+        var pName = GetPropString(user, "project_name", "ProjectName");
+        if (!string.IsNullOrEmpty(pName) && pName != "—") names.Add(pName);
+
+        if (user.ValueKind == JsonValueKind.Object && user.TryGetProperty("projects", out var projsEl) && projsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var p in projsEl.EnumerateArray())
+            {
+                var pid = p.ValueKind == JsonValueKind.String ? p.GetString() : GetPropString(p, "project_id", "id");
+                var pNameFromObj = p.ValueKind == JsonValueKind.Object ? GetPropString(p, "name", "project_name") : "";
+                if (!string.IsNullOrEmpty(pNameFromObj))
+                {
+                    if (!names.Contains(pNameFromObj)) names.Add(pNameFromObj);
+                }
+                else if (!string.IsNullOrEmpty(pid))
+                {
+                    var matched = projectList.FirstOrDefault(proj => GetPropString(proj, "project_id", "id") == pid);
+                    var matchedNm = GetPropString(matched, "name", "project_name");
+                    if (!string.IsNullOrEmpty(matchedNm) && !names.Contains(matchedNm)) names.Add(matchedNm);
+                }
+            }
+        }
+        return names;
+    }
+
+    private List<string> GetUserModuleNames(JsonElement user)
+    {
+        var names = new List<string>();
+        var mName = GetPropString(user, "module_name", "ModuleName");
+        if (!string.IsNullOrEmpty(mName) && mName != "—") names.Add(mName);
+
+        if (user.ValueKind == JsonValueKind.Object && user.TryGetProperty("modules", out var modsEl) && modsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var m in modsEl.EnumerateArray())
+            {
+                var mid = m.ValueKind == JsonValueKind.String ? m.GetString() : GetPropString(m, "module_id", "id");
+                var mNameFromObj = m.ValueKind == JsonValueKind.Object ? GetPropString(m, "name", "module_name") : "";
+                if (!string.IsNullOrEmpty(mNameFromObj))
+                {
+                    if (!names.Contains(mNameFromObj)) names.Add(mNameFromObj);
+                }
+                else if (!string.IsNullOrEmpty(mid))
+                {
+                    var matched = projectModules.FirstOrDefault(mod => GetPropString(mod, "module_id", "id") == mid);
+                    var matchedNm = GetPropString(matched, "name", "module_name");
+                    if (!string.IsNullOrEmpty(matchedNm) && !names.Contains(matchedNm)) names.Add(matchedNm);
+                }
+            }
+        }
+        return names;
+    }
+
+    private List<string> GetUserTenantNames(JsonElement user)
+    {
+        var names = new List<string>();
+        var tName = GetPropString(user, "tenant_name", "TenantName");
+        if (!string.IsNullOrEmpty(tName) && tName != "Internal") names.Add(tName);
+
+        if (user.ValueKind == JsonValueKind.Object && user.TryGetProperty("tenants", out var tensEl) && tensEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var t in tensEl.EnumerateArray())
+            {
+                var tid = t.ValueKind == JsonValueKind.String ? t.GetString() : GetPropString(t, "tenant_id", "id");
+                var tNameFromObj = t.ValueKind == JsonValueKind.Object ? GetPropString(t, "name", "tenant_name") : "";
+                if (!string.IsNullOrEmpty(tNameFromObj))
+                {
+                    if (!names.Contains(tNameFromObj)) names.Add(tNameFromObj);
+                }
+                else if (!string.IsNullOrEmpty(tid))
+                {
+                    var matched = tenantList.FirstOrDefault(ten => GetPropString(ten, "tenant_id", "id") == tid);
+                    var matchedNm = GetPropString(matched, "name", "tenant_name");
+                    if (!string.IsNullOrEmpty(matchedNm) && !names.Contains(matchedNm)) names.Add(matchedNm);
+                }
+            }
+        }
+        return names;
+    }
+
+    private string FormatShiftTiming(JsonElement user)
+    {
+        var sIn = GetPropString(user, "shift_in", "CustomStartTime");
+        var sOut = GetPropString(user, "shift_out", "CustomEndTime");
+        var timing = GetPropString(user, "shift_timing", "ShiftTiming");
+
+        string inFmt = FormatTime12(sIn);
+        string outFmt = FormatTime12(sOut);
+
+        if (!string.IsNullOrEmpty(inFmt) && !string.IsNullOrEmpty(outFmt))
+        {
+            return $"{inFmt} - {outFmt}";
+        }
+        if (!string.IsNullOrEmpty(timing))
+        {
+            if (timing.Contains('-'))
+            {
+                var parts = timing.Split('-');
+                var p1 = FormatTime12(parts[0].Trim());
+                var p2 = FormatTime12(parts[1].Trim());
+                if (!string.IsNullOrEmpty(p1) && !string.IsNullOrEmpty(p2)) return $"{p1} - {p2}";
+            }
+            return FormatTime12(timing);
+        }
+        return "09:30 AM - 06:30 PM";
+    }
+
+    private static string FormatTime12(string? val)
+    {
+        if (string.IsNullOrWhiteSpace(val)) return "";
+        if (TimeOnly.TryParse(val, out var to)) return to.ToString("hh:mm tt");
+        if (DateTime.TryParse(val, out var dt)) return dt.ToString("hh:mm tt");
+        return val;
+    }
+
+    // -------------------------------------------------------------
+    // SAFE JSON CONVERTERS
+    // -------------------------------------------------------------
+    private static string GetPropString(JsonElement el, params string[] propertyNames)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return "";
+        foreach (var name in propertyNames)
+        {
+            if (el.TryGetProperty(name, out var prop))
+            {
+                return prop.ValueKind switch
+                {
+                    JsonValueKind.String => prop.GetString() ?? "",
+                    JsonValueKind.Number => prop.ToString(),
+                    JsonValueKind.True => "true",
+                    JsonValueKind.False => "false",
+                    JsonValueKind.Null => "",
+                    _ => prop.ToString()
+                };
+            }
+        }
+        return "";
+    }
+
+    private static decimal GetPropDecimal(JsonElement el, decimal defaultValue, params string[] propertyNames)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
+        foreach (var name in propertyNames)
+        {
+            if (el.TryGetProperty(name, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.Number && prop.TryGetDecimal(out var d)) return d;
+                if (prop.ValueKind == JsonValueKind.String && decimal.TryParse(prop.GetString(), out var ps)) return ps;
+            }
+        }
+        return defaultValue;
+    }
+
+    private static bool GetPropBool(JsonElement el, bool defaultValue, params string[] propertyNames)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return defaultValue;
+        foreach (var name in propertyNames)
+        {
+            if (el.TryGetProperty(name, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.True) return true;
+                if (prop.ValueKind == JsonValueKind.False) return false;
+                if (prop.ValueKind == JsonValueKind.Number) return prop.GetInt32() == 1;
+                if (prop.ValueKind == JsonValueKind.String && bool.TryParse(prop.GetString(), out var b)) return b;
+            }
+        }
+        return defaultValue;
     }
 }

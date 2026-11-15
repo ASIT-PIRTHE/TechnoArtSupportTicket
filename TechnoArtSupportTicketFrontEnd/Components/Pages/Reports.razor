@@ -9,8 +9,8 @@
 
 <PageTitle>Executive Reports - SupportHub</PageTitle>
 
-<div class="custom-card p-4 h-100">
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+<div class="custom-card p-3 p-md-4 h-100" style="max-width: 100%; overflow-x: hidden;">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-4 border-bottom pb-3">
         <h5 class="fw-bold m-0"><i class="bi bi-bar-chart text-primary me-2"></i> Executive SLA & Performance Reports</h5>
         <div class="d-flex gap-2">
             <button class="btn btn-outline-primary btn-sm fw-semibold shadow-sm" @onclick="LoadReports">
@@ -27,28 +27,28 @@
     {
         <div class="row g-4 mb-4">
             <!-- Key Metric Cards -->
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-md-3">
                 <div class="card border-0 bg-light p-3 shadow-sm border-start border-4 border-primary">
                     <div class="text-muted small fw-semibold">Total Clients</div>
                     <div class="fs-2 fw-bold text-primary">@totalClients</div>
                     <div class="small text-muted"><i class="bi bi-building me-1"></i>Active Tenants</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-md-3">
                 <div class="card border-0 bg-light p-3 shadow-sm border-start border-4 border-info">
                     <div class="text-muted small fw-semibold">Total Projects</div>
                     <div class="fs-2 fw-bold text-info">@totalProjects</div>
                     <div class="small text-muted"><i class="bi bi-kanban me-1"></i>System Projects</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-md-3">
                 <div class="card border-0 bg-light p-3 shadow-sm border-start border-4 border-warning">
                     <div class="text-muted small fw-semibold">Total Tickets</div>
                     <div class="fs-2 fw-bold text-warning">@totalTickets</div>
                     <div class="small text-muted"><i class="bi bi-ticket me-1"></i>All Time Raised</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-md-3">
                 <div class="card border-0 bg-light p-3 shadow-sm border-start border-4 border-success">
                     <div class="text-muted small fw-semibold">Resolved / Closed</div>
                     <div class="fs-2 fw-bold text-success">@resolvedTickets</div>
@@ -59,7 +59,7 @@
 
         <div class="row g-4 mb-4">
             <!-- SLA Compliance Rate -->
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
                 <div class="card border-0 bg-light p-4 shadow-sm h-100">
                     <h6 class="fw-bold text-muted mb-3"><i class="bi bi-shield-check text-success me-2"></i>Overall SLA Compliance Rate</h6>
                     <div class="d-flex align-items-end gap-3 mb-2">
@@ -76,7 +76,7 @@
             </div>
 
             <!-- Priority Breakdown -->
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
                 <div class="card border-0 bg-light p-4 shadow-sm h-100">
                     <h6 class="fw-bold text-muted mb-3"><i class="bi bi-pie-chart text-primary me-2"></i>Ticket Distribution by Priority</h6>
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -100,10 +100,10 @@
         </div>
 
         <!-- Client Breakdown Table -->
-        <div class="card border-0 bg-light p-4 shadow-sm mb-4">
+        <div class="card border-0 bg-light p-3 p-md-4 shadow-sm mb-4">
             <h6 class="fw-bold text-muted mb-3"><i class="bi bi-building text-primary me-2"></i>Client Support Performance Overview</h6>
             <div class="table-responsive">
-                <table class="table table-hover align-middle bg-white rounded">
+                <table class="table table-hover align-middle bg-white rounded mb-0" style="min-width: 650px;">
                     <thead class="bg-light">
                         <tr>
                             <th class="fw-semibold text-muted small">Client / Tenant</th>
@@ -145,7 +145,7 @@
         <div class="card border-0 bg-light p-4 shadow-sm">
             <h6 class="fw-bold text-muted mb-3"><i class="bi bi-person-lines-fill text-primary me-2"></i>Internal Team Performance (Tasks Solved)</h6>
             <div class="table-responsive">
-                <table class="table table-hover align-middle bg-white rounded">
+                <table class="table table-hover align-middle bg-white rounded mb-0" style="min-width: 650px;">
                     <thead class="bg-light">
                         <tr>
                             <th class="fw-semibold text-muted small">Member Name</th>

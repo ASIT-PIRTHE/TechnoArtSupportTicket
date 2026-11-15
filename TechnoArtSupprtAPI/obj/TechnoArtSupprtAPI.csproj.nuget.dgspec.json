@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\TechnoArtSupprtAPI.csproj": {}
+    "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\TechnoArtSupprtAPI.csproj": {}
   },
   "projects": {
-    "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\TechnoArtSupprtAPI.csproj": {
+    "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\TechnoArtSupprtAPI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\TechnoArtSupprtAPI.csproj",
+        "projectUniqueName": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\TechnoArtSupprtAPI.csproj",
         "projectName": "TechnoArtSupprtAPI",
-        "projectPath": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\TechnoArtSupprtAPI.csproj",
+        "projectPath": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\TechnoArtSupprtAPI.csproj",
         "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-        "outputPath": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\obj\\",
+        "outputPath": "D:\\Ticket\\TechnoArtSupportTicket\\TechnoArtSupportTicket\\TechnoArtSupprtAPI\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

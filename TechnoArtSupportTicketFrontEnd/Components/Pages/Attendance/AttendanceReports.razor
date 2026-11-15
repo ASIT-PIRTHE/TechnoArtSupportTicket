@@ -1,0 +1,268 @@
+@page "/attendance/reports"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@inject ApiService BackendApi
+
+<PageTitle>Attendance Analytics & Reports - TechnoArt</PageTitle>
+
+<div class="container-fluid py-2 py-md-4 px-2 px-md-3" style="max-width: 100%; overflow-x: hidden;">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-3">
+        <div>
+            <h4 class="fw-bold mb-1 text-primary">
+                <i class="bi bi-file-earmark-bar-graph me-2"></i> Attendance Analytics & Logs
+            </h4>
+            <p class="text-muted small mb-0">Daily roster verification, monthly attendance summaries, and individual employee sheets</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-success btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="ExportToCsv">
+                <i class="bi bi-filetype-csv me-1"></i> Export CSV
+            </button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Print Sheet
+            </button>
+        </div>
+    </div>
+
+    <!-- Tab Selector -->
+    <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-4 flex-column flex-sm-row">
+        <li class="nav-item">
+            <button class="nav-link rounded-pill @(activeTab == "daily" ? "active bg-primary" : "text-dark")" @onclick='() => SetTab("daily")'>
+                <i class="bi bi-calendar-day me-1"></i> Daily Attendance Sheet
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill @(activeTab == "summary" ? "active bg-primary" : "text-dark")" @onclick='() => SetTab("summary")'>
+                <i class="bi bi-calendar-month me-1"></i> Monthly Summary
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill @(activeTab == "employee" ? "active bg-primary" : "text-dark")" @onclick='() => SetTab("employee")'>
+                <i class="bi bi-person-badge me-1"></i> Individual Employee Log
+            </button>
+        </li>
+    </ul>
+
+    <!-- Filter Card -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-body p-3">
+            <div class="row g-2 align-items-end">
+                @if (activeTab == "daily")
+                {
+                    <div class="col-12 col-sm-8 col-md-4">
+                        <label class="form-label small fw-semibold">Select Target Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="targetDate" />
+                    </div>
+                }
+                else
+                {
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label small fw-semibold">Start Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="startDate" />
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label small fw-semibold">End Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="endDate" />
+                    </div>
+                }
+
+                @if (activeTab == "employee")
+                {
+                    <div class="col-12 col-sm-8 col-md-4">
+                        <label class="form-label small fw-semibold">Select Employee</label>
+                        <select class="form-select form-select-sm" @bind="selectedEmployee">
+                            <option value="ALL">All Staff</option>
+                            <option value="Shuvo TAS">Shuvo TAS (TAS-104)</option>
+                            <option value="Kamrul Hassan">Kamrul Hassan (TAS-108)</option>
+                            <option value="Farzana Akter">Farzana Akter (TAS-112)</option>
+                        </select>
+                    </div>
+                }
+
+                <div class="col-12 col-sm-4 col-md-2 mt-2 mt-sm-0">
+                    <button class="btn btn-primary btn-sm w-100" @onclick="FetchReportData">
+                        <i class="bi bi-funnel me-1"></i> Generate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Table -->
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="min-width: 800px;">
+                <thead class="table-light small text-uppercase text-nowrap">
+                    <tr>
+                        <th class="ps-4">Employee</th>
+                        <th>Designation</th>
+                        <th>Date</th>
+                        <th>In Time</th>
+                        <th>Out Time</th>
+                        <th>Working Hours</th>
+                        <th>Status</th>
+                        <th>Mode</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (reportRecords.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="bi bi-clipboard-x fs-2 d-block mb-2"></i> No records found for the selected period.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var r in reportRecords)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark">@r.EmployeeName</td>
+                                <td>@r.Designation</td>
+                                <td>@r.Date</td>
+                                <td><span class="text-success fw-semibold">@(r.InTime ?? "--:--")</span></td>
+                                <td><span class="text-danger fw-semibold">@(r.OutTime ?? "--:--")</span></td>
+                                <td class="font-monospace">@r.WorkingHours</td>
+                                <td>
+                                    <span class="badge @(r.Status == "ON_TIME" ? "bg-success" : (r.Status == "LATE" ? "bg-warning text-dark" : "bg-danger"))">
+                                        @r.Status
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (r.IsWfh)
+                                    {
+                                        <span class="badge bg-info-subtle text-info"><i class="bi bi-house me-1"></i>WFH</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-building me-1"></i>Hub</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string activeTab = "daily";
+    private DateTime targetDate = DateTime.Today;
+    private DateTime startDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime endDate = DateTime.Today;
+    private string selectedEmployee = "ALL";
+
+    public class FlexibleBoolConverter : System.Text.Json.Serialization.JsonConverter<bool>
+    {
+        public override bool Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+        {
+            if (reader.TokenType == System.Text.Json.JsonTokenType.True) return true;
+            if (reader.TokenType == System.Text.Json.JsonTokenType.False) return false;
+            if (reader.TokenType == System.Text.Json.JsonTokenType.Number)
+            {
+                if (reader.TryGetInt64(out long lVal)) return lVal != 0;
+                if (reader.TryGetDouble(out double dVal)) return dVal != 0.0;
+                return false;
+            }
+            if (reader.TokenType == System.Text.Json.JsonTokenType.String)
+            {
+                var s = reader.GetString()?.Trim();
+                return s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "yes", StringComparison.OrdinalIgnoreCase);
+            }
+            return false;
+        }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, bool value, System.Text.Json.JsonSerializerOptions options)
+        {
+            writer.WriteBooleanValue(value);
+        }
+    }
+
+    public class ReportRow
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("employee_name")]
+        public string EmployeeName { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("designation")]
+        public string Designation { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("date")]
+        public string Date { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("in_time")]
+        public string? InTime { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("out_time")]
+        public string? OutTime { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("working_hours")]
+        public string WorkingHours { get; set; } = "--";
+
+        [System.Text.Json.Serialization.JsonPropertyName("status")]
+        public string Status { get; set; } = "ON_TIME";
+
+        [System.Text.Json.Serialization.JsonPropertyName("is_wfh")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(FlexibleBoolConverter))]
+        public bool IsWfh { get; set; } = false;
+    }
+
+    private List<ReportRow> reportRecords = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await FetchReportData();
+    }
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+        FetchReportData();
+    }
+
+    private async Task FetchReportData()
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
+                ProcID = "GET_ATTENDANCE_REPORT",
+                parm01 = activeTab,
+                parm02 = (activeTab == "daily" ? targetDate : startDate).ToString("yyyy-MM-dd"),
+                parm03 = (activeTab == "daily" ? targetDate : endDate).ToString("yyyy-MM-dd"),
+                parm04 = selectedEmployee
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue && res.Value.ValueKind == JsonValueKind.Array)
+            {
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                opts.Converters.Add(new FlexibleBoolConverter());
+                reportRecords = JsonSerializer.Deserialize<List<ReportRow>>(res.Value.GetRawText(), opts) ?? new();
+            }
+            else
+            {
+                // Demo seed
+                reportRecords = new List<ReportRow>
+                {
+                    new ReportRow { EmployeeName = "Shuvo TAS", Designation = "Software Engineer", Date = DateTime.Today.ToString("yyyy-MM-dd"), InTime = "09:30 AM", OutTime = "06:30 PM", WorkingHours = "9h 00m", Status = "ON_TIME", IsWfh = true },
+                    new ReportRow { EmployeeName = "Kamrul Hassan", Designation = "Support Specialist", Date = DateTime.Today.ToString("yyyy-MM-dd"), InTime = "09:22 AM", OutTime = "06:35 PM", WorkingHours = "9h 13m", Status = "ON_TIME", IsWfh = false },
+                    new ReportRow { EmployeeName = "Farzana Akter", Designation = "UI/UX Designer", Date = DateTime.Today.ToString("yyyy-MM-dd"), InTime = "11:05 AM", OutTime = "08:00 PM", WorkingHours = "8h 55m", Status = "ON_TIME", IsWfh = false }
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Report fetch err: " + ex.Message);
+        }
+    }
+
+    private void ExportToCsv()
+    {
+        // Simple client trigger or prompt
+    }
+}

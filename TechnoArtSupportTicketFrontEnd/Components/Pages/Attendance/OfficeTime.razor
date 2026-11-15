@@ -1,0 +1,206 @@
+@page "/attendance/office-time"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@attribute [Authorize(Roles = "SuperAdmin,MD,SupportManager")]
+@inject ApiService BackendApi
+
+<PageTitle>Office Shifts & Timing - TechnoArt</PageTitle>
+
+<div class="container-fluid py-2 py-md-4 px-2 px-md-3" style="max-width: 100%; overflow-x: hidden;">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-2">
+        <div>
+            <h4 class="fw-bold mb-1 text-primary">
+                <i class="bi bi-clock-history me-2"></i> Office Shifts & Timing Configuration
+            </h4>
+            <p class="text-muted small mb-0">Manage default company office hours, grace periods, and late penalty cutoffs</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi @(isSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i> @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    <div class="row g-3 g-md-4">
+        <div class="col-12 col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-header bg-white border-bottom py-3 px-3 px-md-4">
+                    <h6 class="fw-bold mb-0 text-dark">Default Company Working Shift</h6>
+                </div>
+                <div class="card-body p-3 p-md-4">
+                    <form @onsubmit="SaveDefaultTiming">
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label small fw-semibold">Standard Shift In-Time</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-alarm"></i></span>
+                                    <input type="time" class="form-control" @bind="defaultStartTime" required />
+                                </div>
+                                <small class="text-muted">Standard daily clock-in requirement.</small>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label small fw-semibold">Standard Shift Out-Time</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-clock"></i></span>
+                                    <input type="time" class="form-control" @bind="defaultEndTime" required />
+                                </div>
+                                <small class="text-muted">Standard daily shift conclusion.</small>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label small fw-semibold">Grace Time (Minutes)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-hourglass-split"></i></span>
+                                    <input type="number" class="form-control" @bind="graceMinutes" min="0" max="60" required />
+                                </div>
+                                <small class="text-muted">Allowed delay before status marks as 'LATE'.</small>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label small fw-semibold">Half-Day Cutoff After (Minutes)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-shield-exclamation"></i></span>
+                                    <input type="number" class="form-control" @bind="halfDayCutoffMinutes" min="30" max="240" required />
+                                </div>
+                                <small class="text-muted">Punches after this become half-day attendance.</small>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-stretch justify-content-sm-end">
+                            <button type="submit" class="btn btn-primary w-100 w-sm-auto px-4 py-2 rounded-3 shadow-sm fw-semibold" disabled="@isSaving">
+                                <i class="bi bi-check-lg me-1"></i> @(isSaving ? "Saving..." : "Save Shift Configuration")
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-light">
+                <div class="card-body p-3 p-md-4">
+                    <h6 class="fw-bold text-primary mb-3">
+                        <i class="bi bi-info-circle me-1"></i> Variable Shift Policy
+                    </h6>
+                    <p class="small text-muted mb-3">
+                        TechnoArt allows employee-wise variable shifts. For example:
+                    </p>
+                    <ul class="small text-muted ps-3 mb-4">
+                        <li class="mb-2"><strong>Core Shift:</strong> 09:30 AM – 06:30 PM (Support & Development)</li>
+                        <li class="mb-2"><strong>Late Shift:</strong> 11:00 AM – 08:00 PM (Operations & Night Support)</li>
+                        <li class="mb-2"><strong>Custom Roster:</strong> Individual shift overrides set directly in the User/Employee Directory.</li>
+                    </ul>
+
+                    <div class="p-3 bg-white rounded-3 border">
+                        <div class="fw-semibold small mb-1"><i class="bi bi-person-gear text-primary me-1"></i> Individual Shift Overrides</div>
+                        <p class="small text-muted mb-2">Want to set 11:00 AM for specific employees? Configure it in User Management.</p>
+                        <a href="/admin/employees" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-arrow-right me-1"></i> Go to User & Employee Directory
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private TimeOnly defaultStartTime = new TimeOnly(9, 30);
+    private TimeOnly defaultEndTime = new TimeOnly(18, 30);
+    private int graceMinutes = 15;
+    private int halfDayCutoffMinutes = 120;
+
+    private bool isSaving = false;
+    private string? statusMessage;
+    private bool isSuccess = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOfficeTime();
+    }
+
+    private async Task LoadOfficeTime()
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
+                ProcID = "GET_OFFICE_TIME"
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue)
+            {
+                var root = res.Value;
+                if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0)
+                    root = root[0];
+
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    if (root.TryGetProperty("start_time", out var sProp) && TimeOnly.TryParse(sProp.GetString(), out var sTime))
+                        defaultStartTime = sTime;
+                    if (root.TryGetProperty("end_time", out var eProp) && TimeOnly.TryParse(eProp.GetString(), out var eTime))
+                        defaultEndTime = eTime;
+                    if (root.TryGetProperty("grace_time", out var gProp))
+                    {
+                        if (gProp.ValueKind == JsonValueKind.Number && gProp.TryGetInt32(out var gVal)) graceMinutes = gVal;
+                        else if (gProp.ValueKind == JsonValueKind.String && int.TryParse(gProp.GetString(), out var gVal2)) graceMinutes = gVal2;
+                    }
+                    else if (root.TryGetProperty("grace_minutes", out var gmProp))
+                    {
+                        if (gmProp.ValueKind == JsonValueKind.Number && gmProp.TryGetInt32(out var gmVal)) graceMinutes = gmVal;
+                        else if (gmProp.ValueKind == JsonValueKind.String && int.TryParse(gmProp.GetString(), out var gmVal2)) graceMinutes = gmVal2;
+                    }
+
+                    if (root.TryGetProperty("half_day_cutoff", out var hProp))
+                    {
+                        if (hProp.ValueKind == JsonValueKind.Number && hProp.TryGetInt32(out var hVal)) halfDayCutoffMinutes = hVal;
+                        else if (hProp.ValueKind == JsonValueKind.String && int.TryParse(hProp.GetString(), out var hVal2)) halfDayCutoffMinutes = hVal2;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Office time load err: " + ex.Message);
+        }
+    }
+
+    private async Task SaveDefaultTiming()
+    {
+        isSaving = true;
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
+                ProcID = "SET_OFFICE_TIME",
+                parm01 = defaultStartTime.ToString("HH:mm"),
+                parm02 = defaultEndTime.ToString("HH:mm"),
+                parm03 = graceMinutes.ToString(),
+                parm04 = halfDayCutoffMinutes.ToString()
+            };
+
+            await BackendApi.FetchDataAsync(req);
+            statusMessage = "Company office shift configuration updated successfully!";
+            isSuccess = true;
+            await LoadOfficeTime();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Save error: " + ex.Message;
+            isSuccess = false;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

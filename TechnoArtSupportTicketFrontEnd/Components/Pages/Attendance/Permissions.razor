@@ -1,0 +1,557 @@
+@page "/attendance/permissions"
+@using Microsoft.AspNetCore.Components.Authorization
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text.Json
+@attribute [Authorize(Roles = "SuperAdmin,MD")]
+@inject ApiService BackendApi
+
+<PageTitle>Dynamic Roles & Menu Permissions - TechnoArt</PageTitle>
+
+<div class="container-fluid py-2 py-md-4 px-2 px-md-3" style="max-width: 100%; overflow-x: hidden;">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-3">
+        <div>
+            <h4 class="fw-bold mb-1 text-primary">
+                <i class="bi bi-shield-lock me-2"></i> Dynamic Role & Menu Permissions Matrix
+            </h4>
+            <p class="text-muted small mb-0">Create custom organizational roles and configure fine-grained View, Edit, Delete & Approval permissions per module</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="() => showCreateRoleModal = true">
+                <i class="bi bi-plus-circle me-1"></i> Create New Role
+            </button>
+            <button class="btn btn-primary btn-sm rounded-pill px-4 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="SaveCurrentMatrix" disabled="@isSaving">
+                <i class="bi bi-save me-1"></i> @(isSaving ? "Saving..." : "Save Changes")
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show shadow-sm rounded-3" role="alert">
+            <i class="bi @(isSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i> @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    <!-- Main Navigation Tabs: Role Matrix vs User Overrides -->
+    <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-4">
+        <li class="nav-item">
+            <button class="nav-link rounded-pill @(activeScope == "ROLE" ? "active bg-primary" : "text-dark")" @onclick='() => SetScope("ROLE")'>
+                <i class="bi bi-person-gear me-1"></i> Role-Based Permissions Matrix
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill @(activeScope == "USER" ? "active bg-primary" : "text-dark")" @onclick='() => SetScope("USER")'>
+                <i class="bi bi-person-check me-1"></i> User-Specific Permissions & Password
+            </button>
+        </li>
+    </ul>
+
+    <div class="row g-4">
+        <!-- Left: Selector Sidebar (Roles or Users) -->
+        <div class="col-lg-4">
+            @if (activeScope == "ROLE")
+            {
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                    <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold mb-0"><i class="bi bi-shield me-2 text-primary"></i> System Roles</h6>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">@roleList.Count Roles</span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var r in roleList)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 @(selectedRoleKey == r.Key ? "active" : "")"
+                                    @onclick="() => SelectRole(r.Key)">
+                                <div>
+                                    <div class="fw-bold">@r.DisplayName</div>
+                                    <small class="@(selectedRoleKey == r.Key ? "text-white-50" : "text-muted") font-monospace">Key: @r.Key • @r.AssignedUsersCount Users</small>
+                                </div>
+                                <i class="bi bi-chevron-right @(selectedRoleKey == r.Key ? "text-white" : "text-muted")"></i>
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                    <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold mb-0"><i class="bi bi-people me-2 text-primary"></i> User Directory</h6>
+                        <span class="badge bg-secondary">@userList.Count Users</span>
+                    </div>
+                    <div class="p-2 border-bottom">
+                        <input type="text" class="form-control form-control-sm bg-light" placeholder="Search user by name..." @bind="userSearchQuery" @bind:event="oninput" />
+                    </div>
+                    <div class="list-group list-group-flush" style="max-height: 480px; overflow-y: auto;">
+                        @foreach (var u in filteredUsers)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 @(selectedUserId == u.Id ? "active" : "")"
+                                    @onclick="() => SelectUser(u.Id)">
+                                <div>
+                                    <div class="fw-bold">@u.FullName</div>
+                                    <small class="@(selectedUserId == u.Id ? "text-white-50" : "text-muted")">@u.Role • @u.Email</small>
+                                </div>
+                                <i class="bi bi-chevron-right @(selectedUserId == u.Id ? "text-white" : "text-muted")"></i>
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Right: Matrix Table & Actions -->
+        <div class="col-lg-8">
+            <!-- Context Header Card -->
+            <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mb-3 bg-light">
+                <div class="d-flex justify-content-between align-items-start align-items-sm-center flex-wrap gap-2">
+                    <div>
+                        <span class="text-uppercase text-muted fw-bold small">Configuring Access For</span>
+                        <h5 class="fw-bold text-dark mb-0">
+                            @if (activeScope == "ROLE")
+                            {
+                                <span class="text-primary"><i class="bi bi-shield-check me-1"></i> Role: @currentRoleTitle</span>
+                            }
+                            else
+                            {
+                                <span class="text-primary"><i class="bi bi-person-badge me-1"></i> User: @currentUserName</span>
+                                <span class="badge bg-secondary ms-2">Base Role: @currentUserRole</span>
+                            }
+                        </h5>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 gap-sm-2">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="ToggleAllView">
+                            <i class="bi bi-eye me-1"></i> View
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="ToggleAllEdit">
+                            <i class="bi bi-pencil me-1"></i> Edit
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="ToggleAllDelete">
+                            <i class="bi bi-trash me-1"></i> Delete
+                        </button>
+                    </div>
+                </div>
+
+                @if (activeScope == "USER" && !string.IsNullOrEmpty(selectedUserId))
+                {
+                    <!-- Admin Quick Password Reset Box (Matching Next.js permissions page) -->
+                    <div class="mt-3 pt-3 border-top">
+                        <label class="form-label small fw-semibold text-dark"><i class="bi bi-key me-1 text-danger"></i> Override User Password</label>
+                        <div class="input-group input-group-sm w-100" style="max-width: 480px;">
+                            <input type="password" class="form-control" placeholder="Enter new password (min 6 characters)" @bind="adminOverridePassword" />
+                            <button class="btn btn-danger" @onclick="UpdateUserPassword" disabled="@isUpdatingPassword">
+                                <i class="bi bi-lock-fill me-1"></i> @(isUpdatingPassword ? "Updating..." : "Update Password")
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Matrix Table -->
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" style="min-width: 600px;">
+                        <thead class="table-light small text-uppercase text-nowrap">
+                            <tr>
+                                <th class="ps-4">Module / Feature Menu</th>
+                                <th class="text-center">View</th>
+                                <th class="text-center">Create / Edit</th>
+                                <th class="text-center">Delete</th>
+                                <th class="text-center">Approve</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var perm in activePermissions)
+                            {
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="fw-bold text-dark"><i class="bi @perm.Icon me-2 text-primary"></i> @perm.ModuleName</div>
+                                        <div class="small text-muted">@perm.Description</div>
+                                    </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input" type="checkbox" @bind="perm.CanView" />
+                                    </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input" type="checkbox" @bind="perm.CanEdit" @@onchange="(e) => OnEditChanged(perm, (bool)e.Value!)" />
+                                    </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input" type="checkbox" @bind="perm.CanDelete" @@onchange="(e) => OnDeleteChanged(perm, (bool)e.Value!)" />
+                                    </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input" type="checkbox" @bind="perm.CanApprove" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Role Modal -->
+    @if (showCreateRoleModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-bottom">
+                        <h5 class="modal-title fw-bold"><i class="bi bi-shield-plus text-primary me-2"></i> Create Dynamic Organizational Role</h5>
+                        <button type="button" class="btn-close" @onclick="() => showCreateRoleModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Role Display Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="newRoleName" placeholder="e.g. HR Manager, Accounts Officer, Support Lead" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Role System Key <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control font-monospace" @bind="newRoleKey" placeholder="e.g. HRManager, AccountsOfficer" />
+                            <small class="text-muted">Unique alphanumeric identifier used for JWT claims and route policies.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Description</label>
+                            <textarea class="form-control" rows="2" @bind="newRoleDescription" placeholder="Purpose and department responsibilities..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top">
+                        <button type="button" class="btn btn-light" @onclick="() => showCreateRoleModal = false">Cancel</button>
+                        <button type="button" class="btn btn-primary px-4" @onclick="CreateRole">
+                            <i class="bi bi-check-lg me-1"></i> Register Role
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string activeScope = "ROLE"; // "ROLE" or "USER"
+    private bool showCreateRoleModal = false;
+    private bool isSaving = false;
+    private bool isUpdatingPassword = false;
+    private string? statusMessage;
+    private bool isSuccess = true;
+
+    // Role state
+    private string selectedRoleKey = "SuperAdmin";
+    private string currentRoleTitle = "Super Admin";
+
+    // User state
+    private string selectedUserId = "1";
+    private string currentUserName = "Shuvo TAS";
+    private string currentUserRole = "TeamMember";
+    private string userSearchQuery = "";
+    private string adminOverridePassword = "";
+
+    // Create role form
+    private string newRoleName = "";
+    private string newRoleKey = "";
+    private string newRoleDescription = "";
+
+    public class RoleItem
+    {
+        public string Key { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int AssignedUsersCount { get; set; } = 0;
+    }
+
+    public class UserItem
+    {
+        public string Id { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Role { get; set; } = "";
+    }
+
+    public class ModulePermissionEntry
+    {
+        public string ModuleKey { get; set; } = "";
+        public string ModuleName { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Icon { get; set; } = "bi-app";
+        public bool CanView { get; set; } = false;
+        public bool CanEdit { get; set; } = false;
+        public bool CanDelete { get; set; } = false;
+        public bool CanApprove { get; set; } = false;
+    }
+
+    private List<RoleItem> roleList = new()
+    {
+        new RoleItem { Key = "SuperAdmin", DisplayName = "Super Admin", Description = "Full unrestricted system controller", AssignedUsersCount = 2 },
+        new RoleItem { Key = "MD", DisplayName = "Managing Director", Description = "Executive oversight and KPI reports", AssignedUsersCount = 1 },
+        new RoleItem { Key = "SupportManager", DisplayName = "Support Manager", Description = "Ticket dispatch & attendance approvals", AssignedUsersCount = 4 },
+        new RoleItem { Key = "ProjectManager", DisplayName = "Project Manager", Description = "Project tracking & team roster", AssignedUsersCount = 3 },
+        new RoleItem { Key = "TeamMember", DisplayName = "Team Member (Engineer / Staff)", Description = "Terminal check-in & task handling", AssignedUsersCount = 24 },
+        new RoleItem { Key = "HRManager", DisplayName = "HR Manager", Description = "Attendance verification, leaves & letters", AssignedUsersCount = 2 },
+        new RoleItem { Key = "AccountsOfficer", DisplayName = "Accounts Officer", Description = "Payroll sheets & salary disbursements", AssignedUsersCount = 2 },
+        new RoleItem { Key = "ClientAdmin", DisplayName = "Client Organization Admin", Description = "Tenant company portal admin", AssignedUsersCount = 5 },
+        new RoleItem { Key = "ClientUser", DisplayName = "Client End User", Description = "Support ticket submissions", AssignedUsersCount = 18 }
+    };
+
+    private List<UserItem> userList = new();
+
+    private List<UserItem> filteredUsers => userList
+        .Where(x => string.IsNullOrWhiteSpace(userSearchQuery) ||
+                    x.FullName.Contains(userSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    x.Email.Contains(userSearchQuery, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    private List<ModulePermissionEntry> activePermissions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadDefaultMatrixForRole(selectedRoleKey);
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "GET_USERS",
+                ComCod = "",
+                parm05 = "SuperAdmin"
+            };
+            var res = await BackendApi.FetchDataAsync(req);
+            if (res.HasValue)
+            {
+                var fetched = new List<UserItem>();
+                void AddUser(JsonElement el)
+                {
+                    if (el.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var sub in el.EnumerateArray()) AddUser(sub);
+                    }
+                    else if (el.ValueKind == JsonValueKind.Object)
+                    {
+                        if (el.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var sub in tbl.EnumerateArray()) AddUser(sub);
+                        }
+                        else
+                        {
+                            var uid = el.TryGetProperty("user_id", out var idp) ? idp.GetString() : (el.TryGetProperty("id", out var idp2) ? idp2.GetString() : "");
+                            var name = el.TryGetProperty("full_name", out var np) ? np.GetString() : (el.TryGetProperty("name", out var np2) ? np2.GetString() : "");
+                            var email = el.TryGetProperty("username", out var ep) ? ep.GetString() : (el.TryGetProperty("email", out var ep2) ? ep2.GetString() : "");
+                            var role = el.TryGetProperty("role", out var rp) ? rp.GetString() : "Staff";
+                            if (!string.IsNullOrEmpty(uid) && !string.IsNullOrEmpty(name))
+                            {
+                                fetched.Add(new UserItem { Id = uid, FullName = name, Email = email ?? "", Role = role ?? "Staff" });
+                            }
+                        }
+                    }
+                }
+                AddUser(res.Value);
+                if (fetched.Count > 0)
+                {
+                    userList = fetched;
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void SetScope(string scope)
+    {
+        activeScope = scope;
+        if (scope == "ROLE")
+        {
+            SelectRole(selectedRoleKey);
+        }
+        else
+        {
+            SelectUser(selectedUserId);
+        }
+    }
+
+    private void SelectRole(string roleKey)
+    {
+        selectedRoleKey = roleKey;
+        var r = roleList.FirstOrDefault(x => x.Key == roleKey);
+        currentRoleTitle = r?.DisplayName ?? roleKey;
+        LoadDefaultMatrixForRole(roleKey);
+    }
+
+    private void SelectUser(string userId)
+    {
+        selectedUserId = userId;
+        var u = userList.FirstOrDefault(x => x.Id == userId);
+        if (u != null)
+        {
+            currentUserName = u.FullName;
+            currentUserRole = u.Role;
+            LoadDefaultMatrixForRole(u.Role);
+        }
+    }
+
+    private void LoadDefaultMatrixForRole(string roleKey)
+    {
+        bool isSuper = (roleKey == "SuperAdmin" || roleKey == "MD");
+        bool isManager = (roleKey == "SupportManager" || roleKey == "HRManager");
+
+        activePermissions = new List<ModulePermissionEntry>
+        {
+            new ModulePermissionEntry { ModuleKey = "DASHBOARD", ModuleName = "Executive Command Dashboard", Description = "Live support metrics, uptime gauges, and active agents", Icon = "bi-grid-1x2", CanView = true, CanEdit = isSuper, CanDelete = false, CanApprove = false },
+            new ModulePermissionEntry { ModuleKey = "TICKETS", ModuleName = "Support Desk & Ticket Queue", Description = "Raise, assign, reply, and resolve client tickets", Icon = "bi-inboxes", CanView = true, CanEdit = true, CanDelete = isSuper, CanApprove = (isSuper || isManager) },
+            new ModulePermissionEntry { ModuleKey = "ATTENDANCE_TERMINAL", ModuleName = "Attendance Clock-In Terminal", Description = "GPS Geolocation verified In/Out punch and WFH mode", Icon = "bi-fingerprint", CanView = true, CanEdit = true, CanDelete = false, CanApprove = false },
+            new ModulePermissionEntry { ModuleKey = "ATTENDANCE_APPROVALS", ModuleName = "Attendance Dual HR Approvals", Description = "Review and approve employee In-Time and Out-Time punches", Icon = "bi-calendar-check", CanView = (isSuper || isManager), CanEdit = (isSuper || isManager), CanDelete = isSuper, CanApprove = (isSuper || isManager) },
+            new ModulePermissionEntry { ModuleKey = "OFFICE_HUBS", ModuleName = "Office Hubs & Geofence Zones", Description = "Define branch coordinates and allowed radius meters", Icon = "bi-geo-alt", CanView = isSuper, CanEdit = isSuper, CanDelete = isSuper, CanApprove = isSuper },
+            new ModulePermissionEntry { ModuleKey = "OFFICE_TIMING", ModuleName = "Office Shifts & Timing Policy", Description = "Standard shifts, late grace periods, and cutoff limits", Icon = "bi-clock-history", CanView = (isSuper || isManager), CanEdit = isSuper, CanDelete = isSuper, CanApprove = isSuper },
+            new ModulePermissionEntry { ModuleKey = "LEAVES", ModuleName = "Leave Requests & Allocations", Description = "Submit leave requests and supervisor sign-offs", Icon = "bi-calendar2-range", CanView = true, CanEdit = true, CanDelete = isSuper, CanApprove = (isSuper || isManager) },
+            new ModulePermissionEntry { ModuleKey = "REPORTS", ModuleName = "Attendance Analytics & Logs", Description = "Daily rosters, monthly attendance summaries, and CSV exports", Icon = "bi-file-earmark-bar-graph", CanView = (isSuper || isManager), CanEdit = false, CanDelete = false, CanApprove = false },
+            new ModulePermissionEntry { ModuleKey = "NOTICES", ModuleName = "Company Notice Board", Description = "Post corporate announcements and policy circulars", Icon = "bi-megaphone", CanView = true, CanEdit = (isSuper || isManager), CanDelete = isSuper, CanApprove = isSuper },
+            new ModulePermissionEntry { ModuleKey = "PERMISSIONS", ModuleName = "Role & Permission Security", Description = "Dynamic role configuration and menu access rules", Icon = "bi-shield-lock", CanView = isSuper, CanEdit = isSuper, CanDelete = isSuper, CanApprove = isSuper },
+            new ModulePermissionEntry { ModuleKey = "PAYROLL", ModuleName = "Monthly Payroll & Salary", Description = "Automated salary calculation with late deduction rules", Icon = "bi-cash-coin", CanView = (isSuper || roleKey == "AccountsOfficer"), CanEdit = (isSuper || roleKey == "AccountsOfficer"), CanDelete = isSuper, CanApprove = isSuper },
+            new ModulePermissionEntry { ModuleKey = "KPI", ModuleName = "KPI & Performance Reviews", Description = "Staff evaluation goals, weights, and monthly scores", Icon = "bi-graph-up-arrow", CanView = (isSuper || isManager), CanEdit = (isSuper || isManager), CanDelete = isSuper, CanApprove = isSuper }
+        };
+    }
+
+    private void OnEditChanged(ModulePermissionEntry p, bool val)
+    {
+        if (val) p.CanView = true;
+    }
+
+    private void OnDeleteChanged(ModulePermissionEntry p, bool val)
+    {
+        if (val) { p.CanView = true; p.CanEdit = true; }
+    }
+
+    private void ToggleAllView()
+    {
+        bool target = !activePermissions.All(x => x.CanView);
+        foreach (var p in activePermissions) p.CanView = target;
+    }
+
+    private void ToggleAllEdit()
+    {
+        bool target = !activePermissions.All(x => x.CanEdit);
+        foreach (var p in activePermissions) { p.CanEdit = target; if (target) p.CanView = true; }
+    }
+
+    private void ToggleAllDelete()
+    {
+        bool target = !activePermissions.All(x => x.CanDelete);
+        foreach (var p in activePermissions) { p.CanDelete = target; if (target) { p.CanView = true; p.CanEdit = true; } }
+    }
+
+    private async Task CreateRole()
+    {
+        if (string.IsNullOrWhiteSpace(newRoleName) || string.IsNullOrWhiteSpace(newRoleKey))
+        {
+            statusMessage = "Please specify both the role name and unique system key.";
+            isSuccess = false;
+            return;
+        }
+
+        var key = newRoleKey.Replace(" ", "").Trim();
+        if (roleList.Any(x => x.Key.Equals(key, StringComparison.OrdinalIgnoreCase)))
+        {
+            statusMessage = $"Role key '{key}' already exists in system.";
+            isSuccess = false;
+            return;
+        }
+
+        var newRole = new RoleItem
+        {
+            Key = key,
+            DisplayName = newRoleName.Trim(),
+            Description = newRoleDescription,
+            AssignedUsersCount = 0
+        };
+
+        roleList.Add(newRole);
+
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_permission_operations",
+                ProcID = "CREATE_ROLE",
+                parm01 = newRole.Key,
+                parm02 = newRole.DisplayName,
+                parm03 = newRole.Description
+            };
+            await BackendApi.FetchDataAsync(req);
+        }
+        catch {}
+
+        showCreateRoleModal = false;
+        newRoleName = "";
+        newRoleKey = "";
+        newRoleDescription = "";
+        SelectRole(newRole.Key);
+
+        statusMessage = $"Role '{newRole.DisplayName}' created successfully! It is now dynamically available in User Creation.";
+        isSuccess = true;
+    }
+
+    private async Task SaveCurrentMatrix()
+    {
+        isSaving = true;
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_permission_operations",
+                ProcID = (activeScope == "ROLE") ? "SAVE_ROLE_PERMISSIONS" : "SAVE_USER_PERMISSIONS",
+                parm01 = (activeScope == "ROLE") ? selectedRoleKey : selectedUserId,
+                parmJson1 = JsonSerializer.Serialize(activePermissions)
+            };
+
+            await BackendApi.FetchDataAsync(req);
+            statusMessage = $"Permissions for {(activeScope == "ROLE" ? currentRoleTitle : currentUserName)} successfully updated!";
+            isSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Save error: " + ex.Message;
+            isSuccess = false;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task UpdateUserPassword()
+    {
+        if (string.IsNullOrWhiteSpace(adminOverridePassword) || adminOverridePassword.Length < 6)
+        {
+            statusMessage = "Password must contain at least 6 characters.";
+            isSuccess = false;
+            return;
+        }
+
+        isUpdatingPassword = true;
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_user_operations",
+                ProcID = "ADMIN_RESET_PASSWORD",
+                parm01 = selectedUserId,
+                parm02 = adminOverridePassword
+            };
+
+            await BackendApi.FetchDataAsync(req);
+            statusMessage = $"Password for {currentUserName} has been successfully updated!";
+            isSuccess = true;
+            adminOverridePassword = "";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Password update error: " + ex.Message;
+            isSuccess = false;
+        }
+        finally
+        {
+            isUpdatingPassword = false;
+        }
+    }
+}

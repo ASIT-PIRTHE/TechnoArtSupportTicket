@@ -7,13 +7,15 @@
 
 <PageTitle>Client & Tenant Management</PageTitle>
 
-<div class="custom-card p-4 h-100">
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+<div class="custom-card p-3 p-md-4 h-100" style="max-width: 100%; overflow-x: hidden;">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-4 border-bottom pb-3">
         <h5 class="fw-bold m-0"><i class="bi bi-building text-primary me-2"></i> Client / Tenant Directory</h5>
         <AuthorizeView Roles="SuperAdmin">
-            <button class="btn btn-primary btn-sm fw-semibold shadow-sm" @onclick="ToggleAddMode">
-                <i class="bi @(isAddMode ? "bi-x-lg" : "bi-plus-lg") me-1"></i> @(isAddMode ? "Cancel" : "Add New Client")
-            </button>
+            <div>
+                <button class="btn btn-primary btn-sm rounded-pill px-3 py-2 fw-semibold shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="ToggleAddMode">
+                    <i class="bi @(isAddMode ? "bi-x-lg" : "bi-plus-lg") me-1"></i> @(isAddMode ? "Cancel" : "Add New Client")
+                </button>
+            </div>
         </AuthorizeView>
     </div>
 
@@ -28,19 +30,19 @@
     @if (isAddMode)
     {
         <div class="card bg-light border-primary mb-4 shadow-sm border-0 border-start border-4">
-            <div class="card-body p-4">
+            <div class="card-body p-3 p-md-4">
                 <h6 class="fw-bold mb-3 text-primary">@(string.IsNullOrEmpty(editClientId) ? "Register New Tenant Company" : "Edit Tenant Company")</h6>
                 <form @onsubmit="CreateClient">
                     <div class="row g-3 mb-3">
-                        <div class="col-md-4">
+                        <div class="col-12 col-md-4">
                             <label class="form-label small fw-semibold">Company Full Name</label>
                             <input type="text" class="form-control" @bind="newClientName" required placeholder="e.g. Pirthe Limited" />
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-12 col-md-4">
                             <label class="form-label small fw-semibold">Tenant Code</label>
                             <input type="text" class="form-control" @bind="newClientCode" required placeholder="e.g. C-1004" />
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-12 col-md-4">
                             <label class="form-label small fw-semibold">Logo URL</label>
                             <input type="text" class="form-control" @bind="newClientLogo" placeholder="e.g. https://pirthe.com/logo.png" />
                         </div>
@@ -58,7 +60,7 @@
     }
 
     <div class="table-responsive">
-        <table class="table table-hover align-middle">
+        <table class="table table-hover align-middle" style="min-width: 650px;">
             <thead class="bg-light text-muted small text-uppercase">
                 <tr>
                     <th>Logo</th>
@@ -66,7 +68,7 @@
                     <th>Client Name</th>
                     <th>Tenant Code</th>
                     <th>Status</th>
-                    <th class="text-end">Action</th>
+                    <th class="text-end text-nowrap">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -79,10 +81,11 @@
                     foreach (var client in clientList)
                     {
                         var logo = client.TryGetProperty("logo_url", out var l) && l.ValueKind == JsonValueKind.String ? l.GetString() : null;
-                        var cId = client.TryGetProperty("tenant_id", out var cidp) ? cidp.GetString() ?? "" : "";
+                        var cId = client.TryGetProperty("tenant_id", out var cidp) ? cidp.GetString() ?? "" : (client.TryGetProperty("id", out var idp) ? idp.GetString() ?? "" : "");
                         var cName = client.TryGetProperty("name", out var cnmp) ? cnmp.GetString() ?? "" : "";
                         var cCode = client.TryGetProperty("code", out var ccdp) ? ccdp.GetString() ?? "" : "";
-                        var isDefaultTenant = cId == "00000000-0000-0000-0000-000000000000";
+                        var displayTenantId = cId.Length > 12 ? ("T-" + cId[..8]) : cId;
+                        var isDefaultTenant = cId == "000000000001" || cId == "T00000000001" || cId == "00000000-0000-0000-0000-000000000000";
                         <tr>
                             <td>
                                 @if (!string.IsNullOrEmpty(logo))
@@ -94,12 +97,12 @@
                                     <div class="avatar-circle bg-secondary text-white" style="width:30px;height:30px;font-size:0.8rem;">@(string.IsNullOrEmpty(cName) ? "?" : cName[..1])</div>
                                 }
                             </td>
-                            <td class="small text-muted font-monospace">@cId</td>
+                            <td class="font-monospace"><span class="badge bg-light text-primary border font-monospace fw-bold px-2 py-1">@displayTenantId</span></td>
                             <td class="fw-bold">@cName</td>
                             <td><span class="badge bg-light text-dark border">@cCode</span></td>
                             <td><span class="dot dot-green me-1"></span> Active</td>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-primary" @onclick='() => StartEditClient(cId, cCode, cName, logo)' title="Edit Client"><i class="bi bi-pencil"></i></button>
+                            <td class="text-end text-nowrap">
+                                <button class="btn btn-sm btn-outline-primary" @onclick='() => StartEditClient(cId, cName, cCode, logo)' title="Edit Client"><i class="bi bi-pencil"></i></button>
                                 @if (!isDefaultTenant)
                                 {
                                     <AuthorizeView Roles="SuperAdmin">
@@ -168,6 +171,38 @@
         await LoadClients();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && (clientList == null || clientList.Count == 0))
+        {
+            await LoadClients();
+            StateHasChanged();
+        }
+    }
+
+    private static void ExtractItems(JsonElement element, Action<JsonElement> onObject)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) ExtractItems(item, onObject);
+        }
+        else if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Table", out var tbl) && tbl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in tbl.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else if (element.TryGetProperty("data", out var dt) && dt.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dt.EnumerateArray()) ExtractItems(item, onObject);
+            }
+            else
+            {
+                onObject(element);
+            }
+        }
+    }
+
     private async Task LoadClients()
     {
         isLoading = true;
@@ -178,39 +213,45 @@
         if (result.HasValue)
         {
             try {
-                if (result.Value.ValueKind == JsonValueKind.Array)
+                ExtractItems(result.Value, el =>
                 {
-                    foreach (var el in result.Value.EnumerateArray())
+                    if (el.ValueKind == JsonValueKind.Object && (el.TryGetProperty("tenant_id", out _) || el.TryGetProperty("name", out _) || el.TryGetProperty("id", out _)))
                     {
-                        if (el.TryGetProperty("tenant_id", out _) || el.TryGetProperty("name", out _))
+                        var cid = el.TryGetProperty("tenant_id", out var cp) && cp.ValueKind == JsonValueKind.String ? cp.GetString() : (el.TryGetProperty("id", out var ip) && ip.ValueKind == JsonValueKind.String ? ip.GetString() : null);
+                        if (!string.IsNullOrEmpty(cid))
+                        {
+                            if (!clientList.Any(x => (x.ValueKind == JsonValueKind.Object && x.TryGetProperty("tenant_id", out var xc) && xc.GetString() == cid) || (x.ValueKind == JsonValueKind.Object && x.TryGetProperty("id", out var xi) && xi.GetString() == cid)))
+                            {
+                                clientList.Add(el);
+                            }
+                        }
+                        else
+                        {
                             clientList.Add(el);
+                        }
                     }
-                }
-                else if (result.Value.ValueKind == JsonValueKind.Object && 
-                        (result.Value.TryGetProperty("tenant_id", out _) || result.Value.TryGetProperty("name", out _)))
-                {
-                    clientList.Add(result.Value);
-                }
+                });
             } catch {}
         }
         isLoading = false;
+        StateHasChanged();
     }
 
     private void ToggleAddMode() {
         isAddMode = !isAddMode;
         if(isAddMode) {
             editClientId = null;
-            newClientCode = "";
+            newClientCode = "T" + (clientList.Count + 1).ToString("D10");
             newClientName = "";
             newClientLogo = "";
         }
     }
     
-    private void StartEditClient(string? id, string? code, string? name, string? logo)
+    private void StartEditClient(string? id, string? name, string? code, string? logo)
     {
         editClientId = id;
-        newClientCode = code ?? "";
         newClientName = name ?? "";
+        newClientCode = code ?? "";
         newClientLogo = logo ?? "";
         isAddMode = true;
     }
@@ -238,7 +279,8 @@
         showDeleteModal = false;
         isSubmitting = false;
 
-        if (result.HasValue && result.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+        var resEl = result.HasValue ? (result.Value.ValueKind == JsonValueKind.Array && result.Value.GetArrayLength() > 0 ? result.Value[0] : result.Value) : default;
+        if (result.HasValue && resEl.ValueKind == JsonValueKind.Object && resEl.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
         {
             statusMessage = err.GetString();
             statusClass = "danger";
@@ -259,14 +301,16 @@
         { 
             ProcID = string.IsNullOrEmpty(editClientId) ? "CREATE_TENANT" : "UPDATE_TENANT",
             parm01 = string.IsNullOrEmpty(editClientId) ? newClientCode : editClientId,
-            parm02 = string.IsNullOrEmpty(editClientId) ? newClientName : newClientCode,
-            parm03 = string.IsNullOrEmpty(editClientId) ? newClientLogo : newClientName,
-            parm04 = newClientLogo
+            parm02 = newClientName,
+            parm03 = newClientCode,
+            parm04 = newClientLogo,
+            parm06 = newClientLogo
         };
 
         var res = await BackendApi.FetchDataAsync(payload);
         
-        if (res.HasValue && res.Value.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
+        var resEl = res.HasValue ? (res.Value.ValueKind == JsonValueKind.Array && res.Value.GetArrayLength() > 0 ? res.Value[0] : res.Value) : default;
+        if (res.HasValue && resEl.ValueKind == JsonValueKind.Object && resEl.TryGetProperty("error", out var err) && !string.IsNullOrEmpty(err.GetString()))
         {
             statusMessage = err.GetString();
             statusClass = "danger";
