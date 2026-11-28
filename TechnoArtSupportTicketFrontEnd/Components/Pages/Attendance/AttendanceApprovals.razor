@@ -2,8 +2,10 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
 @using System.Text.Json
-@attribute [Authorize(Roles = "SuperAdmin,MD,SupportManager,ProjectManager")]
+@attribute [Authorize(Roles = "SuperAdmin,Admin,MD,HRManager,SupportManager")]
 @inject ApiService BackendApi
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Attendance Approvals - HR Portal</PageTitle>
 
@@ -17,10 +19,10 @@
             <p class="text-muted small mb-0">Dual In/Out punch verification and WFH validation queue for HR and Management</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="LoadAttendanceQueue">
+            <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="LoadAttendanceQueue" disabled="@isBusy">
                 <i class="bi bi-arrow-clockwise me-1"></i> Refresh Queue
             </button>
-            <button class="btn btn-success btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="BulkApprovePending" disabled="@(filteredList.Count == 0)">
+            <button class="btn btn-success btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="BulkApprovePending" disabled="@(isBusy || !HasPendingVisible)">
                 <i class="bi bi-check2-all me-1"></i> Approve All Visible
             </button>
         </div>
@@ -66,7 +68,7 @@
                     <div>
                         <div class="text-muted small fw-bold text-uppercase">WFH Requests</div>
                         <h3 class="fw-bold my-1 text-primary">@wfhCount</h3>
-                        <span class="small text-muted">Remote punches needing verification</span>
+                        <span class="small text-muted">Remote punches on this date</span>
                     </div>
                     <i class="bi bi-house fs-1 text-primary opacity-50"></i>
                 </div>
@@ -76,9 +78,9 @@
             <div class="card border-0 shadow-sm rounded-4 p-3 border-start border-4 border-success">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-bold text-uppercase">Approved Today</div>
-                        <h3 class="fw-bold my-1 text-success">@approvedTodayCount</h3>
-                        <span class="small text-muted">Verified & synchronized</span>
+                        <div class="text-muted small fw-bold text-uppercase">Approved Records</div>
+                        <h3 class="fw-bold my-1 text-success">@approvedCount</h3>
+                        <span class="small text-muted">Verified on this date</span>
                     </div>
                     <i class="bi bi-check-circle fs-1 text-success opacity-50"></i>
                 </div>
@@ -102,12 +104,12 @@
                         <option value="IN_PENDING">Check-In Pending Only</option>
                         <option value="OUT_PENDING">Check-Out Pending Only</option>
                         <option value="WFH_ONLY">Remote / WFH Only</option>
-                        <option value="APPROVED_TODAY">Approved Today</option>
+                        <option value="APPROVED">Approved Records</option>
                         <option value="ALL">All Records</option>
                     </select>
                 </div>
                 <div class="col-12 col-sm-6 col-md-3">
-                    <input type="date" class="form-control form-control-sm" @bind="selectedDate" />
+                    <input type="date" class="form-control form-control-sm" value="@selectedDate.ToString("yyyy-MM-dd")" @onchange="OnDateChanged" />
                 </div>
                 <div class="col-12 col-md-2 text-start text-md-end">
                     <span class="badge bg-secondary">Total: @filteredList.Count</span>
@@ -129,12 +131,20 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if (filteredList.Count == 0)
+                    @if (isLoading)
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <span class="spinner-border spinner-border-sm me-2"></span> Loading attendance queue...
+                            </td>
+                        </tr>
+                    }
+                    else if (filteredList.Count == 0)
                     {
                         <tr>
                             <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="bi bi-check-circle fs-2 text-success d-block mb-2"></i>
-                                All attendance records in this queue are verified! No pending approvals.
+                                Nothing to show for this filter and date.
                             </td>
                         </tr>
                     }
@@ -181,41 +191,33 @@
                                     }
                                     <div class="small text-muted">@item.DistanceDesc</div>
                                 </td>
-                                <td>
-                                    <span class="badge @GetBadgeClass(item.InApprovalStatus)">
-                                        In: @item.InApprovalStatus
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="badge @GetBadgeClass(item.OutApprovalStatus)">
-                                        Out: @item.OutApprovalStatus
-                                    </span>
-                                </td>
+                                <td><span class="badge @GetBadgeClass(item.InApprovalStatus)">In: @StatusText(item.InApprovalStatus)</span></td>
+                                <td><span class="badge @GetBadgeClass(item.OutApprovalStatus)">Out: @StatusText(item.OutApprovalStatus)</span></td>
                                 <td class="text-end pe-4">
                                     <div class="btn-group btn-group-sm">
-                                        @if (string.Equals(item.InApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase))
+                                        @if (IsPending(item.InApprovalStatus))
                                         {
-                                            <button class="btn btn-outline-success" title="Approve In-Time" @onclick="() => ApprovePunch(item.EffectiveId, true, true)">
+                                            <button class="btn btn-outline-success" title="Approve In-Time" disabled="@isBusy" @onclick="() => ApprovePunch(item, true, true)">
                                                 <i class="bi bi-box-arrow-in-right me-1"></i> In
                                             </button>
-                                            <button class="btn btn-outline-danger" title="Reject In-Time" @onclick="() => ApprovePunch(item.EffectiveId, true, false)">
+                                            <button class="btn btn-outline-danger" title="Reject In-Time" disabled="@isBusy" @onclick="() => ApprovePunch(item, true, false)">
                                                 <i class="bi bi-x"></i>
                                             </button>
                                         }
 
-                                        @if (string.Equals(item.OutApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase))
+                                        @if (IsPending(item.OutApprovalStatus))
                                         {
-                                            <button class="btn btn-outline-success" title="Approve Out-Time" @onclick="() => ApprovePunch(item.EffectiveId, false, true)">
+                                            <button class="btn btn-outline-success" title="Approve Out-Time" disabled="@isBusy" @onclick="() => ApprovePunch(item, false, true)">
                                                 <i class="bi bi-box-arrow-right me-1"></i> Out
                                             </button>
-                                            <button class="btn btn-outline-danger" title="Reject Out-Time" @onclick="() => ApprovePunch(item.EffectiveId, false, false)">
+                                            <button class="btn btn-outline-danger" title="Reject Out-Time" disabled="@isBusy" @onclick="() => ApprovePunch(item, false, false)">
                                                 <i class="bi bi-x"></i>
                                             </button>
                                         }
 
-                                        @if (string.Equals(item.InApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase) && string.Equals(item.OutApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase))
+                                        @if (IsPending(item.InApprovalStatus) && IsPending(item.OutApprovalStatus))
                                         {
-                                            <button class="btn btn-success" title="Approve Both" @onclick="() => ApproveBoth(item.EffectiveId)">
+                                            <button class="btn btn-success" title="Approve Both" disabled="@isBusy" @onclick="() => ApproveIds(new List<string> { item.AttendanceId })">
                                                 <i class="bi bi-check2-all"></i> Both
                                             </button>
                                         }
@@ -232,89 +234,69 @@
 
 @code {
     private string searchQuery = "";
-    private string selectedFilter = "ALL";
+    private string selectedFilter = "ALL_PENDING";
     private DateTime selectedDate = DateTime.Today;
 
-    private int pendingInCount = 0;
-    private int pendingOutCount = 0;
-    private int wfhCount = 0;
-    private int approvedTodayCount = 0;
+    private int pendingInCount, pendingOutCount, wfhCount, approvedCount;
 
     private string? statusMessage;
     private bool isSuccess = true;
+    private bool isLoading = false;
+    private bool isBusy = false;
+    private string currentUser = "";
 
     private List<ApprovalRecord> queue = new();
 
+    private static readonly JsonSerializerOptions JsonOpts = CreateOptions();
+
+    private static JsonSerializerOptions CreateOptions()
+    {
+        var o = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        o.Converters.Add(new FlexibleBoolConverter());
+        return o;
+    }
+
     public class FlexibleBoolConverter : System.Text.Json.Serialization.JsonConverter<bool>
     {
-        public override bool Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+        public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType == System.Text.Json.JsonTokenType.True) return true;
-            if (reader.TokenType == System.Text.Json.JsonTokenType.False) return false;
-            if (reader.TokenType == System.Text.Json.JsonTokenType.Number)
+            switch (reader.TokenType)
             {
-                if (reader.TryGetInt64(out long lVal)) return lVal != 0;
-                if (reader.TryGetDouble(out double dVal)) return dVal != 0.0;
-                return false;
+                case JsonTokenType.True: return true;
+                case JsonTokenType.False: return false;
+                case JsonTokenType.Number:
+                    if (reader.TryGetInt64(out long l)) return l != 0;
+                    return reader.TryGetDouble(out double d) && d != 0.0;
+                case JsonTokenType.String:
+                    var s = reader.GetString()?.Trim();
+                    return s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "yes", StringComparison.OrdinalIgnoreCase);
+                default: return false;
             }
-            if (reader.TokenType == System.Text.Json.JsonTokenType.String)
-            {
-                var s = reader.GetString()?.Trim();
-                return s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "yes", StringComparison.OrdinalIgnoreCase);
-            }
-            return false;
         }
 
-        public override void Write(System.Text.Json.Utf8JsonWriter writer, bool value, System.Text.Json.JsonSerializerOptions options)
-        {
-            writer.WriteBooleanValue(value);
-        }
+        public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options) => writer.WriteBooleanValue(value);
     }
 
     public class ApprovalRecord
     {
-        [System.Text.Json.Serialization.JsonPropertyName("id")]
-        public string AttendanceId { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("attendance_id")]
-        public string AltAttendanceId { get; set; } = "";
-
-        public string EffectiveId => !string.IsNullOrEmpty(AttendanceId) ? AttendanceId : AltAttendanceId;
-
-        [System.Text.Json.Serialization.JsonPropertyName("employee_name")]
-        public string EmployeeName { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("employee_code")]
-        public string EmployeeCode { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("designation")]
-        public string Designation { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("branch_name")]
-        public string BranchName { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("date")]
-        public string Date { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("in_time")]
-        public string? InTime { get; set; }
-
-        [System.Text.Json.Serialization.JsonPropertyName("out_time")]
-        public string? OutTime { get; set; }
-
+        [System.Text.Json.Serialization.JsonPropertyName("id")] public string AttendanceId { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("employee_name")] public string EmployeeName { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("employee_code")] public string EmployeeCode { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("designation")] public string? Designation { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("branch_name")] public string BranchName { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("date")] public string Date { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("in_time")] public string? InTime { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("out_time")] public string? OutTime { get; set; }
         [System.Text.Json.Serialization.JsonPropertyName("is_wfh")]
         [System.Text.Json.Serialization.JsonConverter(typeof(FlexibleBoolConverter))]
         public bool IsWfh { get; set; }
-
-        [System.Text.Json.Serialization.JsonPropertyName("distance_desc")]
-        public string DistanceDesc { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("in_status")]
-        public string InApprovalStatus { get; set; } = "PENDING";
-
-        [System.Text.Json.Serialization.JsonPropertyName("out_status")]
-        public string OutApprovalStatus { get; set; } = "PENDING";
+        [System.Text.Json.Serialization.JsonPropertyName("distance_desc")] public string DistanceDesc { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("in_status")] public string InApprovalStatus { get; set; } = "NOT_PUNCHED";
+        [System.Text.Json.Serialization.JsonPropertyName("out_status")] public string OutApprovalStatus { get; set; } = "NOT_PUNCHED";
     }
+
+    private static bool IsPending(string? s) => string.Equals(s, "PENDING", StringComparison.OrdinalIgnoreCase);
+    private static bool IsApproved(string? s) => string.Equals(s, "APPROVED", StringComparison.OrdinalIgnoreCase);
 
     private List<ApprovalRecord> filteredList => queue
         .Where(x => string.IsNullOrWhiteSpace(searchQuery) ||
@@ -322,128 +304,214 @@
                     x.EmployeeCode.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
         .Where(x => selectedFilter switch
         {
-            "IN_PENDING" => string.Equals(x.InApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase),
-            "OUT_PENDING" => string.Equals(x.OutApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase),
+            "IN_PENDING" => IsPending(x.InApprovalStatus),
+            "OUT_PENDING" => IsPending(x.OutApprovalStatus),
             "WFH_ONLY" => x.IsWfh,
-            "APPROVED_TODAY" => string.Equals(x.InApprovalStatus, "APPROVED", StringComparison.OrdinalIgnoreCase) || string.Equals(x.OutApprovalStatus, "APPROVED", StringComparison.OrdinalIgnoreCase),
-            "ALL_PENDING" => string.Equals(x.InApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase) || string.Equals(x.OutApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase),
+            "APPROVED" => IsApproved(x.InApprovalStatus) || IsApproved(x.OutApprovalStatus),
+            "ALL_PENDING" => IsPending(x.InApprovalStatus) || IsPending(x.OutApprovalStatus),
             _ => true
         })
         .ToList();
 
+    private bool HasPendingVisible => filteredList.Any(x => IsPending(x.InApprovalStatus) || IsPending(x.OutApprovalStatus));
+
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUser = authState.User.Identity?.Name ?? "";
         await LoadAttendanceQueue();
+    }
+
+    private async Task OnDateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var d))
+        {
+            selectedDate = d;
+            await LoadAttendanceQueue();
+        }
     }
 
     private async Task LoadAttendanceQueue()
     {
+        isLoading = true;
+        StateHasChanged();
         try
         {
             var req = new APIDataAccParms
             {
                 ProcName = "sp_attendance_operations",
                 ProcID = "GET_APPROVAL_QUEUE",
-                parm01 = selectedDate.ToString("yyyy-MM-dd")
+                parm01 = selectedDate.ToString("yyyy-MM-dd"),
+                parm05 = currentUser
             };
 
             var res = await BackendApi.FetchDataAsync(req);
-            if (res.HasValue)
-            {
-                var root = res.Value;
-                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                opts.Converters.Add(new FlexibleBoolConverter());
-
-                if (root.ValueKind == JsonValueKind.Array)
-                {
-                    queue = JsonSerializer.Deserialize<List<ApprovalRecord>>(root.GetRawText(), opts) ?? new();
-                }
-                else if (root.ValueKind == JsonValueKind.Object && (root.TryGetProperty("id", out _) || root.TryGetProperty("attendance_id", out _) || root.TryGetProperty("employee_name", out _)))
-                {
-                    var single = JsonSerializer.Deserialize<ApprovalRecord>(root.GetRawText(), opts);
-                    if (single != null) queue = new List<ApprovalRecord> { single };
-                }
-            }
+            queue = ParseList<ApprovalRecord>(res);
             RecalculateStats();
         }
         catch (Exception ex)
         {
             statusMessage = "Queue load error: " + ex.Message;
             isSuccess = false;
+            queue = new();
+            RecalculateStats();
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
     private void RecalculateStats()
     {
-        pendingInCount = queue.Count(x => string.Equals(x.InApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase));
-        pendingOutCount = queue.Count(x => string.Equals(x.OutApprovalStatus, "PENDING", StringComparison.OrdinalIgnoreCase));
+        pendingInCount = queue.Count(x => IsPending(x.InApprovalStatus));
+        pendingOutCount = queue.Count(x => IsPending(x.OutApprovalStatus));
         wfhCount = queue.Count(x => x.IsWfh);
-        approvedTodayCount = queue.Count(x => string.Equals(x.InApprovalStatus, "APPROVED", StringComparison.OrdinalIgnoreCase) || string.Equals(x.OutApprovalStatus, "APPROVED", StringComparison.OrdinalIgnoreCase));
+        approvedCount = queue.Count(x => IsApproved(x.InApprovalStatus) || IsApproved(x.OutApprovalStatus));
     }
 
-    private async Task ApprovePunch(string attendanceId, bool isInPunch, bool isApprove)
+    private async Task ApprovePunch(ApprovalRecord item, bool isInPunch, bool isApprove)
     {
+        string remarks = "";
+        if (!isApprove)
+        {
+            // window.prompt returns null when the reviewer cancels
+            var reason = await JS.InvokeAsync<string?>("prompt", $"Reason for rejecting {item.EmployeeName}'s {(isInPunch ? "check-in" : "check-out")} (optional):", "");
+            if (reason == null) return;
+            remarks = reason;
+        }
+
+        var newStatus = isApprove ? "APPROVED" : "REJECTED";
+        var ok = await CallAction(isInPunch ? "APPROVE_IN" : "APPROVE_OUT", item.AttendanceId, newStatus, remarks);
+        if (ok)
+        {
+            statusMessage = $"{item.EmployeeName}: {(isInPunch ? "check-in" : "check-out")} {newStatus.ToLower()}.";
+            isSuccess = true;
+            await LoadAttendanceQueue();
+        }
+    }
+
+    private async Task ApproveIds(List<string> ids)
+    {
+        var ok = await CallAction("APPROVE_BULK", string.Join(",", ids), "", "");
+        if (ok)
+        {
+            statusMessage = "Pending punches approved.";
+            isSuccess = true;
+            await LoadAttendanceQueue();
+        }
+    }
+
+    private async Task BulkApprovePending()
+    {
+        var ids = filteredList
+            .Where(x => IsPending(x.InApprovalStatus) || IsPending(x.OutApprovalStatus))
+            .Select(x => x.AttendanceId)
+            .ToList();
+        if (ids.Count == 0) return;
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Approve all pending punches for {ids.Count} record(s) currently shown?");
+        if (!confirmed) return;
+
+        await ApproveIds(ids);
+    }
+
+    // Sends one action and reports failure from the server's own "success"/"message" reply.
+    private async Task<bool> CallAction(string procId, string p1, string p2, string p3)
+    {
+        isBusy = true;
         try
         {
-            var target = queue.FirstOrDefault(x => x.AttendanceId == attendanceId || x.AltAttendanceId == attendanceId);
-            if (target != null)
+            var req = new APIDataAccParms
             {
-                var newStatus = isApprove ? "APPROVED" : "REJECTED";
-                if (isInPunch) target.InApprovalStatus = newStatus;
-                else target.OutApprovalStatus = newStatus;
+                ProcName = "sp_attendance_operations",
+                ProcID = procId,
+                parm01 = p1,
+                parm02 = p2,
+                parm03 = p3,
+                parm05 = currentUser
+            };
 
-                var req = new APIDataAccParms
-                {
-                    ProcName = "sp_admin_approve_attendance",
-                    ProcID = isInPunch ? "APPROVE_IN" : "APPROVE_OUT",
-                    parm01 = target.EffectiveId,
-                    parm02 = newStatus
-                };
-
-                await BackendApi.FetchDataAsync(req);
-                statusMessage = $"Punch successfully updated to {newStatus}.";
-                isSuccess = true;
-                RecalculateStats();
+            var res = await BackendApi.FetchDataAsync(req);
+            if (!CheckResult(res, out var message))
+            {
+                statusMessage = message;
+                isSuccess = false;
+                return false;
             }
+            return true;
         }
         catch (Exception ex)
         {
             statusMessage = "Approval error: " + ex.Message;
             isSuccess = false;
+            return false;
+        }
+        finally
+        {
+            isBusy = false;
         }
     }
 
-    private async Task ApproveBoth(string attendanceId)
+    // Accepts a plain array/object, or the project's { result_json: "..." } wrapper.
+    private static JsonElement? Unwrap(JsonElement? res)
     {
-        await ApprovePunch(attendanceId, true, true);
-        await ApprovePunch(attendanceId, false, true);
-    }
+        if (!res.HasValue) return null;
+        var el = res.Value;
 
-    private async Task BulkApprovePending()
-    {
-        foreach (var item in filteredList)
+        if (el.ValueKind == JsonValueKind.Array && el.GetArrayLength() > 0
+            && el[0].ValueKind == JsonValueKind.Object && el[0].TryGetProperty("result_json", out var first))
+            el = first;
+        else if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty("result_json", out var obj))
+            el = obj;
+
+        if (el.ValueKind == JsonValueKind.String)
         {
-            if (item.InApprovalStatus == "PENDING" && item.InTime != null)
-                item.InApprovalStatus = "APPROVED";
-            if (item.OutApprovalStatus == "PENDING" && item.OutTime != null)
-                item.OutApprovalStatus = "APPROVED";
+            var s = el.GetString();
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            using var doc = JsonDocument.Parse(s);
+            return doc.RootElement.Clone();
         }
-        RecalculateStats();
-        statusMessage = "All visible pending punches have been approved!";
-        isSuccess = true;
+        return el;
     }
 
-    private string GetBadgeClass(string? status)
+    private static List<T> ParseList<T>(JsonElement? res)
     {
-        return status switch
-        {
-            "APPROVED" => "bg-success",
-            "REJECTED" => "bg-danger",
-            _ => "bg-warning text-dark"
-        };
+        var el = Unwrap(res);
+        if (!el.HasValue || el.Value.ValueKind != JsonValueKind.Array) return new();
+        return JsonSerializer.Deserialize<List<T>>(el.Value.GetRawText(), JsonOpts) ?? new();
     }
 
-    private string GetInitials(string? name)
+    private static bool CheckResult(JsonElement? res, out string message)
+    {
+        message = "";
+        var el = Unwrap(res);
+        if (!el.HasValue) return true;
+
+        var v = el.Value;
+        if (v.ValueKind == JsonValueKind.Array && v.GetArrayLength() > 0) v = v[0];
+        if (v.ValueKind == JsonValueKind.Object
+            && v.TryGetProperty("success", out var ok) && ok.ValueKind == JsonValueKind.False)
+        {
+            message = v.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String
+                ? m.GetString() ?? "Request rejected."
+                : "Request rejected.";
+            return false;
+        }
+        return true;
+    }
+
+    private static string GetBadgeClass(string? status) => status?.ToUpperInvariant() switch
+    {
+        "APPROVED" => "bg-success",
+        "REJECTED" => "bg-danger",
+        "NOT_PUNCHED" => "bg-secondary",
+        _ => "bg-warning text-dark"
+    };
+
+    private static string StatusText(string? status) => status?.ToUpperInvariant() == "NOT_PUNCHED" ? "—" : (status ?? "");
+
+    private static string GetInitials(string? name)
     {
         if (string.IsNullOrWhiteSpace(name)) return "U";
         var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);

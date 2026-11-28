@@ -1,8 +1,12 @@
 @page "/attendance/reports"
+@attribute [Authorize]
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
+@using System.Text
 @using System.Text.Json
 @inject ApiService BackendApi
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Attendance Analytics & Reports - TechnoArt</PageTitle>
 
@@ -16,7 +20,8 @@
             <p class="text-muted small mb-0">Daily roster verification, monthly attendance summaries, and individual employee sheets</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-outline-success btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="ExportToCsv">
+            <button class="btn btn-outline-success btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center"
+                    @onclick="ExportToCsv" disabled="@(isLoading || RowCount == 0)">
                 <i class="bi bi-filetype-csv me-1"></i> Export CSV
             </button>
             <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" onclick="window.print()">
@@ -24,6 +29,14 @@
             </button>
         </div>
     </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
 
     <!-- Tab Selector -->
     <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-4 flex-column flex-sm-row">
@@ -71,18 +84,30 @@
                 {
                     <div class="col-12 col-sm-8 col-md-4">
                         <label class="form-label small fw-semibold">Select Employee</label>
-                        <select class="form-select form-select-sm" @bind="selectedEmployee">
-                            <option value="ALL">All Staff</option>
-                            <option value="Shuvo TAS">Shuvo TAS (TAS-104)</option>
-                            <option value="Kamrul Hassan">Kamrul Hassan (TAS-108)</option>
-                            <option value="Farzana Akter">Farzana Akter (TAS-112)</option>
+                        <select class="form-select form-select-sm" @bind="selectedEmployee" disabled="@(employees.Count <= 1)">
+                            @if (employees.Count > 1)
+                            {
+                                <option value="ALL">All Staff</option>
+                            }
+                            @foreach (var emp in employees)
+                            {
+                                <option value="@emp.Id">@emp.Name (@emp.Code)</option>
+                            }
                         </select>
                     </div>
                 }
 
                 <div class="col-12 col-sm-4 col-md-2 mt-2 mt-sm-0">
-                    <button class="btn btn-primary btn-sm w-100" @onclick="FetchReportData">
-                        <i class="bi bi-funnel me-1"></i> Generate
+                    <button class="btn btn-primary btn-sm w-100" @onclick="FetchReportData" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-funnel me-1"></i>
+                        }
+                        Generate
                     </button>
                 </div>
             </div>
@@ -92,59 +117,105 @@
     <!-- Report Table -->
     <div class="card border-0 shadow-sm rounded-4">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" style="min-width: 800px;">
-                <thead class="table-light small text-uppercase text-nowrap">
-                    <tr>
-                        <th class="ps-4">Employee</th>
-                        <th>Designation</th>
-                        <th>Date</th>
-                        <th>In Time</th>
-                        <th>Out Time</th>
-                        <th>Working Hours</th>
-                        <th>Status</th>
-                        <th>Mode</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (reportRecords.Count == 0)
-                    {
+            @if (activeTab == "summary")
+            {
+                <table class="table table-hover align-middle mb-0" style="min-width: 800px;">
+                    <thead class="table-light small text-uppercase text-nowrap">
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
-                                <i class="bi bi-clipboard-x fs-2 d-block mb-2"></i> No records found for the selected period.
-                            </td>
+                            <th class="ps-4">Employee</th>
+                            <th>Designation</th>
+                            <th class="text-center">Present Days</th>
+                            <th class="text-center">Late Days</th>
+                            <th class="text-center">WFH Days</th>
+                            <th class="text-center">Total Hours</th>
+                            <th class="text-center">Pending Approvals</th>
                         </tr>
-                    }
-                    else
-                    {
-                        @foreach (var r in reportRecords)
+                    </thead>
+                    <tbody>
+                        @if (summaryRecords.Count == 0)
                         {
                             <tr>
-                                <td class="ps-4 fw-bold text-dark">@r.EmployeeName</td>
-                                <td>@r.Designation</td>
-                                <td>@r.Date</td>
-                                <td><span class="text-success fw-semibold">@(r.InTime ?? "--:--")</span></td>
-                                <td><span class="text-danger fw-semibold">@(r.OutTime ?? "--:--")</span></td>
-                                <td class="font-monospace">@r.WorkingHours</td>
-                                <td>
-                                    <span class="badge @(r.Status == "ON_TIME" ? "bg-success" : (r.Status == "LATE" ? "bg-warning text-dark" : "bg-danger"))">
-                                        @r.Status
-                                    </span>
-                                </td>
-                                <td>
-                                    @if (r.IsWfh)
-                                    {
-                                        <span class="badge bg-info-subtle text-info"><i class="bi bi-house me-1"></i>WFH</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-building me-1"></i>Hub</span>
-                                    }
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="bi bi-clipboard-x fs-2 d-block mb-2"></i> @(isLoading ? "Loading..." : "No records found for the selected period.")
                                 </td>
                             </tr>
                         }
-                    }
-                </tbody>
-            </table>
+                        else
+                        {
+                            @foreach (var s in summaryRecords)
+                            {
+                                <tr>
+                                    <td class="ps-4 fw-bold text-dark">@s.EmployeeName</td>
+                                    <td>@s.Designation</td>
+                                    <td class="text-center fw-semibold text-success">@s.PresentDays</td>
+                                    <td class="text-center fw-semibold @(s.LateDays > 0 ? "text-warning" : "text-muted")">@s.LateDays</td>
+                                    <td class="text-center">@s.WfhDays</td>
+                                    <td class="text-center font-monospace">@s.TotalHours.ToString("0.0")</td>
+                                    <td class="text-center">
+                                        <span class="badge @(s.PendingApprovals > 0 ? "bg-warning text-dark" : "bg-light text-muted border")">@s.PendingApprovals</span>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <table class="table table-hover align-middle mb-0" style="min-width: 800px;">
+                    <thead class="table-light small text-uppercase text-nowrap">
+                        <tr>
+                            <th class="ps-4">Employee</th>
+                            <th>Designation</th>
+                            <th>Date</th>
+                            <th>In Time</th>
+                            <th>Out Time</th>
+                            <th>Working Hours</th>
+                            <th>Status</th>
+                            <th>Mode</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (reportRecords.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="bi bi-clipboard-x fs-2 d-block mb-2"></i> @(isLoading ? "Loading..." : "No records found for the selected period.")
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var r in reportRecords)
+                            {
+                                <tr>
+                                    <td class="ps-4 fw-bold text-dark">@r.EmployeeName</td>
+                                    <td>@r.Designation</td>
+                                    <td>@r.Date</td>
+                                    <td><span class="text-success fw-semibold">@(r.InTime ?? "--:--")</span></td>
+                                    <td><span class="text-danger fw-semibold">@(r.OutTime ?? "--:--")</span></td>
+                                    <td class="font-monospace">@r.WorkingHours</td>
+                                    <td><span class="badge @StatusBadge(r.Status)">@r.Status</span></td>
+                                    <td>
+                                        @if (r.Status == "ABSENT" || r.Status == "ON_LEAVE")
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                        else if (r.IsWfh)
+                                        {
+                                            <span class="badge bg-info-subtle text-info"><i class="bi bi-house me-1"></i>WFH</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-building me-1"></i>Hub</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
         </div>
     </div>
 </div>
@@ -156,113 +227,226 @@
     private DateTime endDate = DateTime.Today;
     private string selectedEmployee = "ALL";
 
+    private bool isLoading = false;
+    private string? errorMessage;
+    private string currentUser = "";
+
+    private List<ReportRow> reportRecords = new();
+    private List<SummaryRow> summaryRecords = new();
+    private List<EmployeeOption> employees = new();
+
+    private int RowCount => activeTab == "summary" ? summaryRecords.Count : reportRecords.Count;
+
+    private static readonly JsonSerializerOptions JsonOpts = CreateOptions();
+
+    private static JsonSerializerOptions CreateOptions()
+    {
+        var o = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        o.Converters.Add(new FlexibleBoolConverter());
+        return o;
+    }
+
     public class FlexibleBoolConverter : System.Text.Json.Serialization.JsonConverter<bool>
     {
-        public override bool Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+        public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType == System.Text.Json.JsonTokenType.True) return true;
-            if (reader.TokenType == System.Text.Json.JsonTokenType.False) return false;
-            if (reader.TokenType == System.Text.Json.JsonTokenType.Number)
+            switch (reader.TokenType)
             {
-                if (reader.TryGetInt64(out long lVal)) return lVal != 0;
-                if (reader.TryGetDouble(out double dVal)) return dVal != 0.0;
-                return false;
+                case JsonTokenType.True: return true;
+                case JsonTokenType.False: return false;
+                case JsonTokenType.Number:
+                    if (reader.TryGetInt64(out long l)) return l != 0;
+                    return reader.TryGetDouble(out double d) && d != 0.0;
+                case JsonTokenType.String:
+                    var s = reader.GetString()?.Trim();
+                    return s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "yes", StringComparison.OrdinalIgnoreCase);
+                default: return false;
             }
-            if (reader.TokenType == System.Text.Json.JsonTokenType.String)
-            {
-                var s = reader.GetString()?.Trim();
-                return s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "yes", StringComparison.OrdinalIgnoreCase);
-            }
-            return false;
         }
 
-        public override void Write(System.Text.Json.Utf8JsonWriter writer, bool value, System.Text.Json.JsonSerializerOptions options)
-        {
-            writer.WriteBooleanValue(value);
-        }
+        public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options) => writer.WriteBooleanValue(value);
     }
 
     public class ReportRow
     {
-        [System.Text.Json.Serialization.JsonPropertyName("employee_name")]
-        public string EmployeeName { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("designation")]
-        public string Designation { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("date")]
-        public string Date { get; set; } = "";
-
-        [System.Text.Json.Serialization.JsonPropertyName("in_time")]
-        public string? InTime { get; set; }
-
-        [System.Text.Json.Serialization.JsonPropertyName("out_time")]
-        public string? OutTime { get; set; }
-
-        [System.Text.Json.Serialization.JsonPropertyName("working_hours")]
-        public string WorkingHours { get; set; } = "--";
-
-        [System.Text.Json.Serialization.JsonPropertyName("status")]
-        public string Status { get; set; } = "ON_TIME";
-
+        [System.Text.Json.Serialization.JsonPropertyName("employee_name")] public string EmployeeName { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("designation")] public string? Designation { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("date")] public string Date { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("in_time")] public string? InTime { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("out_time")] public string? OutTime { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("working_hours")] public string WorkingHours { get; set; } = "--";
+        [System.Text.Json.Serialization.JsonPropertyName("status")] public string Status { get; set; } = "ON_TIME";
         [System.Text.Json.Serialization.JsonPropertyName("is_wfh")]
         [System.Text.Json.Serialization.JsonConverter(typeof(FlexibleBoolConverter))]
-        public bool IsWfh { get; set; } = false;
+        public bool IsWfh { get; set; }
     }
 
-    private List<ReportRow> reportRecords = new();
+    public class SummaryRow
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("employee_name")] public string EmployeeName { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("designation")] public string? Designation { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("present_days")] public int PresentDays { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("late_days")] public int LateDays { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("wfh_days")] public int WfhDays { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("total_hours")] public double TotalHours { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("pending_approvals")] public int PendingApprovals { get; set; }
+    }
+
+    public class EmployeeOption
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("id")] public string Id { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("name")] public string Name { get; set; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("code")] public string? Code { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUser = authState.User.Identity?.Name ?? "";
+
+        await LoadEmployees();
         await FetchReportData();
     }
 
-    private void SetTab(string tab)
+    private async Task SetTab(string tab)
     {
         activeTab = tab;
-        FetchReportData();
+        await FetchReportData();
     }
 
-    private async Task FetchReportData()
+    private async Task LoadEmployees()
     {
         try
         {
             var req = new APIDataAccParms
             {
                 ProcName = "sp_attendance_operations",
+                ProcID = "GET_ATTENDANCE_EMPLOYEES",
+                parm05 = currentUser
+            };
+            var res = await BackendApi.FetchDataAsync(req);
+            employees = ParseList<EmployeeOption>(res);
+
+            // A non-management user only gets their own record: preselect it.
+            if (employees.Count == 1) selectedEmployee = employees[0].Id;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Could not load employee list: " + ex.Message;
+        }
+    }
+
+    private async Task FetchReportData()
+    {
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var from = activeTab == "daily" ? targetDate : startDate;
+            var to = activeTab == "daily" ? targetDate : endDate;
+
+            if (to < from)
+            {
+                errorMessage = "End date cannot be earlier than start date.";
+                return;
+            }
+
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_attendance_operations",
                 ProcID = "GET_ATTENDANCE_REPORT",
                 parm01 = activeTab,
-                parm02 = (activeTab == "daily" ? targetDate : startDate).ToString("yyyy-MM-dd"),
-                parm03 = (activeTab == "daily" ? targetDate : endDate).ToString("yyyy-MM-dd"),
-                parm04 = selectedEmployee
+                parm02 = from.ToString("yyyy-MM-dd"),
+                parm03 = to.ToString("yyyy-MM-dd"),
+                parm04 = activeTab == "employee" ? selectedEmployee : "ALL",
+                parm05 = currentUser
             };
 
             var res = await BackendApi.FetchDataAsync(req);
-            if (res.HasValue && res.Value.ValueKind == JsonValueKind.Array)
+
+            if (activeTab == "summary")
             {
-                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                opts.Converters.Add(new FlexibleBoolConverter());
-                reportRecords = JsonSerializer.Deserialize<List<ReportRow>>(res.Value.GetRawText(), opts) ?? new();
+                summaryRecords = ParseList<SummaryRow>(res);
+                reportRecords = new();
             }
             else
             {
-                // Demo seed
-                reportRecords = new List<ReportRow>
-                {
-                    new ReportRow { EmployeeName = "Shuvo TAS", Designation = "Software Engineer", Date = DateTime.Today.ToString("yyyy-MM-dd"), InTime = "09:30 AM", OutTime = "06:30 PM", WorkingHours = "9h 00m", Status = "ON_TIME", IsWfh = true },
-                    new ReportRow { EmployeeName = "Kamrul Hassan", Designation = "Support Specialist", Date = DateTime.Today.ToString("yyyy-MM-dd"), InTime = "09:22 AM", OutTime = "06:35 PM", WorkingHours = "9h 13m", Status = "ON_TIME", IsWfh = false },
-                    new ReportRow { EmployeeName = "Farzana Akter", Designation = "UI/UX Designer", Date = DateTime.Today.ToString("yyyy-MM-dd"), InTime = "11:05 AM", OutTime = "08:00 PM", WorkingHours = "8h 55m", Status = "ON_TIME", IsWfh = false }
-                };
+                reportRecords = ParseList<ReportRow>(res);
+                summaryRecords = new();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Report fetch err: " + ex.Message);
+            errorMessage = "Failed to load report: " + ex.Message;
+            reportRecords = new();
+            summaryRecords = new();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
         }
     }
 
-    private void ExportToCsv()
+    // Accepts a plain JSON array, or the project's usual { result_json: "[...]" } wrapper
+    // (as an object or as the first element of an array).
+    private static List<T> ParseList<T>(JsonElement? res)
     {
-        // Simple client trigger or prompt
+        if (!res.HasValue) return new();
+        var el = res.Value;
+
+        if (el.ValueKind == JsonValueKind.Array && el.GetArrayLength() > 0
+            && el[0].ValueKind == JsonValueKind.Object && el[0].TryGetProperty("result_json", out var rjFirst))
+            el = rjFirst;
+        else if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty("result_json", out var rjObj))
+            el = rjObj;
+
+        if (el.ValueKind == JsonValueKind.String)
+        {
+            var s = el.GetString();
+            if (string.IsNullOrWhiteSpace(s)) return new();
+            using var doc = JsonDocument.Parse(s);
+            el = doc.RootElement.Clone();
+        }
+
+        if (el.ValueKind != JsonValueKind.Array) return new();
+        return JsonSerializer.Deserialize<List<T>>(el.GetRawText(), JsonOpts) ?? new();
+    }
+
+    private static string StatusBadge(string status) => status switch
+    {
+        "ON_TIME" => "bg-success",
+        "LATE" => "bg-warning text-dark",
+        "ON_LEAVE" => "bg-info text-dark",
+        _ => "bg-danger"
+    };
+
+    private static string Csv(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
+
+    private async Task ExportToCsv()
+    {
+        if (RowCount == 0) return;
+
+        var sb = new StringBuilder();
+        sb.Append('\uFEFF'); // BOM so Excel reads UTF-8 correctly
+
+        if (activeTab == "summary")
+        {
+            sb.AppendLine("Employee,Designation,Present Days,Late Days,WFH Days,Total Hours,Pending Approvals");
+            foreach (var s in summaryRecords)
+                sb.AppendLine(string.Join(",", Csv(s.EmployeeName), Csv(s.Designation), s.PresentDays, s.LateDays, s.WfhDays, s.TotalHours.ToString("0.0"), s.PendingApprovals));
+        }
+        else
+        {
+            sb.AppendLine("Employee,Designation,Date,In Time,Out Time,Working Hours,Status,Mode");
+            foreach (var r in reportRecords)
+                sb.AppendLine(string.Join(",", Csv(r.EmployeeName), Csv(r.Designation), Csv(r.Date), Csv(r.InTime), Csv(r.OutTime),
+                    Csv(r.WorkingHours), Csv(r.Status), Csv(r.IsWfh ? "WFH" : "Hub")));
+        }
+
+        var name = $"attendance_{activeTab}_{DateTime.Today:yyyyMMdd}.csv";
+        await JS.InvokeVoidAsync("downloadTextFile", name, sb.ToString());
     }
 }

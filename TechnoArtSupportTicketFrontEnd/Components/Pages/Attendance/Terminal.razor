@@ -6,6 +6,7 @@
 @inject ApiService BackendApi
 @inject IJSRuntime JS
 @inject AuthenticationStateProvider AuthStateProvider
+@implements IDisposable
 
 <PageTitle>Attendance Terminal - TechnoArt</PageTitle>
 
@@ -405,33 +406,48 @@
                 parm02 = DateTime.Today.ToString("yyyy-MM-dd")
             };
 
+            // var res = await BackendApi.FetchDataAsync(req);
+            // if (res.HasValue)
+            // {
+            //     var target = res.Value;
+            //     if (target.ValueKind == JsonValueKind.Array && target.GetArrayLength() > 0) target = target[0];
+            //     if (target.ValueKind == JsonValueKind.Object)
+            //     {
+            //         if (target.TryGetProperty("in_time", out var inProp) && inProp.GetString() != null)
+            //         {
+            //             var rawIn = inProp.GetString();
+            //             if (DateTime.TryParse(rawIn, out var parsedIn)) todayInTime = parsedIn.ToString("hh:mm tt");
+            //             else todayInTime = rawIn;
+            //         }
+            //         if (target.TryGetProperty("out_time", out var outProp) && outProp.GetString() != null)
+            //         {
+            //             var rawOut = outProp.GetString();
+            //             if (DateTime.TryParse(rawOut, out var parsedOut)) todayOutTime = parsedOut.ToString("hh:mm tt");
+            //             else todayOutTime = rawOut;
+            //         }
+            //         if (target.TryGetProperty("in_approval_status", out var inApp))
+            //         {
+            //             inApprovalStatus = inApp.GetString() ?? "PENDING";
+            //         }
+            //         if (target.TryGetProperty("out_approval_status", out var outApp))
+            //         {
+            //             outApprovalStatus = outApp.GetString() ?? "PENDING";
+            //         }
+            //     }
+            // }
+            
+            // b) check the result instead of assuming success (both handlers)
             var res = await BackendApi.FetchDataAsync(req);
             if (res.HasValue)
             {
-                var target = res.Value;
-                if (target.ValueKind == JsonValueKind.Array && target.GetArrayLength() > 0) target = target[0];
-                if (target.ValueKind == JsonValueKind.Object)
+                var r = res.Value;
+                if (r.ValueKind == JsonValueKind.Array && r.GetArrayLength() > 0) r = r[0];
+                if (r.ValueKind == JsonValueKind.Object &&
+                    r.TryGetProperty("success", out var ok) && ok.ValueKind == JsonValueKind.False)
                 {
-                    if (target.TryGetProperty("in_time", out var inProp) && inProp.GetString() != null)
-                    {
-                        var rawIn = inProp.GetString();
-                        if (DateTime.TryParse(rawIn, out var parsedIn)) todayInTime = parsedIn.ToString("hh:mm tt");
-                        else todayInTime = rawIn;
-                    }
-                    if (target.TryGetProperty("out_time", out var outProp) && outProp.GetString() != null)
-                    {
-                        var rawOut = outProp.GetString();
-                        if (DateTime.TryParse(rawOut, out var parsedOut)) todayOutTime = parsedOut.ToString("hh:mm tt");
-                        else todayOutTime = rawOut;
-                    }
-                    if (target.TryGetProperty("in_approval_status", out var inApp))
-                    {
-                        inApprovalStatus = inApp.GetString() ?? "PENDING";
-                    }
-                    if (target.TryGetProperty("out_approval_status", out var outApp))
-                    {
-                        outApprovalStatus = outApp.GetString() ?? "PENDING";
-                    }
+                    statusMessage = r.TryGetProperty("message", out var m) ? m.GetString() : "Request rejected.";
+                    isSuccess = false;
+                    return;   // finally{} still resets isPunching
                 }
             }
 
@@ -472,7 +488,7 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_checkin",
+                ProcName = "sp_attendance_operations",
                 ProcID = "CHECK_IN",
                 parm01 = username,
                 parm02 = DateTime.UtcNow.ToString("o"),
@@ -509,7 +525,7 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_checkout",
+                ProcName = "sp_attendance_operations",
                 ProcID = "CHECK_OUT",
                 parm01 = username,
                 parm02 = DateTime.UtcNow.ToString("o"),
