@@ -17,23 +17,30 @@
                 <i class="bi bi-calendar-check me-2"></i> Attendance Verification & Approvals
             </h4>
             <p class="text-muted small mb-0">Dual In/Out punch verification and WFH validation queue for HR and Management</p>
-        </div>
+
+</div>
         <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-warning text-dark btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="OpenManualModal" disabled="@isBusy">
+                <i class="bi bi-calendar-plus me-1"></i> + Missed / Manual Punch
+            </button>
             <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="LoadAttendanceQueue" disabled="@isBusy">
                 <i class="bi bi-arrow-clockwise me-1"></i> Refresh Queue
             </button>
             <button class="btn btn-success btn-sm rounded-pill px-3 py-2 shadow-sm text-nowrap d-inline-flex align-items-center" @onclick="BulkApprovePending" disabled="@(isBusy || !HasPendingVisible)">
                 <i class="bi bi-check2-all me-1"></i> Approve All Visible
             </button>
-        </div>
-    </div>
+
+</div>
+
+</div>
 
     @if (!string.IsNullOrEmpty(statusMessage))
     {
         <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show shadow-sm" role="alert">
             <i class="bi @(isSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i> @statusMessage
             <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
-        </div>
+
+</div>
     }
 
     <!-- Stat Cards -->
@@ -42,51 +49,72 @@
             <div class="card border-0 shadow-sm rounded-4 p-3 border-start border-4 border-warning">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-bold text-uppercase">Pending In-Approval</div>
+                        <div class="text-muted small fw-bold text-uppercase">Pending In-Approval
+</div>
                         <h3 class="fw-bold my-1 text-warning">@pendingInCount</h3>
                         <span class="small text-muted">Awaiting HR In-Punch check</span>
-                    </div>
+            
+</div>
                     <i class="bi bi-box-arrow-in-right fs-1 text-warning opacity-50"></i>
-                </div>
-            </div>
-        </div>
+        
+</div>
+    
+</div>
+
+</div>
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="card border-0 shadow-sm rounded-4 p-3 border-start border-4 border-info">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-bold text-uppercase">Pending Out-Approval</div>
+                        <div class="text-muted small fw-bold text-uppercase">Pending Out-Approval
+</div>
                         <h3 class="fw-bold my-1 text-info">@pendingOutCount</h3>
                         <span class="small text-muted">Awaiting HR Out-Punch check</span>
-                    </div>
+            
+</div>
                     <i class="bi bi-box-arrow-right fs-1 text-info opacity-50"></i>
-                </div>
-            </div>
-        </div>
+        
+</div>
+    
+</div>
+
+</div>
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="card border-0 shadow-sm rounded-4 p-3 border-start border-4 border-primary">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-bold text-uppercase">WFH Requests</div>
+                        <div class="text-muted small fw-bold text-uppercase">WFH Requests
+</div>
                         <h3 class="fw-bold my-1 text-primary">@wfhCount</h3>
                         <span class="small text-muted">Remote punches on this date</span>
-                    </div>
+            
+</div>
                     <i class="bi bi-house fs-1 text-primary opacity-50"></i>
-                </div>
-            </div>
-        </div>
+        
+</div>
+    
+</div>
+
+</div>
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="card border-0 shadow-sm rounded-4 p-3 border-start border-4 border-success">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-bold text-uppercase">Approved Records</div>
+                        <div class="text-muted small fw-bold text-uppercase">Approved Records
+</div>
                         <h3 class="fw-bold my-1 text-success">@approvedCount</h3>
                         <span class="small text-muted">Verified on this date</span>
-                    </div>
+            
+</div>
                     <i class="bi bi-check-circle fs-1 text-success opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
+        
+</div>
+    
+</div>
+
+</div>
+
+</div>
 
     <!-- Filters & Table -->
     <div class="card border-0 shadow-sm rounded-4">
@@ -96,8 +124,10 @@
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
                         <input type="text" class="form-control bg-light border-start-0" placeholder="Search employee name, ID..." @bind="searchQuery" @bind:event="oninput" />
-                    </div>
-                </div>
+            
+</div>
+        
+</div>
                 <div class="col-12 col-sm-6 col-md-3">
                     <select class="form-select form-select-sm" @bind="selectedFilter">
                         <option value="ALL_PENDING">Pending Approvals (In or Out)</option>
@@ -107,15 +137,20 @@
                         <option value="APPROVED">Approved Records</option>
                         <option value="ALL">All Records</option>
                     </select>
-                </div>
+        
+</div>
                 <div class="col-12 col-sm-6 col-md-3">
                     <input type="date" class="form-control form-control-sm" value="@selectedDate.ToString("yyyy-MM-dd")" @onchange="OnDateChanged" />
-                </div>
+        
+</div>
                 <div class="col-12 col-md-2 text-start text-md-end">
                     <span class="badge bg-secondary">Total: @filteredList.Count</span>
-                </div>
-            </div>
-        </div>
+        
+</div>
+    
+</div>
+
+</div>
 
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" style="min-width: 850px;">
@@ -157,12 +192,17 @@
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px;">
                                             @GetInitials(item.EmployeeName)
-                                        </div>
+                                
+</div>
                                         <div>
-                                            <div class="fw-bold text-dark">@item.EmployeeName</div>
-                                            <div class="text-muted small">ID: @item.EmployeeCode • @item.Designation</div>
-                                        </div>
-                                    </div>
+                                            <div class="fw-bold text-dark">@item.EmployeeName
+</div>
+                                            <div class="text-muted small">ID: @item.EmployeeCode • @item.Designation
+</div>
+                                
+</div>
+                            
+</div>
                                 </td>
                                 <td>
                                     <span class="badge bg-light text-dark border">
@@ -170,11 +210,13 @@
                                     </span>
                                 </td>
                                 <td>
-                                    <div class="fw-semibold">@item.Date</div>
+                                    <div class="fw-semibold">@item.Date
+</div>
                                     <div class="small text-muted">
                                         <span class="text-success"><i class="bi bi-box-arrow-in-right"></i> @(item.InTime ?? "--:--")</span> |
                                         <span class="text-danger"><i class="bi bi-box-arrow-right"></i> @(item.OutTime ?? "--:--")</span>
-                                    </div>
+                            
+</div>
                                 </td>
                                 <td>
                                     @if (item.IsWfh)
@@ -189,7 +231,8 @@
                                             <i class="bi bi-building me-1"></i> On-Site
                                         </span>
                                     }
-                                    <div class="small text-muted">@item.DistanceDesc</div>
+                                    <div class="small text-muted">@item.DistanceDesc
+</div>
                                 </td>
                                 <td><span class="badge @GetBadgeClass(item.InApprovalStatus)">In: @StatusText(item.InApprovalStatus)</span></td>
                                 <td><span class="badge @GetBadgeClass(item.OutApprovalStatus)">Out: @StatusText(item.OutApprovalStatus)</span></td>
@@ -221,7 +264,8 @@
                                                 <i class="bi bi-check2-all"></i> Both
                                             </button>
                                         }
-                                    </div>
+                            
+</div>
                                 </td>
                             </tr>
                         }
@@ -230,7 +274,101 @@
             </table>
         </div>
     </div>
+
+    <!-- Manual / Missed Punch Entry Modal -->
+    @if (showManualModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-bottom bg-light">
+                        <h5 class="modal-title fw-bold text-primary">
+                            <i class="bi bi-calendar-plus me-2"></i> HR Manual / Missed Punch Entry
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="() => showManualModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        @if (!string.IsNullOrEmpty(manualErrorMessage))
+                        {
+                            <div class="alert alert-danger py-2 small mb-3">@manualErrorMessage</div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Select Employee <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="manualEmployeeId">
+                                <option value="">-- Choose Employee --</option>
+                                @foreach (var emp in employeeOptions)
+                                {
+                                    <option value="@emp.Id">@emp.Name (@emp.Role)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Attendance Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" @bind="manualDate" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Status / Punctuality</label>
+                                <select class="form-select" @bind="manualStatus">
+                                    <option value="ON_TIME">On Time / Present</option>
+                                    <option value="LATE">Late</option>
+                                    <option value="SHORT_LEAVE">Short Leave Approved</option>
+                                    <option value="HALF_DAY">Half Day</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">In Time (HH:mm)</label>
+                                <input type="time" class="form-control" @bind="manualInTime" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Out Time (HH:mm)</label>
+                                <input type="time" class="form-control" @bind="manualOutTime" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Office Branch / Hub</label>
+                            <select class="form-select" @bind="manualBranchId">
+                                <option value="">-- Main Office / Default --</option>
+                                @foreach (var b in branchOptions)
+                                {
+                                    <option value="@b.Id">@b.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="manualIsWfh" @bind="manualIsWfh" />
+                            <label class="form-check-label small fw-semibold" for="manualIsWfh">
+                                Approved Work From Home (WFH)
+                            </label>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">HR Reason / Remarks</label>
+                            <input type="text" class="form-control" placeholder="e.g. Employee forgot to punch yesterday / system issue" @bind="manualRemarks" />
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top bg-light">
+                        <button type="button" class="btn btn-light" @onclick="() => showManualModal = false">Cancel</button>
+                        <button type="button" class="btn btn-primary px-4" @onclick="SubmitManualAttendance" disabled="@isSubmittingManual">
+                            <i class="bi bi-check-lg me-1"></i> @(isSubmittingManual ? "Saving..." : "Save Attendance")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
 </div>
+
+
+
 
 @code {
     private string searchQuery = "";
@@ -244,6 +382,161 @@
     private bool isLoading = false;
     private bool isBusy = false;
     private string currentUser = "";
+
+    public class SimpleEmployee
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Role { get; set; } = "";
+    }
+
+    public class SimpleBranch
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+    }
+
+    private bool showManualModal = false;
+    private bool isSubmittingManual = false;
+    private string manualErrorMessage = "";
+    private string manualEmployeeId = "";
+    private DateTime manualDate = DateTime.Today.AddDays(-1);
+    private TimeOnly manualInTime = new TimeOnly(9, 30);
+    private TimeOnly manualOutTime = new TimeOnly(18, 30);
+    private string manualBranchId = "";
+    private string manualStatus = "ON_TIME";
+    private bool manualIsWfh = false;
+    private string manualRemarks = "HR Missed punch recorded";
+    private List<SimpleEmployee> employeeOptions = new();
+    private List<SimpleBranch> branchOptions = new();
+
+    private async Task OpenManualModal()
+    {
+        manualErrorMessage = "";
+        showManualModal = true;
+        if (employeeOptions.Count == 0)
+        {
+            await LoadEmployeeOptions();
+        }
+        if (branchOptions.Count == 0)
+        {
+            await LoadBranchOptions();
+        }
+    }
+
+    private async Task LoadEmployeeOptions()
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "GET_USERS",
+                parm05 = "SuperAdmin"
+            };
+            var res = await BackendApi.FetchDataAsync(req);
+            var el = Unwrap(res);
+            if (el.HasValue && el.Value.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<SimpleEmployee>();
+                foreach (var item in el.Value.EnumerateArray())
+                {
+                    var uid = item.TryGetProperty("user_id", out var idp) ? idp.GetString() : (item.TryGetProperty("id", out var idp2) ? idp2.GetString() : "");
+                    var name = item.TryGetProperty("full_name", out var np) ? np.GetString() : (item.TryGetProperty("name", out var np2) ? np2.GetString() : "");
+                    var role = item.TryGetProperty("role", out var rp) ? rp.GetString() : "Employee";
+                    if (!string.IsNullOrEmpty(uid) && !string.IsNullOrEmpty(name))
+                    {
+                        list.Add(new SimpleEmployee { Id = uid, Name = name, Role = role ?? "Staff" });
+                    }
+                }
+                employeeOptions = list;
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadBranchOptions()
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "GET_BRANCHES"
+            };
+            var res = await BackendApi.FetchDataAsync(req);
+            var el = Unwrap(res);
+            if (el.HasValue && el.Value.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<SimpleBranch>();
+                foreach (var item in el.Value.EnumerateArray())
+                {
+                    var bid = item.TryGetProperty("id", out var idp) ? idp.GetString() : (item.TryGetProperty("branch_id", out var idp2) ? idp2.GetString() : "");
+                    var name = item.TryGetProperty("name", out var np) ? np.GetString() : (item.TryGetProperty("branch_name", out var np2) ? np2.GetString() : "");
+                    if (!string.IsNullOrEmpty(bid) && !string.IsNullOrEmpty(name))
+                    {
+                        list.Add(new SimpleBranch { Id = bid, Name = name });
+                    }
+                }
+                branchOptions = list;
+            }
+        }
+        catch { }
+    }
+
+    private async Task SubmitManualAttendance()
+    {
+        if (string.IsNullOrWhiteSpace(manualEmployeeId))
+        {
+            manualErrorMessage = "Please select an employee.";
+            return;
+        }
+
+        isSubmittingManual = true;
+        manualErrorMessage = "";
+        try
+        {
+            var inStr = manualInTime.ToString("HH:mm:ss");
+            var outStr = manualOutTime.ToString("HH:mm:ss");
+
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_ticket_operations",
+                ProcID = "MANUAL_ATTENDANCE",
+                parm01 = manualEmployeeId,
+                parm02 = manualDate.ToString("yyyy-MM-dd"),
+                parm03 = inStr,
+                parm04 = outStr,
+                parm05 = manualIsWfh ? "1" : "0",
+                parm06 = manualBranchId,
+                parm07 = manualStatus,
+                parm08 = manualRemarks,
+                parm09 = currentUser
+            };
+
+            var res = await BackendApi.FetchDataAsync(req);
+            if (CheckResult(res, out var msg))
+            {
+                showManualModal = false;
+                statusMessage = "Manual missed attendance recorded and approved successfully.";
+                isSuccess = true;
+                selectedDate = manualDate;
+                await LoadAttendanceQueue();
+            }
+            else
+            {
+                manualErrorMessage = msg;
+            }
+        }
+        catch (Exception ex)
+        {
+            manualErrorMessage = "Save failed: " + ex.Message;
+        }
+        finally
+        {
+            isSubmittingManual = false;
+        }
+    }
 
     private List<ApprovalRecord> queue = new();
 

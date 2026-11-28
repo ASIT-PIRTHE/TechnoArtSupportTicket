@@ -1,6 +1,11 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.Extensions.Configuration
+@using TechnoArtSupportTicketFrontEnd.Services
+@using System.Security.Claims
+@using System.Text.Json
 @inject IConfiguration Config
+@inject ApiService BackendApi
+@inject AuthenticationStateProvider AuthStateProvider
 
 <div class="sidebar-logo">
     <i class="bi bi-headset"></i> @(Config["Branding:SiteName"] ?? "SupportHub")
@@ -14,79 +19,128 @@
         <i class="bi bi-grid-1x2"></i> Dashboard
     </NavLink>
     
-    <AuthorizeView Roles="SuperAdmin,MD">
+    @if (CanView("CLIENTS", "SuperAdmin,MD"))
+    {
         <NavLink class="nav-link" href="admin/clients">
             <i class="bi bi-building"></i> Clients & Tenants
         </NavLink>
-    </AuthorizeView>
+    }
 
-    <AuthorizeView Roles="SuperAdmin,MD,HRManager,ProjectManager">
+    @if (CanView("USERS", "SuperAdmin,MD,HRManager,ProjectManager"))
+    {
         <NavLink class="nav-link" href="admin/employees">
             <i class="bi bi-people"></i> User Management
         </NavLink>
-    </AuthorizeView>
+    }
         
-    <AuthorizeView Roles="SuperAdmin,MD,HRManager,AccountsOfficer">
+    @if (CanViewAnyHrm())
+    {
         <div class="nav-section-title">Management & HRM</div>
-        <NavLink class="nav-link" href="attendance/approvals">
-            <i class="bi bi-calendar-check"></i> Attendance Approvals
-        </NavLink>
-        <NavLink class="nav-link" href="attendance/branches">
-            <i class="bi bi-geo-alt"></i> Office Hubs & Geofence
-        </NavLink>
-        <NavLink class="nav-link" href="attendance/office-time">
-            <i class="bi bi-clock-history"></i> Office Shifts & Timing
-        </NavLink>
-        <NavLink class="nav-link" href="attendance/leaves">
-            <i class="bi bi-calendar2-range"></i> Leave Management
-        </NavLink>
-        <NavLink class="nav-link" href="attendance/reports">
-            <i class="bi bi-file-earmark-bar-graph"></i> Attendance Reports
-        </NavLink>
-        <NavLink class="nav-link" href="attendance/notices">
-            <i class="bi bi-megaphone"></i> Notice Board
-        </NavLink>
-        <NavLink class="nav-link" href="attendance/permissions">
-            <i class="bi bi-shield-lock"></i> Menu Permissions
-        </NavLink>
-        <NavLink class="nav-link" href="admin/reports">
-            <i class="bi bi-bar-chart"></i> Executive Reports
-        </NavLink>
-    </AuthorizeView>
+        @if (CanView("ATTENDANCE_APPROVALS", "SuperAdmin,MD,HRManager,SupportManager"))
+        {
+            <NavLink class="nav-link" href="attendance/approvals">
+                <i class="bi bi-calendar-check"></i> Attendance Approvals
+            </NavLink>
+        }
+        @if (CanView("OFFICE_HUBS", "SuperAdmin,MD"))
+        {
+            <NavLink class="nav-link" href="attendance/branches">
+                <i class="bi bi-geo-alt"></i> Office Hubs & Geofence
+            </NavLink>
+        }
+        @if (CanView("OFFICE_TIMING", "SuperAdmin,MD,HRManager"))
+        {
+            <NavLink class="nav-link" href="attendance/office-time">
+                <i class="bi bi-clock-history"></i> Office Shifts & Timing
+            </NavLink>
+        }
+        @if (CanView("LEAVES", "SuperAdmin,MD,HRManager,AccountsOfficer"))
+        {
+            <NavLink class="nav-link" href="attendance/leaves">
+                <i class="bi bi-calendar2-range"></i> Leave Management
+            </NavLink>
+        }
+        @if (CanView("REPORTS", "SuperAdmin,MD,HRManager,AccountsOfficer"))
+        {
+            <NavLink class="nav-link" href="attendance/reports">
+                <i class="bi bi-file-earmark-bar-graph"></i> Attendance Reports
+            </NavLink>
+        }
+        @if (CanView("NOTICES", "SuperAdmin,MD,HRManager,AccountsOfficer"))
+        {
+            <NavLink class="nav-link" href="attendance/notices">
+                <i class="bi bi-megaphone"></i> Notice Board
+            </NavLink>
+        }
+        @if (CanView("PERMISSIONS", "SuperAdmin,MD"))
+        {
+            <NavLink class="nav-link" href="attendance/permissions">
+                <i class="bi bi-shield-lock"></i> Menu Permissions
+            </NavLink>
+        }
+        @if (CanView("EXECUTIVE_REPORTS", "SuperAdmin,MD"))
+        {
+            <NavLink class="nav-link" href="admin/reports">
+                <i class="bi bi-bar-chart"></i> Executive Reports
+            </NavLink>
+        }
+    }
 
-    <AuthorizeView Roles="ProjectManager,SupportManager,SuperAdmin,MD,ClientAdmin,ClientUser">
+    @if (CanView("PROJECTS", "ProjectManager,SupportManager,SuperAdmin,MD,ClientAdmin,ClientUser"))
+    {
         <div class="nav-section-title">Projects & Teams</div>
         <NavLink class="nav-link" href="projects">
             <i class="bi bi-kanban"></i> Projects
         </NavLink>
-    </AuthorizeView>
+    }
 
-    <AuthorizeView Roles="ProjectManager,SupportManager,SuperAdmin">
-        <NavLink class="nav-link" href="all-tickets">
-            <i class="bi bi-inboxes"></i> Ticket Queue
-        </NavLink>
-        <NavLink class="nav-link" href="team-workload">
-            <i class="bi bi-person-lines-fill"></i> Team Workload
-        </NavLink>
-    </AuthorizeView>
+    @if (CanView("TICKETS", "ProjectManager,SupportManager,SuperAdmin") || CanView("TEAM_WORKLOAD", "ProjectManager,SupportManager,SuperAdmin"))
+    {
+        @if (CanView("TICKETS", "ProjectManager,SupportManager,SuperAdmin"))
+        {
+            <NavLink class="nav-link" href="all-tickets">
+                <i class="bi bi-inboxes"></i> Ticket Queue
+            </NavLink>
+        }
+        @if (CanView("TEAM_WORKLOAD", "ProjectManager,SupportManager,SuperAdmin"))
+        {
+            <NavLink class="nav-link" href="team-workload">
+                <i class="bi bi-person-lines-fill"></i> Team Workload
+            </NavLink>
+        }
+    }
 
-    <AuthorizeView Roles="TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer">
+    @if (CanViewAnyMyWork())
+    {
         <div class="nav-section-title">My Work & Attendance</div>
-        <NavLink class="nav-link" href="attendance/terminal">
-            <i class="bi bi-fingerprint text-success"></i> Attendance Terminal
-        </NavLink>
-        <NavLink class="nav-link" href="raise-ticket">
-            <i class="bi bi-ticket-plus"></i> Raise a Ticket
-        </NavLink>
-        <NavLink class="nav-link" href="my-tickets">
-            <i class="bi bi-ticket"></i> My Tickets
-        </NavLink>
-        <NavLink class="nav-link" href="my-tasks">
-            <i class="bi bi-list-task"></i> My Tasks
-        </NavLink>
-    </AuthorizeView>
+        @if (CanView("ATTENDANCE_TERMINAL", "TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer"))
+        {
+            <NavLink class="nav-link" href="attendance/terminal">
+                <i class="bi bi-fingerprint text-success"></i> Attendance Terminal
+            </NavLink>
+        }
+        @if (CanView("RAISE_TICKET", "TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer,ClientAdmin,ClientUser"))
+        {
+            <NavLink class="nav-link" href="raise-ticket">
+                <i class="bi bi-ticket-plus"></i> Raise a Ticket
+            </NavLink>
+        }
+        @if (CanView("MY_TICKETS", "TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer"))
+        {
+            <NavLink class="nav-link" href="my-tickets">
+                <i class="bi bi-ticket"></i> My Tickets
+            </NavLink>
+        }
+        @if (CanView("MY_TASKS", "TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer"))
+        {
+            <NavLink class="nav-link" href="my-tasks">
+                <i class="bi bi-list-task"></i> My Tasks
+            </NavLink>
+        }
+    }
 
-    <AuthorizeView Roles="ClientAdmin,ClientUser">
+    @if (IsClientScope())
+    {
         <div class="nav-section-title">Support Desk</div>
         <NavLink class="nav-link" href="raise-ticket">
             <i class="bi bi-ticket-plus"></i> Raise a Ticket
@@ -94,13 +148,13 @@
         <NavLink class="nav-link" href="client/my-tickets">
             <i class="bi bi-ticket"></i> My Tickets
         </NavLink>
-    </AuthorizeView>
-    
-    <AuthorizeView Roles="ClientAdmin">
-        <NavLink class="nav-link" href="admin/employees">
-            <i class="bi bi-people"></i> Company Users
-        </NavLink>
-    </AuthorizeView>
+        @if (CanView("COMPANY_USERS", "ClientAdmin"))
+        {
+            <NavLink class="nav-link" href="admin/employees">
+                <i class="bi bi-people"></i> Company Users
+            </NavLink>
+        }
+    }
 
     <div class="nav-section-title mt-4">Account</div>
     <NavLink class="nav-link" href="profile">
@@ -110,3 +164,108 @@
         <i class="bi bi-gear"></i> Settings
     </NavLink>
 </div>
+
+@code {
+    private string currentUserRole = "";
+    private string currentUserId = "";
+    private bool isSuperAdminOrMd = false;
+    private Dictionary<string, bool> canViewMap = new(StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                currentUserRole = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+                currentUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("nameid")?.Value ?? user.Identity.Name ?? "";
+                isSuperAdminOrMd = string.Equals(currentUserRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(currentUserRole, "MD", StringComparison.OrdinalIgnoreCase);
+
+                var req = new APIDataAccParms
+                {
+                    ProcName = "sp_permission_operations",
+                    ProcID = "GET_USER_PERMISSIONS",
+                    parm01 = currentUserId,
+                    parm05 = currentUserRole
+                };
+                var res = await BackendApi.FetchDataAsync(req);
+                var el = Unwrap(res);
+                if (el.HasValue && el.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in el.Value.EnumerateArray())
+                    {
+                        var mKey = item.TryGetProperty("ModuleKey", out var mk) ? mk.GetString() : (item.TryGetProperty("module_key", out var mk2) ? mk2.GetString() : "");
+                        var canV = item.TryGetProperty("CanView", out var cv) && (cv.ValueKind == JsonValueKind.True || (cv.ValueKind == JsonValueKind.Number && cv.GetInt32() == 1) || (cv.ValueKind == JsonValueKind.String && cv.GetString() == "1"));
+                        if (!string.IsNullOrEmpty(mKey))
+                        {
+                            canViewMap[mKey] = canV;
+                        }
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    private static JsonElement? Unwrap(JsonElement? res)
+    {
+        if (!res.HasValue) return null;
+        var el = res.Value;
+        if (el.ValueKind == JsonValueKind.Array && el.GetArrayLength() > 0
+            && el[0].ValueKind == JsonValueKind.Object && el[0].TryGetProperty("result_json", out var first))
+            el = first;
+        else if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty("result_json", out var obj))
+            el = obj;
+
+        if (el.ValueKind == JsonValueKind.String)
+        {
+            var s = el.GetString();
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            using var doc = JsonDocument.Parse(s);
+            return doc.RootElement.Clone();
+        }
+        return el;
+    }
+
+    private bool CanView(string moduleKey, string fallbackRoles = "")
+    {
+        if (isSuperAdminOrMd) return true;
+        if (canViewMap.TryGetValue(moduleKey, out var allowed)) return allowed;
+        if (!string.IsNullOrEmpty(fallbackRoles))
+        {
+            var roles = fallbackRoles.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            return roles.Any(r => string.Equals(currentUserRole, r, StringComparison.OrdinalIgnoreCase));
+        }
+        return false;
+    }
+
+    private bool CanViewAnyHrm()
+    {
+        return CanView("ATTENDANCE_APPROVALS", "SuperAdmin,MD,HRManager,SupportManager")
+            || CanView("OFFICE_HUBS", "SuperAdmin,MD")
+            || CanView("OFFICE_TIMING", "SuperAdmin,MD,HRManager")
+            || CanView("LEAVES", "SuperAdmin,MD,HRManager,AccountsOfficer")
+            || CanView("REPORTS", "SuperAdmin,MD,HRManager,AccountsOfficer")
+            || CanView("NOTICES", "SuperAdmin,MD,HRManager,AccountsOfficer")
+            || CanView("PERMISSIONS", "SuperAdmin,MD")
+            || CanView("EXECUTIVE_REPORTS", "SuperAdmin,MD");
+    }
+
+    private bool CanViewAnyMyWork()
+    {
+        if (IsClientScope()) return false;
+        return CanView("ATTENDANCE_TERMINAL", "TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer")
+            || CanView("RAISE_TICKET", "TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer")
+            || CanView("MY_TICKETS", "TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer")
+            || CanView("MY_TASKS", "TeamMember,ProjectManager,SupportManager,SuperAdmin,MD,HRManager,AccountsOfficer");
+    }
+
+    private bool IsClientScope()
+    {
+        return string.Equals(currentUserRole, "ClientAdmin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentUserRole, "ClientUser", StringComparison.OrdinalIgnoreCase);
+    }
+}

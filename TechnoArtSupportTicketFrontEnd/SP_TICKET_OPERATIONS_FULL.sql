@@ -1,6 +1,41 @@
 USE TASUPORTDB;
 GO
 
+-- ----------------------------------------------------------------------------
+-- Ensure Dynamic Role & User Menu Permission Tables Exist
+-- ----------------------------------------------------------------------------
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RoleMenuPermissions')
+BEGIN
+    CREATE TABLE dbo.RoleMenuPermissions (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        RoleKey NVARCHAR(100) NOT NULL,
+        ModuleKey NVARCHAR(100) NOT NULL,
+        CanView BIT NOT NULL DEFAULT 0,
+        CanEdit BIT NOT NULL DEFAULT 0,
+        CanDelete BIT NOT NULL DEFAULT 0,
+        CanApprove BIT NOT NULL DEFAULT 0,
+        UpdatedAt DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
+        CONSTRAINT UQ_RoleMenu UNIQUE (RoleKey, ModuleKey)
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserMenuPermissions')
+BEGIN
+    CREATE TABLE dbo.UserMenuPermissions (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        UserId NVARCHAR(100) NOT NULL,
+        ModuleKey NVARCHAR(100) NOT NULL,
+        CanView BIT NOT NULL DEFAULT 0,
+        CanEdit BIT NOT NULL DEFAULT 0,
+        CanDelete BIT NOT NULL DEFAULT 0,
+        CanApprove BIT NOT NULL DEFAULT 0,
+        UpdatedAt DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
+        CONSTRAINT UQ_UserMenu UNIQUE (UserId, ModuleKey)
+    );
+END
+GO
+
 -- ============================================================================
 -- MASTER STORED PROCEDURE: dbo.sp_ticket_operations
 -- UPDATED WITH 12-CHAR STANDARDIZED PRIMARY KEY IDs:
@@ -385,35 +420,24 @@ BEGIN
             FROM dbo.Projects p
             LEFT JOIN dbo.Tenants t ON CONVERT(NVARCHAR(50), p.TenantId) = CONVERT(NVARCHAR(50), t.TenantId)
             WHERE (
-                -- 1. SuperAdmin / MD / Support / HR: see all projects, or filter by tenant if tenant specified
-                (LOWER(@v_PRole) IN ('superadmin', 'md', 'hrmanager', 'supportmanager', 'admin') AND (@v_PTenant = '' OR CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant))
-                -- 2. Project Manager: see projects they are assigned to
-                OR (LOWER(@v_PRole) = 'projectmanager' AND (
+                -- 1. SuperAdmin / MD: see all projects, or filter by tenant if tenant specified
+                (LOWER(@v_PRole) IN ('superadmin', 'md') AND (@v_PTenant = '' OR CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant))
+
+                -- 2. Client Admin without explicit project assignments: see all projects of their company
+                OR (LOWER(@v_PRole) = 'clientadmin' 
+                    AND NOT EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
+                    AND (@v_UserProject = '' OR @v_UserProject IS NULL)
+                    AND (
+                        (@v_PTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant)
+                        OR (@v_UserTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_UserTenant)
+                    ))
+
+                -- 3. All other users (ClientUser, TeamMember, ProjectManager, Engineer, or ANY user with assigned projects):
+                -- STRICTLY see ONLY their assigned project(s)!
+                OR (
                     CONVERT(NVARCHAR(50), p.ProjectId) IN (SELECT CONVERT(NVARCHAR(50), ProjectId) FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
                     OR CONVERT(NVARCHAR(50), p.ProjectId) = @v_UserProject
-                ))
-                -- 3. Team Member: strictly see projects they are assigned to
-                OR (LOWER(@v_PRole) = 'teammember' AND (
-                    CONVERT(NVARCHAR(50), p.ProjectId) IN (SELECT CONVERT(NVARCHAR(50), ProjectId) FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
-                    OR CONVERT(NVARCHAR(50), p.ProjectId) = @v_UserProject
-                ))
-                -- 4. Client Admin: see all projects belonging to their company/tenant!
-                OR (LOWER(@v_PRole) = 'clientadmin' AND (
-                    (@v_PTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant)
-                    OR (@v_UserTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_UserTenant)
-                ))
-                -- 5. Client User: ONLY see their assigned project! (Not every project of the tenant)
-                OR (LOWER(@v_PRole) = 'clientuser' AND (
-                    CONVERT(NVARCHAR(50), p.ProjectId) IN (SELECT CONVERT(NVARCHAR(50), ProjectId) FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
-                    OR CONVERT(NVARCHAR(50), p.ProjectId) = @v_UserProject
-                    OR (
-                        (@v_UserProject = '' OR @v_UserProject IS NULL)
-                        AND NOT EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
-                        AND (@v_UserTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_UserTenant)
-                    )
-                ))
-                -- 6. Universal fallback for unauthenticated / unscoped internal
-                OR (LOWER(@v_PRole) NOT IN ('clientadmin', 'clientuser', 'projectmanager', 'teammember') AND (@v_PTenant = '' OR CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant))
+                )
             )
             ORDER BY p.Name ASC
             FOR JSON PATH
@@ -516,6 +540,21 @@ BEGIN
     -- ========================================================================
     ELSE IF @ProcID = 'GET_PROJECT_MODULES'
     BEGIN
+        DECLARE @v_UserModAssigned TABLE (ModuleId NVARCHAR(50));
+        IF @parm04 <> '' AND LOWER(@parm05) NOT IN ('superadmin', 'md', 'supportmanager')
+        BEGIN
+            INSERT INTO @v_UserModAssigned (ModuleId)
+            SELECT DISTINCT CONVERT(NVARCHAR(50), ModuleId)
+            FROM dbo.ProjectMembers
+            WHERE (CONVERT(NVARCHAR(50), UserId) = @parm04 OR UserId IN (SELECT CONVERT(NVARCHAR(50), Id) FROM dbo.Users WHERE Username = @parm04))
+              AND ModuleId IS NOT NULL AND ModuleId <> ''
+            UNION
+            SELECT DISTINCT CONVERT(NVARCHAR(50), ModuleId)
+            FROM dbo.Users
+            WHERE (CONVERT(NVARCHAR(50), Id) = @parm04 OR Username = @parm04)
+              AND ModuleId IS NOT NULL AND ModuleId <> '';
+        END
+
         SET @v_JsonOut = (
             SELECT 
                 CONVERT(NVARCHAR(50), pm.ModuleId) AS module_id,
@@ -528,6 +567,10 @@ BEGIN
                 CAST(COALESCE(pm.IsActive, 1) AS BIT) AS is_active
             FROM dbo.ProjectModules pm
             WHERE (@parm01 = '' OR CONVERT(NVARCHAR(50), pm.ProjectId) = @parm01)
+              AND (
+                  NOT EXISTS (SELECT 1 FROM @v_UserModAssigned)
+                  OR CONVERT(NVARCHAR(50), pm.ModuleId) IN (SELECT ModuleId FROM @v_UserModAssigned)
+              )
             ORDER BY pm.Name ASC
             FOR JSON PATH
         );
@@ -2163,6 +2206,125 @@ BEGIN
         SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
     END
 
+    -- ========================================================================
+    -- 41. MANUAL_ATTENDANCE / SAVE_MANUAL_ATTENDANCE (HR Missed Punch Entry)
+    -- ========================================================================
+    ELSE IF @ProcID IN ('MANUAL_ATTENDANCE', 'SAVE_MANUAL_ATTENDANCE', 'HR_MANUAL_PUNCH')
+    BEGIN
+        DECLARE @v_ManDate DATE = COALESCE(TRY_CAST(@parm02 AS DATE), CAST(GETDATE() AS DATE));
+        DECLARE @v_ManEmpId NVARCHAR(50) = NULL;
+        DECLARE @v_ManUserId NVARCHAR(50) = NULL;
+        DECLARE @v_ManBranchId NVARCHAR(50) = NULL;
+
+        SELECT TOP 1 
+            @v_ManEmpId = CONVERT(NVARCHAR(50), e.Id),
+            @v_ManUserId = CONVERT(NVARCHAR(50), e.UserId),
+            @v_ManBranchId = CONVERT(NVARCHAR(50), e.BranchId)
+        FROM dbo.Employees e
+        WHERE CONVERT(NVARCHAR(50), e.Id) = @parm01;
+
+        IF @v_ManEmpId IS NULL
+        BEGIN
+            SELECT TOP 1 
+                @v_ManEmpId = CONVERT(NVARCHAR(50), e.Id),
+                @v_ManUserId = CONVERT(NVARCHAR(50), u.Id),
+                @v_ManBranchId = CONVERT(NVARCHAR(50), e.BranchId)
+            FROM dbo.Users u
+            LEFT JOIN dbo.Employees e ON CONVERT(NVARCHAR(50), e.UserId) = CONVERT(NVARCHAR(50), u.Id)
+            WHERE CONVERT(NVARCHAR(50), u.Id) = @parm01 
+               OR u.Username = @parm01 
+               OR u.Email = @parm01;
+        END
+
+        IF @v_ManEmpId IS NULL
+        BEGIN
+            SET @v_ManEmpId = @parm01;
+        END
+
+        IF @parm06 <> '' AND EXISTS (SELECT 1 FROM dbo.Branches WHERE CONVERT(NVARCHAR(50), Id) = @parm06)
+            SET @v_ManBranchId = @parm06;
+
+        -- Construct DATETIMEOFFSET for InTime & OutTime
+        DECLARE @v_InTimeVal DATETIMEOFFSET = NULL;
+        DECLARE @v_OutTimeVal DATETIMEOFFSET = NULL;
+
+        IF NULLIF(TRIM(@parm03), '') IS NOT NULL
+        BEGIN
+            SET @v_InTimeVal = TRY_CAST(CONVERT(VARCHAR(10), @v_ManDate, 120) + ' ' + TRIM(@parm03) AS DATETIMEOFFSET);
+            IF @v_InTimeVal IS NULL
+                SET @v_InTimeVal = TODATETIMEOFFSET(TRY_CAST(CONVERT(VARCHAR(10), @v_ManDate, 120) + ' ' + TRIM(@parm03) AS DATETIME2), '+06:00');
+        END
+
+        IF NULLIF(TRIM(@parm04), '') IS NOT NULL
+        BEGIN
+            SET @v_OutTimeVal = TRY_CAST(CONVERT(VARCHAR(10), @v_ManDate, 120) + ' ' + TRIM(@parm04) AS DATETIMEOFFSET);
+            IF @v_OutTimeVal IS NULL
+                SET @v_OutTimeVal = TODATETIMEOFFSET(TRY_CAST(CONVERT(VARCHAR(10), @v_ManDate, 120) + ' ' + TRIM(@parm04) AS DATETIME2), '+06:00');
+        END
+
+        DECLARE @v_ManStatus NVARCHAR(50) = COALESCE(NULLIF(TRIM(@parm07), ''), 'ON_TIME');
+        DECLARE @v_ManRemarks NVARCHAR(MAX) = COALESCE(NULLIF(TRIM(@parm08), ''), 'HR Manual Missed Punch');
+        DECLARE @v_ManHrUser NVARCHAR(100) = COALESCE(NULLIF(TRIM(@parm09), ''), NULLIF(TRIM(@UserId), ''), 'HRManager');
+        DECLARE @v_ManIsWfh BIT = CASE WHEN @parm05 = '1' THEN 1 ELSE 0 END;
+
+        -- Check if attendance record exists for this employee and date
+        DECLARE @v_ExistManAtt NVARCHAR(50) = NULL;
+        SELECT TOP 1 @v_ExistManAtt = CONVERT(NVARCHAR(50), Id)
+        FROM dbo.Attendances
+        WHERE AttendanceDate = @v_ManDate
+          AND (EmployeeId = @v_ManEmpId OR EmployeeId = @v_ManUserId OR EmployeeId = @parm01);
+
+        IF @v_ExistManAtt IS NOT NULL
+        BEGIN
+            UPDATE dbo.Attendances
+            SET InTime = COALESCE(@v_InTimeVal, InTime),
+                OutTime = COALESCE(@v_OutTimeVal, OutTime),
+                BranchId = COALESCE(@v_ManBranchId, BranchId),
+                IsWfh = @v_ManIsWfh,
+                Punctuality = @v_ManStatus,
+                InApprovalStatus = 'APPROVED',
+                OutApprovalStatus = CASE WHEN @v_OutTimeVal IS NOT NULL THEN 'APPROVED' ELSE OutApprovalStatus END,
+                InApprovedBy = @v_ManHrUser,
+                OutApprovedBy = CASE WHEN @v_OutTimeVal IS NOT NULL THEN @v_ManHrUser ELSE OutApprovedBy END,
+                ApprovalRemarks = @v_ManRemarks,
+                UpdatedAt = SYSDATETIMEOFFSET()
+            WHERE CONVERT(NVARCHAR(50), Id) = @v_ExistManAtt;
+
+            SET @v_GenKey = @v_ExistManAtt;
+        END
+        ELSE
+        BEGIN
+            -- Standard 12-char ID: A + YYMM + 7 digits (e.g. A26110000001)
+            DECLARE @v_AttYYMM_Man VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextAttSeq_Man BIGINT = 1;
+            SELECT @v_NextAttSeq_Man = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+            FROM dbo.Attendances WHERE Id LIKE 'A' + @v_AttYYMM_Man + '%';
+            SET @v_GenKey = 'A' + @v_AttYYMM_Man + RIGHT('0000000' + CAST(@v_NextAttSeq_Man AS VARCHAR(10)), 7);
+
+            INSERT INTO dbo.Attendances (
+                Id, EmployeeId, BranchId, AttendanceDate, InTime, OutTime, IsWfh,
+                Punctuality, InApprovalStatus, OutApprovalStatus,
+                InApprovedBy, OutApprovedBy, ApprovalRemarks, CreatedAt, UpdatedAt
+            )
+            VALUES (
+                @v_GenKey, @v_ManEmpId, @v_ManBranchId, @v_ManDate,
+                COALESCE(@v_InTimeVal, TODATETIMEOFFSET(TRY_CAST(CONVERT(VARCHAR(10), @v_ManDate, 120) + ' 09:30:00' AS DATETIME2), '+06:00')),
+                @v_OutTimeVal,
+                @v_ManIsWfh,
+                @v_ManStatus,
+                'APPROVED',
+                CASE WHEN @v_OutTimeVal IS NOT NULL THEN 'APPROVED' ELSE 'NOT_PUNCHED' END,
+                @v_ManHrUser,
+                CASE WHEN @v_OutTimeVal IS NOT NULL THEN @v_ManHrUser ELSE NULL END,
+                @v_ManRemarks,
+                SYSDATETIMEOFFSET(),
+                SYSDATETIMEOFFSET()
+            );
+        END
+
+        SELECT CAST(1 AS BIT) AS success, @v_GenKey AS attendance_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+    END
+
     ELSE
     BEGIN
         SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
@@ -2171,33 +2333,9 @@ END;
 GO
 
 -- ============================================================================
--- 2. PROCEDURE: dbo.sp_ticket_operations
+-- 2. PROCEDURE: dbo.sp_attendance_operations (CLEAN ROUTER - NO DUPLICATE PARAMS)
 -- ============================================================================
-CREATE OR ALTER PROCEDURE dbo.sp_ticket_operations
-    @p_ComCod NVARCHAR(100) = '', @p_ProcID NVARCHAR(100) = '', @p_ProcName NVARCHAR(100) = '',
-    @p_UserId NVARCHAR(100) = '', @p_UserCode NVARCHAR(100) = '', @p_UserName NVARCHAR(100) = '',
-    @p_Action NVARCHAR(100) = '', @p_parm00 NVARCHAR(MAX) = '', @p_parm01 NVARCHAR(MAX) = '',
-    @p_parm02 NVARCHAR(MAX) = '', @p_parm03 NVARCHAR(MAX) = '', @p_parm04 NVARCHAR(MAX) = '',
-    @p_parm05 NVARCHAR(MAX) = '', @p_parm06 NVARCHAR(MAX) = '', @p_parm07 NVARCHAR(MAX) = '',
-    @p_parm08 NVARCHAR(MAX) = '', @p_parm09 NVARCHAR(MAX) = '', @p_parm10 NVARCHAR(MAX) = '',
-    @p_parm11 NVARCHAR(MAX) = '', @p_parm12 NVARCHAR(MAX) = '', @p_parm13 NVARCHAR(MAX) = '',
-    @p_parm14 NVARCHAR(MAX) = '', @p_parm15 NVARCHAR(MAX) = '', @p_parm16 NVARCHAR(MAX) = '',
-    @p_parm17 NVARCHAR(MAX) = '', @p_parm18 NVARCHAR(MAX) = '', @p_parm19 NVARCHAR(MAX) = '',
-    @p_parm20 NVARCHAR(MAX) = '',
-    @p_Desc01 NVARCHAR(MAX) = '', @p_Desc02 NVARCHAR(MAX) = '', @p_Desc03 NVARCHAR(MAX) = '',
-    @p_Desc04 NVARCHAR(MAX) = '', @p_Desc05 NVARCHAR(MAX) = '', @p_Desc06 NVARCHAR(MAX) = '',
-    @p_Desc07 NVARCHAR(MAX) = '', @p_Desc08 NVARCHAR(MAX) = '', @p_Desc09 NVARCHAR(MAX) = '',
-    @p_Desc10 NVARCHAR(MAX) = '',
-    @p_parmJson1 NVARCHAR(MAX) = '', @p_parmJson2 NVARCHAR(MAX) = '', @p_parmJson3 NVARCHAR(MAX) = '',
-    @p_parmJson4 NVARCHAR(MAX) = '', @p_parmJson5 NVARCHAR(MAX) = '',
-    @p_Djson1 NVARCHAR(MAX) = '', @p_Djson2 NVARCHAR(MAX) = '', @p_Djson3 NVARCHAR(MAX) = '',
-    @p_Djson4 NVARCHAR(MAX) = '', @p_Djson5 NVARCHAR(MAX) = '',
-    @p_parmBin01 VARBINARY(MAX) = NULL, @p_parmBin02 VARBINARY(MAX) = NULL,
-    @p_Dbin01 VARBINARY(MAX) = NULL, @p_Dbin02 VARBINARY(MAX) = NULL,
-    @p_Dbin03 VARBINARY(MAX) = NULL, @p_Dbin04 VARBINARY(MAX) = NULL, @p_Dbin05 VARBINARY(MAX) = NULL,
-    @p_Dxml1 NVARCHAR(MAX) = '', @p_Dxml2 NVARCHAR(MAX) = '',
-    @p_Dnum01 DECIMAL(18,4) = 0, @p_Dnum02 DECIMAL(18,4) = 0,
-    @p_Ddate01 DATETIME = NULL, @p_Ddate02 DATETIME = NULL,
+CREATE OR ALTER PROCEDURE dbo.sp_attendance_operations
     @ComCod NVARCHAR(100) = '', @ProcID NVARCHAR(100) = '', @ProcName NVARCHAR(100) = '',
     @UserId NVARCHAR(100) = '', @UserCode NVARCHAR(100) = '', @UserName NVARCHAR(100) = '',
     @Action NVARCHAR(100) = '', @parm00 NVARCHAR(MAX) = '', @parm01 NVARCHAR(MAX) = '',
@@ -2214,39 +2352,11 @@ CREATE OR ALTER PROCEDURE dbo.sp_ticket_operations
     @Desc10 NVARCHAR(MAX) = '',
     @parmJson1 NVARCHAR(MAX) = '', @parmJson2 NVARCHAR(MAX) = '', @parmJson3 NVARCHAR(MAX) = '',
     @parmJson4 NVARCHAR(MAX) = '', @parmJson5 NVARCHAR(MAX) = '',
-    @Djson1 NVARCHAR(MAX) = '', @Djson2 NVARCHAR(MAX) = '', @Djson3 NVARCHAR(MAX) = '',
-    @Djson4 NVARCHAR(MAX) = '', @Djson5 NVARCHAR(MAX) = '',
-    @parmBin01 VARBINARY(MAX) = NULL, @parmBin02 VARBINARY(MAX) = NULL,
-    @Dbin01 VARBINARY(MAX) = NULL, @Dbin02 VARBINARY(MAX) = NULL,
-    @Dbin03 VARBINARY(MAX) = NULL, @Dbin04 VARBINARY(MAX) = NULL, @Dbin05 VARBINARY(MAX) = NULL,
-    @Dxml1 NVARCHAR(MAX) = '', @Dxml2 NVARCHAR(MAX) = '',
-    @Dnum01 DECIMAL(18,4) = 0, @Dnum02 DECIMAL(18,4) = 0,
-    @Ddate01 DATETIME = NULL, @Ddate02 DATETIME = NULL
+    @parmBin01 VARBINARY(MAX) = NULL, @parmBin02 VARBINARY(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
-
     EXEC dbo.sp_ticket_operations
-        @p_ComCod=@p_ComCod, @p_ProcID=@p_ProcID, @p_ProcName=@p_ProcName,
-        @p_UserId=@p_UserId, @p_UserCode=@p_UserCode, @p_UserName=@p_UserName,
-        @p_Action=@p_Action, @p_parm00=@p_parm00,
-        @p_parm01=@p_parm01, @p_parm02=@p_parm02, @p_parm03=@p_parm03, @p_parm04=@p_parm04,
-        @p_parm05=@p_parm05, @p_parm06=@p_parm06, @p_parm07=@p_parm07, @p_parm08=@p_parm08,
-        @p_parm09=@p_parm09, @p_parm10=@p_parm10, @p_parm11=@p_parm11, @p_parm12=@p_parm12,
-        @p_parm13=@p_parm13, @p_parm14=@p_parm14, @p_parm15=@p_parm15, @p_parm16=@p_parm16,
-        @p_parm17=@p_parm17, @p_parm18=@p_parm18, @p_parm19=@p_parm19, @p_parm20=@p_parm20,
-        @p_Desc01=@p_Desc01, @p_Desc02=@p_Desc02, @p_Desc03=@p_Desc03, @p_Desc04=@p_Desc04,
-        @p_Desc05=@p_Desc05, @p_Desc06=@p_Desc06, @p_Desc07=@p_Desc07, @p_Desc08=@p_Desc08,
-        @p_Desc09=@p_Desc09, @p_Desc10=@p_Desc10,
-        @p_parmJson1=@p_parmJson1, @p_parmJson2=@p_parmJson2, @p_parmJson3=@p_parmJson3,
-        @p_parmJson4=@p_parmJson4, @p_parmJson5=@p_parmJson5,
-        @p_Djson1=@p_Djson1, @p_Djson2=@p_Djson2, @p_Djson3=@p_Djson3,
-        @p_Djson4=@p_Djson4, @p_Djson5=@p_Djson5,
-        @p_parmBin01=@p_parmBin01, @p_parmBin02=@p_parmBin02,
-        @p_Dbin01=@p_Dbin01, @p_Dbin02=@p_Dbin02, @p_Dbin03=@p_Dbin03, @p_Dbin04=@p_Dbin04, @p_Dbin05=@p_Dbin05,
-        @p_Dxml1=@p_Dxml1, @p_Dxml2=@p_Dxml2,
-        @p_Dnum01=@p_Dnum01, @p_Dnum02=@p_Dnum02,
-        @p_Ddate01=@p_Ddate01, @p_Ddate02=@p_Ddate02,
         @ComCod=@ComCod, @ProcID=@ProcID, @ProcName=@ProcName,
         @UserId=@UserId, @UserCode=@UserCode, @UserName=@UserName,
         @Action=@Action, @parm00=@parm00,
@@ -2260,44 +2370,14 @@ BEGIN
         @Desc09=@Desc09, @Desc10=@Desc10,
         @parmJson1=@parmJson1, @parmJson2=@parmJson2, @parmJson3=@parmJson3,
         @parmJson4=@parmJson4, @parmJson5=@parmJson5,
-        @Djson1=@Djson1, @Djson2=@Djson2, @Djson3=@Djson3,
-        @Djson4=@Djson4, @Djson5=@Djson5,
-        @parmBin01=@parmBin01, @parmBin02=@parmBin02,
-        @Dbin01=@Dbin01, @Dbin02=@Dbin02, @Dbin03=@Dbin03, @Dbin04=@Dbin04, @Dbin05=@Dbin05,
-        @Dxml1=@Dxml1, @Dxml2=@Dxml2,
-        @Dnum01=@Dnum01, @Dnum02=@Dnum02,
-        @Ddate01=@Ddate01, @Ddate02=@Ddate02;
+        @parmBin01=@parmBin01, @parmBin02=@parmBin02;
 END;
 GO
 
 -- ============================================================================
--- 3. PROCEDURE: dbo.sp_permission_operations
+-- 3. PROCEDURE: dbo.sp_permission_operations (DYNAMIC MATRIX & MENUS)
 -- ============================================================================
 CREATE OR ALTER PROCEDURE dbo.sp_permission_operations
-    @p_ComCod NVARCHAR(100) = '', @p_ProcID NVARCHAR(100) = '', @p_ProcName NVARCHAR(100) = '',
-    @p_UserId NVARCHAR(100) = '', @p_UserCode NVARCHAR(100) = '', @p_UserName NVARCHAR(100) = '',
-    @p_Action NVARCHAR(100) = '', @p_parm00 NVARCHAR(MAX) = '', @p_parm01 NVARCHAR(MAX) = '',
-    @p_parm02 NVARCHAR(MAX) = '', @p_parm03 NVARCHAR(MAX) = '', @p_parm04 NVARCHAR(MAX) = '',
-    @p_parm05 NVARCHAR(MAX) = '', @p_parm06 NVARCHAR(MAX) = '', @p_parm07 NVARCHAR(MAX) = '',
-    @p_parm08 NVARCHAR(MAX) = '', @p_parm09 NVARCHAR(MAX) = '', @p_parm10 NVARCHAR(MAX) = '',
-    @p_parm11 NVARCHAR(MAX) = '', @p_parm12 NVARCHAR(MAX) = '', @p_parm13 NVARCHAR(MAX) = '',
-    @p_parm14 NVARCHAR(MAX) = '', @p_parm15 NVARCHAR(MAX) = '', @p_parm16 NVARCHAR(MAX) = '',
-    @p_parm17 NVARCHAR(MAX) = '', @p_parm18 NVARCHAR(MAX) = '', @p_parm19 NVARCHAR(MAX) = '',
-    @p_parm20 NVARCHAR(MAX) = '',
-    @p_Desc01 NVARCHAR(MAX) = '', @p_Desc02 NVARCHAR(MAX) = '', @p_Desc03 NVARCHAR(MAX) = '',
-    @p_Desc04 NVARCHAR(MAX) = '', @p_Desc05 NVARCHAR(MAX) = '', @p_Desc06 NVARCHAR(MAX) = '',
-    @p_Desc07 NVARCHAR(MAX) = '', @p_Desc08 NVARCHAR(MAX) = '', @p_Desc09 NVARCHAR(MAX) = '',
-    @p_Desc10 NVARCHAR(MAX) = '',
-    @p_parmJson1 NVARCHAR(MAX) = '', @p_parmJson2 NVARCHAR(MAX) = '', @p_parmJson3 NVARCHAR(MAX) = '',
-    @p_parmJson4 NVARCHAR(MAX) = '', @p_parmJson5 NVARCHAR(MAX) = '',
-    @p_Djson1 NVARCHAR(MAX) = '', @p_Djson2 NVARCHAR(MAX) = '', @p_Djson3 NVARCHAR(MAX) = '',
-    @p_Djson4 NVARCHAR(MAX) = '', @p_Djson5 NVARCHAR(MAX) = '',
-    @p_parmBin01 VARBINARY(MAX) = NULL, @p_parmBin02 VARBINARY(MAX) = NULL,
-    @p_Dbin01 VARBINARY(MAX) = NULL, @p_Dbin02 VARBINARY(MAX) = NULL,
-    @p_Dbin03 VARBINARY(MAX) = NULL, @p_Dbin04 VARBINARY(MAX) = NULL, @p_Dbin05 VARBINARY(MAX) = NULL,
-    @p_Dxml1 NVARCHAR(MAX) = '', @p_Dxml2 NVARCHAR(MAX) = '',
-    @p_Dnum01 DECIMAL(18,4) = 0, @p_Dnum02 DECIMAL(18,4) = 0,
-    @p_Ddate01 DATETIME = NULL, @p_Ddate02 DATETIME = NULL,
     @ComCod NVARCHAR(100) = '', @ProcID NVARCHAR(100) = '', @ProcName NVARCHAR(100) = '',
     @UserId NVARCHAR(100) = '', @UserCode NVARCHAR(100) = '', @UserName NVARCHAR(100) = '',
     @Action NVARCHAR(100) = '', @parm00 NVARCHAR(MAX) = '', @parm01 NVARCHAR(MAX) = '',
@@ -2314,25 +2394,17 @@ CREATE OR ALTER PROCEDURE dbo.sp_permission_operations
     @Desc10 NVARCHAR(MAX) = '',
     @parmJson1 NVARCHAR(MAX) = '', @parmJson2 NVARCHAR(MAX) = '', @parmJson3 NVARCHAR(MAX) = '',
     @parmJson4 NVARCHAR(MAX) = '', @parmJson5 NVARCHAR(MAX) = '',
-    @Djson1 NVARCHAR(MAX) = '', @Djson2 NVARCHAR(MAX) = '', @Djson3 NVARCHAR(MAX) = '',
-    @Djson4 NVARCHAR(MAX) = '', @Djson5 NVARCHAR(MAX) = '',
-    @parmBin01 VARBINARY(MAX) = NULL, @parmBin02 VARBINARY(MAX) = NULL,
-    @Dbin01 VARBINARY(MAX) = NULL, @Dbin02 VARBINARY(MAX) = NULL,
-    @Dbin03 VARBINARY(MAX) = NULL, @Dbin04 VARBINARY(MAX) = NULL, @Dbin05 VARBINARY(MAX) = NULL,
-    @Dxml1 NVARCHAR(MAX) = '', @Dxml2 NVARCHAR(MAX) = '',
-    @Dnum01 DECIMAL(18,4) = 0, @Dnum02 DECIMAL(18,4) = 0,
-    @Ddate01 DATETIME = NULL, @Ddate02 DATETIME = NULL
+    @parmBin01 VARBINARY(MAX) = NULL, @parmBin02 VARBINARY(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
-    IF @p_ProcID <> '' SET @ProcID = @p_ProcID;
-    ELSE IF @p_Action <> '' SET @ProcID = @p_Action;
-    ELSE IF @Action <> '' SET @ProcID = @Action;
+    IF @Action <> '' AND @ProcID = '' SET @ProcID = @Action;
 
+    -- 1. GET_ROLES
     IF @ProcID = 'GET_ROLES'
     BEGIN
-        DECLARE @v_JsonOut NVARCHAR(MAX);
-        SET @v_JsonOut = (
+        DECLARE @v_RolesJson NVARCHAR(MAX);
+        SET @v_RolesJson = (
             SELECT 
                 RoleKey AS [Key], 
                 RoleKey AS key_name, 
@@ -2345,7 +2417,150 @@ BEGIN
             ORDER BY RoleKey ASC 
             FOR JSON PATH
         );
-        SELECT COALESCE(@v_JsonOut, '[]') AS result_json;
+        SELECT COALESCE(@v_RolesJson, '[]') AS result_json;
+    END
+
+    -- 2. CREATE_ROLE
+    ELSE IF @ProcID = 'CREATE_ROLE'
+    BEGIN
+        DECLARE @v_NewKey NVARCHAR(100) = TRIM(@parm01);
+        DECLARE @v_NewName NVARCHAR(150) = TRIM(@parm02);
+        DECLARE @v_NewDesc NVARCHAR(MAX) = COALESCE(NULLIF(TRIM(@parm03), ''), '');
+
+        IF NOT EXISTS (SELECT 1 FROM dbo.Roles WHERE RoleKey = @v_NewKey)
+        BEGIN
+            INSERT INTO dbo.Roles (RoleKey, DisplayName, Description, IsSystem, CreatedAt)
+            VALUES (@v_NewKey, @v_NewName, @v_NewDesc, 0, SYSDATETIMEOFFSET());
+        END
+        SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+    END
+
+    -- 3. SAVE_ROLE_PERMISSIONS
+    ELSE IF @ProcID = 'SAVE_ROLE_PERMISSIONS'
+    BEGIN
+        DECLARE @v_SaveRoleKey NVARCHAR(100) = TRIM(@parm01);
+        IF @v_SaveRoleKey <> '' AND @parmJson1 <> '' AND ISJSON(@parmJson1) = 1
+        BEGIN
+            DELETE FROM dbo.RoleMenuPermissions WHERE RoleKey = @v_SaveRoleKey;
+
+            INSERT INTO dbo.RoleMenuPermissions (RoleKey, ModuleKey, CanView, CanEdit, CanDelete, CanApprove, UpdatedAt)
+            SELECT 
+                @v_SaveRoleKey,
+                JSON_VALUE(value, '$.ModuleKey'),
+                TRY_CAST(JSON_VALUE(value, '$.CanView') AS BIT),
+                TRY_CAST(JSON_VALUE(value, '$.CanEdit') AS BIT),
+                TRY_CAST(JSON_VALUE(value, '$.CanDelete') AS BIT),
+                TRY_CAST(JSON_VALUE(value, '$.CanApprove') AS BIT),
+                SYSDATETIMEOFFSET()
+            FROM OPENJSON(@parmJson1)
+            WHERE JSON_VALUE(value, '$.ModuleKey') IS NOT NULL;
+        END
+        SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+    END
+
+    -- 4. SAVE_USER_PERMISSIONS
+    ELSE IF @ProcID = 'SAVE_USER_PERMISSIONS'
+    BEGIN
+        DECLARE @v_SaveUserId NVARCHAR(100) = TRIM(@parm01);
+        IF @v_SaveUserId <> '' AND @parmJson1 <> '' AND ISJSON(@parmJson1) = 1
+        BEGIN
+            DELETE FROM dbo.UserMenuPermissions WHERE UserId = @v_SaveUserId;
+
+            INSERT INTO dbo.UserMenuPermissions (UserId, ModuleKey, CanView, CanEdit, CanDelete, CanApprove, UpdatedAt)
+            SELECT 
+                @v_SaveUserId,
+                JSON_VALUE(value, '$.ModuleKey'),
+                TRY_CAST(JSON_VALUE(value, '$.CanView') AS BIT),
+                TRY_CAST(JSON_VALUE(value, '$.CanEdit') AS BIT),
+                TRY_CAST(JSON_VALUE(value, '$.CanDelete') AS BIT),
+                TRY_CAST(JSON_VALUE(value, '$.CanApprove') AS BIT),
+                SYSDATETIMEOFFSET()
+            FROM OPENJSON(@parmJson1)
+            WHERE JSON_VALUE(value, '$.ModuleKey') IS NOT NULL;
+        END
+        SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+    END
+
+    -- 5. GET_ROLE_PERMISSIONS
+    ELSE IF @ProcID = 'GET_ROLE_PERMISSIONS'
+    BEGIN
+        DECLARE @v_GetRoleKey NVARCHAR(100) = TRIM(@parm01);
+        DECLARE @v_RolePermsJson NVARCHAR(MAX);
+        SET @v_RolePermsJson = (
+            SELECT 
+                ModuleKey,
+                ModuleKey AS module_key,
+                CanView,
+                CanEdit,
+                CanDelete,
+                CanApprove
+            FROM dbo.RoleMenuPermissions
+            WHERE RoleKey = @v_GetRoleKey
+            FOR JSON PATH
+        );
+        SELECT COALESCE(@v_RolePermsJson, '[]') AS result_json;
+    END
+
+    -- 6. GET_USER_PERMISSIONS
+    ELSE IF @ProcID = 'GET_USER_PERMISSIONS'
+    BEGIN
+        DECLARE @v_QueryUser NVARCHAR(100) = COALESCE(NULLIF(TRIM(@parm01), ''), NULLIF(TRIM(@UserId), ''), NULLIF(TRIM(@UserName), ''));
+        DECLARE @v_QueryRole NVARCHAR(100) = COALESCE(NULLIF(TRIM(@parm05), ''), '');
+        DECLARE @v_TargetUid NVARCHAR(100) = @v_QueryUser;
+
+        IF @v_QueryUser <> ''
+        BEGIN
+            SELECT TOP 1 
+                @v_TargetUid = CONVERT(NVARCHAR(50), Id),
+                @v_QueryRole = CASE WHEN @v_QueryRole = '' THEN COALESCE(Role, '') ELSE @v_QueryRole END
+            FROM dbo.Users
+            WHERE CONVERT(NVARCHAR(50), Id) = @v_QueryUser OR Username = @v_QueryUser OR Email = @v_QueryUser;
+        END
+
+        DECLARE @v_UserPermsJson NVARCHAR(MAX);
+
+        -- SuperAdmin and MD have full access to all menus
+        IF LOWER(@v_QueryRole) IN ('superadmin', 'md')
+        BEGIN
+            SET @v_UserPermsJson = (
+                SELECT 
+                    m.ModuleKey,
+                    m.ModuleKey AS module_key,
+                    CAST(1 AS BIT) AS CanView,
+                    CAST(1 AS BIT) AS CanEdit,
+                    CAST(1 AS BIT) AS CanDelete,
+                    CAST(1 AS BIT) AS CanApprove
+                FROM (VALUES 
+                    ('DASHBOARD'), ('CLIENTS'), ('USERS'), ('PROJECTS'), ('TICKETS'),
+                    ('TEAM_WORKLOAD'), ('ATTENDANCE_TERMINAL'), ('ATTENDANCE_APPROVALS'),
+                    ('OFFICE_HUBS'), ('OFFICE_TIMING'), ('LEAVES'), ('REPORTS'),
+                    ('NOTICES'), ('PERMISSIONS'), ('EXECUTIVE_REPORTS'), ('PAYROLL'),
+                    ('KPI'), ('RAISE_TICKET'), ('MY_TICKETS'), ('MY_TASKS'), ('COMPANY_USERS')
+                ) AS m(ModuleKey)
+                FOR JSON PATH
+            );
+        END
+        ELSE
+        BEGIN
+            -- Merged effective permissions: User override takes precedence over Role matrix
+            SET @v_UserPermsJson = (
+                SELECT 
+                    COALESCE(u.ModuleKey, r.ModuleKey) AS ModuleKey,
+                    COALESCE(u.ModuleKey, r.ModuleKey) AS module_key,
+                    COALESCE(u.CanView, r.CanView, 0) AS CanView,
+                    COALESCE(u.CanEdit, r.CanEdit, 0) AS CanEdit,
+                    COALESCE(u.CanDelete, r.CanDelete, 0) AS CanDelete,
+                    COALESCE(u.CanApprove, r.CanApprove, 0) AS CanApprove
+                FROM dbo.RoleMenuPermissions r
+                FULL OUTER JOIN (
+                    SELECT * FROM dbo.UserMenuPermissions WHERE UserId = @v_TargetUid
+                ) u ON r.ModuleKey = u.ModuleKey AND r.RoleKey = @v_QueryRole
+                WHERE r.RoleKey = @v_QueryRole OR u.UserId = @v_TargetUid
+                FOR JSON PATH
+            );
+        END
+
+        SELECT COALESCE(@v_UserPermsJson, '[]') AS result_json;
     END
     ELSE
     BEGIN

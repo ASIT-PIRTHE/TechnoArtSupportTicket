@@ -305,6 +305,7 @@
     {
         LoadDefaultMatrixForRole(selectedRoleKey);
         await LoadUsers();
+        await LoadSavedPermissionsForRole(selectedRoleKey);
     }
 
     private async Task LoadUsers()
@@ -357,28 +358,29 @@
         catch { }
     }
 
-    private void SetScope(string scope)
+    private async Task SetScope(string scope)
     {
         activeScope = scope;
         if (scope == "ROLE")
         {
-            SelectRole(selectedRoleKey);
+            await SelectRole(selectedRoleKey);
         }
         else
         {
-            SelectUser(selectedUserId);
+            await SelectUser(selectedUserId);
         }
     }
 
-    private void SelectRole(string roleKey)
+    private async Task SelectRole(string roleKey)
     {
         selectedRoleKey = roleKey;
         var r = roleList.FirstOrDefault(x => x.Key == roleKey);
         currentRoleTitle = r?.DisplayName ?? roleKey;
         LoadDefaultMatrixForRole(roleKey);
+        await LoadSavedPermissionsForRole(roleKey);
     }
 
-    private void SelectUser(string userId)
+    private async Task SelectUser(string userId)
     {
         selectedUserId = userId;
         var u = userList.FirstOrDefault(x => x.Id == userId);
@@ -387,7 +389,80 @@
             currentUserName = u.FullName;
             currentUserRole = u.Role;
             LoadDefaultMatrixForRole(u.Role);
+            await LoadSavedPermissionsForUser(userId);
         }
+    }
+
+    private async Task LoadSavedPermissionsForRole(string roleKey)
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_permission_operations",
+                ProcID = "GET_ROLE_PERMISSIONS",
+                parm01 = roleKey
+            };
+            var res = await BackendApi.FetchDataAsync(req);
+            MergeSavedPermissions(res);
+        }
+        catch { }
+    }
+
+    private async Task LoadSavedPermissionsForUser(string userId)
+    {
+        try
+        {
+            var req = new APIDataAccParms
+            {
+                ProcName = "sp_permission_operations",
+                ProcID = "GET_USER_PERMISSIONS",
+                parm01 = userId
+            };
+            var res = await BackendApi.FetchDataAsync(req);
+            MergeSavedPermissions(res);
+        }
+        catch { }
+    }
+
+    private void MergeSavedPermissions(JsonElement? res)
+    {
+        var el = Unwrap(res);
+        if (!el.HasValue || el.Value.ValueKind != JsonValueKind.Array) return;
+        foreach (var item in el.Value.EnumerateArray())
+        {
+            var mk = item.TryGetProperty("ModuleKey", out var p1) ? p1.GetString() : (item.TryGetProperty("module_key", out var p2) ? p2.GetString() : "");
+            if (string.IsNullOrEmpty(mk)) continue;
+            var target = activePermissions.FirstOrDefault(x => string.Equals(x.ModuleKey, mk, StringComparison.OrdinalIgnoreCase));
+            if (target != null)
+            {
+                if (item.TryGetProperty("CanView", out var cv)) target.CanView = cv.ValueKind == JsonValueKind.True || (cv.ValueKind == JsonValueKind.Number && cv.GetInt32() == 1) || (cv.ValueKind == JsonValueKind.String && cv.GetString() == "1");
+                if (item.TryGetProperty("CanEdit", out var ce)) target.CanEdit = ce.ValueKind == JsonValueKind.True || (ce.ValueKind == JsonValueKind.Number && ce.GetInt32() == 1) || (ce.ValueKind == JsonValueKind.String && ce.GetString() == "1");
+                if (item.TryGetProperty("CanDelete", out var cd)) target.CanDelete = cd.ValueKind == JsonValueKind.True || (cd.ValueKind == JsonValueKind.Number && cd.GetInt32() == 1) || (cd.ValueKind == JsonValueKind.String && cd.GetString() == "1");
+                if (item.TryGetProperty("CanApprove", out var ca)) target.CanApprove = ca.ValueKind == JsonValueKind.True || (ca.ValueKind == JsonValueKind.Number && ca.GetInt32() == 1) || (ca.ValueKind == JsonValueKind.String && ca.GetString() == "1");
+            }
+        }
+        StateHasChanged();
+    }
+
+    private static JsonElement? Unwrap(JsonElement? res)
+    {
+        if (!res.HasValue) return null;
+        var el = res.Value;
+        if (el.ValueKind == JsonValueKind.Array && el.GetArrayLength() > 0
+            && el[0].ValueKind == JsonValueKind.Object && el[0].TryGetProperty("result_json", out var first))
+            el = first;
+        else if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty("result_json", out var obj))
+            el = obj;
+
+        if (el.ValueKind == JsonValueKind.String)
+        {
+            var s = el.GetString();
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            using var doc = JsonDocument.Parse(s);
+            return doc.RootElement.Clone();
+        }
+        return el;
     }
 
     private void LoadDefaultMatrixForRole(string roleKey)
@@ -398,7 +473,11 @@
         activePermissions = new List<ModulePermissionEntry>
         {
             new ModulePermissionEntry { ModuleKey = "DASHBOARD", ModuleName = "Executive Command Dashboard", Description = "Live support metrics, uptime gauges, and active agents", Icon = "bi-grid-1x2", CanView = true, CanEdit = isSuper, CanDelete = false, CanApprove = false },
+            new ModulePermissionEntry { ModuleKey = "CLIENTS", ModuleName = "Clients & Tenants", Description = "Tenant company management and client organizations", Icon = "bi-building", CanView = isSuper, CanEdit = isSuper, CanDelete = isSuper, CanApprove = isSuper },
+            new ModulePermissionEntry { ModuleKey = "USERS", ModuleName = "User Management & Employees", Description = "Manage internal staff, project rosters, and client users", Icon = "bi-people", CanView = (isSuper || isManager || roleKey == "ProjectManager"), CanEdit = (isSuper || isManager), CanDelete = isSuper, CanApprove = isSuper },
+            new ModulePermissionEntry { ModuleKey = "PROJECTS", ModuleName = "Projects & Modules", Description = "Projects, software modules (HRM, Payroll, CPF), and teams", Icon = "bi-kanban", CanView = (isSuper || isManager || roleKey == "ProjectManager" || roleKey == "ClientAdmin" || roleKey == "ClientUser"), CanEdit = (isSuper || roleKey == "ProjectManager"), CanDelete = isSuper, CanApprove = isSuper },
             new ModulePermissionEntry { ModuleKey = "TICKETS", ModuleName = "Support Desk & Ticket Queue", Description = "Raise, assign, reply, and resolve client tickets", Icon = "bi-inboxes", CanView = true, CanEdit = true, CanDelete = isSuper, CanApprove = (isSuper || isManager) },
+            new ModulePermissionEntry { ModuleKey = "TEAM_WORKLOAD", ModuleName = "Team Workload & Assignments", Description = "Active workload, task distribution, and agent capacity", Icon = "bi-person-lines-fill", CanView = (isSuper || isManager || roleKey == "ProjectManager"), CanEdit = (isSuper || roleKey == "ProjectManager"), CanDelete = isSuper, CanApprove = isSuper },
             new ModulePermissionEntry { ModuleKey = "ATTENDANCE_TERMINAL", ModuleName = "Attendance Clock-In Terminal", Description = "GPS Geolocation verified In/Out punch and WFH mode", Icon = "bi-fingerprint", CanView = true, CanEdit = true, CanDelete = false, CanApprove = false },
             new ModulePermissionEntry { ModuleKey = "ATTENDANCE_APPROVALS", ModuleName = "Attendance Dual HR Approvals", Description = "Review and approve employee In-Time and Out-Time punches", Icon = "bi-calendar-check", CanView = (isSuper || isManager), CanEdit = (isSuper || isManager), CanDelete = isSuper, CanApprove = (isSuper || isManager) },
             new ModulePermissionEntry { ModuleKey = "OFFICE_HUBS", ModuleName = "Office Hubs & Geofence Zones", Description = "Define branch coordinates and allowed radius meters", Icon = "bi-geo-alt", CanView = isSuper, CanEdit = isSuper, CanDelete = isSuper, CanApprove = isSuper },
@@ -407,6 +486,7 @@
             new ModulePermissionEntry { ModuleKey = "REPORTS", ModuleName = "Attendance Analytics & Logs", Description = "Daily rosters, monthly attendance summaries, and CSV exports", Icon = "bi-file-earmark-bar-graph", CanView = (isSuper || isManager), CanEdit = false, CanDelete = false, CanApprove = false },
             new ModulePermissionEntry { ModuleKey = "NOTICES", ModuleName = "Company Notice Board", Description = "Post corporate announcements and policy circulars", Icon = "bi-megaphone", CanView = true, CanEdit = (isSuper || isManager), CanDelete = isSuper, CanApprove = isSuper },
             new ModulePermissionEntry { ModuleKey = "PERMISSIONS", ModuleName = "Role & Permission Security", Description = "Dynamic role configuration and menu access rules", Icon = "bi-shield-lock", CanView = isSuper, CanEdit = isSuper, CanDelete = isSuper, CanApprove = isSuper },
+            new ModulePermissionEntry { ModuleKey = "EXECUTIVE_REPORTS", ModuleName = "Executive Reports & Audit", Description = "Company-wide executive reports and SLA audits", Icon = "bi-bar-chart", CanView = isSuper, CanEdit = isSuper, CanDelete = isSuper, CanApprove = isSuper },
             new ModulePermissionEntry { ModuleKey = "PAYROLL", ModuleName = "Monthly Payroll & Salary", Description = "Automated salary calculation with late deduction rules", Icon = "bi-cash-coin", CanView = (isSuper || roleKey == "AccountsOfficer"), CanEdit = (isSuper || roleKey == "AccountsOfficer"), CanDelete = isSuper, CanApprove = isSuper },
             new ModulePermissionEntry { ModuleKey = "KPI", ModuleName = "KPI & Performance Reviews", Description = "Staff evaluation goals, weights, and monthly scores", Icon = "bi-graph-up-arrow", CanView = (isSuper || isManager), CanEdit = (isSuper || isManager), CanDelete = isSuper, CanApprove = isSuper }
         };
