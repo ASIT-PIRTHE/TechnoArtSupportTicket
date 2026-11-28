@@ -1,5 +1,5 @@
 @page "/attendance/reports"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "SuperAdmin,Admin,MD,HRManager,AccountsOfficer,ProjectManager")]
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
 @using System.Text
@@ -320,7 +320,7 @@
         {
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "GET_ATTENDANCE_EMPLOYEES",
                 parm05 = currentUser
             };
@@ -355,7 +355,7 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "GET_ATTENDANCE_REPORT",
                 parm01 = activeTab,
                 parm02 = from.ToString("yyyy-MM-dd"),

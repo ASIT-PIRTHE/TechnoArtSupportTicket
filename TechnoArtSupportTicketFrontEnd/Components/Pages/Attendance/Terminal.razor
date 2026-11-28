@@ -358,7 +358,6 @@
                 userLat = loc.Latitude;
                 userLong = loc.Longitude;
 
-                // Calculate distance via JS interop or local formula
                 userDistance = await JS.InvokeAsync<double>("calculateHaversineDistance", userLat, userLong, branchLat, branchLong);
                 isWithinRadius = userDistance <= branchRadius;
 
@@ -400,54 +399,65 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "GET_TODAY_ATTENDANCE",
                 parm01 = username,
                 parm02 = DateTime.Today.ToString("yyyy-MM-dd")
             };
 
-            // var res = await BackendApi.FetchDataAsync(req);
-            // if (res.HasValue)
-            // {
-            //     var target = res.Value;
-            //     if (target.ValueKind == JsonValueKind.Array && target.GetArrayLength() > 0) target = target[0];
-            //     if (target.ValueKind == JsonValueKind.Object)
-            //     {
-            //         if (target.TryGetProperty("in_time", out var inProp) && inProp.GetString() != null)
-            //         {
-            //             var rawIn = inProp.GetString();
-            //             if (DateTime.TryParse(rawIn, out var parsedIn)) todayInTime = parsedIn.ToString("hh:mm tt");
-            //             else todayInTime = rawIn;
-            //         }
-            //         if (target.TryGetProperty("out_time", out var outProp) && outProp.GetString() != null)
-            //         {
-            //             var rawOut = outProp.GetString();
-            //             if (DateTime.TryParse(rawOut, out var parsedOut)) todayOutTime = parsedOut.ToString("hh:mm tt");
-            //             else todayOutTime = rawOut;
-            //         }
-            //         if (target.TryGetProperty("in_approval_status", out var inApp))
-            //         {
-            //             inApprovalStatus = inApp.GetString() ?? "PENDING";
-            //         }
-            //         if (target.TryGetProperty("out_approval_status", out var outApp))
-            //         {
-            //             outApprovalStatus = outApp.GetString() ?? "PENDING";
-            //         }
-            //     }
-            // }
-            
-            // b) check the result instead of assuming success (both handlers)
             var res = await BackendApi.FetchDataAsync(req);
             if (res.HasValue)
             {
-                var r = res.Value;
-                if (r.ValueKind == JsonValueKind.Array && r.GetArrayLength() > 0) r = r[0];
-                if (r.ValueKind == JsonValueKind.Object &&
-                    r.TryGetProperty("success", out var ok) && ok.ValueKind == JsonValueKind.False)
+                var target = res.Value;
+                if (target.ValueKind == JsonValueKind.Array && target.GetArrayLength() > 0) target = target[0];
+                if (target.ValueKind == JsonValueKind.Object && target.TryGetProperty("result_json", out var rj))
                 {
-                    statusMessage = r.TryGetProperty("message", out var m) ? m.GetString() : "Request rejected.";
-                    isSuccess = false;
-                    return;   // finally{} still resets isPunching
+                    if (rj.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(rj.GetString()))
+                    {
+                        using var doc = JsonDocument.Parse(rj.GetString()!);
+                        target = doc.RootElement.Clone();
+                        if (target.ValueKind == JsonValueKind.Array && target.GetArrayLength() > 0) target = target[0];
+                    }
+                }
+
+                if (target.ValueKind == JsonValueKind.Object)
+                {
+                    if (target.TryGetProperty("in_time", out var inProp) && inProp.GetString() != null)
+                    {
+                        var rawIn = inProp.GetString();
+                        if (DateTime.TryParse(rawIn, out var parsedIn)) todayInTime = parsedIn.ToString("hh:mm tt");
+                        else todayInTime = rawIn;
+                    }
+                    if (target.TryGetProperty("out_time", out var outProp) && outProp.GetString() != null)
+                    {
+                        var rawOut = outProp.GetString();
+                        if (DateTime.TryParse(rawOut, out var parsedOut)) todayOutTime = parsedOut.ToString("hh:mm tt");
+                        else todayOutTime = rawOut;
+                    }
+                    if (target.TryGetProperty("in_approval_status", out var inApp))
+                    {
+                        inApprovalStatus = inApp.GetString() ?? "PENDING";
+                    }
+                    if (target.TryGetProperty("out_approval_status", out var outApp))
+                    {
+                        outApprovalStatus = outApp.GetString() ?? "PENDING";
+                    }
+                    if (target.TryGetProperty("is_wfh", out var wfhProp))
+                    {
+                        isWfh = wfhProp.ValueKind == JsonValueKind.True || (wfhProp.ValueKind == JsonValueKind.Number && wfhProp.GetInt32() == 1);
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(todayInTime) && todayInTime != "--:--" && !string.IsNullOrEmpty(todayOutTime) && todayOutTime != "--:--")
+            {
+                if (DateTime.TryParse(todayInTime, out var tIn) && DateTime.TryParse(todayOutTime, out var tOut))
+                {
+                    var span = tOut - tIn;
+                    if (span.TotalMinutes > 0)
+                    {
+                        calculatedHours = $"{(int)span.TotalHours}h {span.Minutes}m";
+                    }
                 }
             }
 
@@ -488,12 +498,12 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "CHECK_IN",
                 parm01 = username,
                 parm02 = DateTime.UtcNow.ToString("o"),
-                parm03 = userLat.ToString(),
-                parm04 = userLong.ToString(),
+                parm03 = userLat.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                parm04 = userLong.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 parm05 = isWfh ? "1" : "0"
             };
 
@@ -525,12 +535,12 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "CHECK_OUT",
                 parm01 = username,
                 parm02 = DateTime.UtcNow.ToString("o"),
-                parm03 = userLat.ToString(),
-                parm04 = userLong.ToString()
+                parm03 = userLat.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                parm04 = userLong.ToString(System.Globalization.CultureInfo.InvariantCulture)
             };
 
             var res = await BackendApi.FetchDataAsync(req);

@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
 @using System.Text.Json
-@attribute [Authorize(Roles = "SuperAdmin,MD,SupportManager")]
+@attribute [Authorize(Roles = "SuperAdmin,Admin,MD,HRManager,SupportManager,AccountsOfficer")]
 @inject ApiService BackendApi
 @inject IJSRuntime JS
 
@@ -295,7 +295,7 @@
             // Fallback if needed
             if (!res.HasValue || (res.Value.ValueKind == JsonValueKind.Object && res.Value.TryGetProperty("error", out _)))
             {
-                req.ProcName = "sp_attendance_operations";
+                req.ProcName = "sp_ticket_operations";
                 res = await BackendApi.FetchDataAsync(req);
             }
 

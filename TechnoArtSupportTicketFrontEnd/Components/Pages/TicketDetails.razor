@@ -226,12 +226,17 @@ else
                         <div class="d-flex gap-1">
                             <select class="form-select form-select-sm" @bind="selectedNewPmId">
                                 <option value="">-- Choose Member --</option>
-                                @foreach (var m in teamMembers)
+                                @foreach (var m in teamMembers.Where(m => { var role = GetPropString(m, "role", "Role")?.Trim();
+                                return !string.Equals(role, "ClientUser", StringComparison.OrdinalIgnoreCase) && !string.Equals(role, "ClientAdmin", StringComparison.OrdinalIgnoreCase); }))
                                 {
                                     var uid = GetPropString(m, "user_id", "id", "UserId");
                                     var unm = GetPropString(m, "full_name", "name", "FullName", "Name");
-                                    if (string.IsNullOrEmpty(unm)) unm = GetPropString(m, "username", "userName", "email");
+
+                                    if (string.IsNullOrEmpty(unm))
+                                        unm = GetPropString(m, "username", "userName", "email");
+
                                     var urole = GetPropString(m, "role", "Role");
+
                                     <option value="@uid">@unm (@urole)</option>
                                 }
                             </select>
@@ -288,7 +293,11 @@ else
                                 <label class="form-label small fw-semibold text-muted">Assign To</label>
                                 <select class="form-select form-select-sm" @bind="newTaskAssignee">
                                     <option value="">-- Select Member --</option>
-                                    @foreach(var member in teamMembers)
+                                    @foreach (var member in teamMembers.Where(m =>
+                                    {
+                                        var role = GetPropString(m, "role", "Role")?.Trim();
+                                        return !string.Equals(role, "ClientUser", StringComparison.OrdinalIgnoreCase) && !string.Equals(role, "ClientAdmin", StringComparison.OrdinalIgnoreCase);
+                                    }))
                                     {
                                         var mUid = GetPropString(member, "user_id", "id", "UserId");
                                         var mName = GetPropString(member, "full_name", "name", "FullName", "Name");

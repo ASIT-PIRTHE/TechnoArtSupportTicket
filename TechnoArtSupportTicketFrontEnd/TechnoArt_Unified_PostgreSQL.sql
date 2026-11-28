@@ -627,9 +627,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================================
--- 9. ATTENDANCE & HRM STORED PROCEDURE: sp_attendance_operations (POSTGRESQL)
+-- 9. ATTENDANCE & HRM STORED PROCEDURE: sp_ticket_operations (POSTGRESQL)
 -- ============================================================================
-CREATE OR REPLACE FUNCTION sp_attendance_operations(
+CREATE OR REPLACE FUNCTION sp_ticket_operations(
     p_com_cod VARCHAR DEFAULT '',
     p_proc_id VARCHAR DEFAULT '',
     p_parm01 VARCHAR DEFAULT '',
@@ -854,7 +854,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION support.sp_attendance_operations(
+CREATE OR REPLACE FUNCTION support.sp_ticket_operations(
     p_com_cod VARCHAR DEFAULT '', p_proc_id VARCHAR DEFAULT '', p_parm01 VARCHAR DEFAULT '',
     p_parm02 VARCHAR DEFAULT '', p_parm03 VARCHAR DEFAULT '', p_parm04 VARCHAR DEFAULT '',
     p_parm05 VARCHAR DEFAULT '', p_parm06 TEXT DEFAULT '', p_parm07 VARCHAR DEFAULT '',
@@ -862,6 +862,6 @@ CREATE OR REPLACE FUNCTION support.sp_attendance_operations(
     p_parm_json1 JSONB DEFAULT NULL, p_parm_json2 JSONB DEFAULT NULL
 ) RETURNS JSONB AS $$
 BEGIN
-    RETURN sp_attendance_operations(p_com_cod, p_proc_id, p_parm01, p_parm02, p_parm03, p_parm04, p_parm05, p_parm06, p_parm07, p_parm08, p_parm09, p_parm10, p_parm_json1, p_parm_json2);
+    RETURN sp_ticket_operations(p_com_cod, p_proc_id, p_parm01, p_parm02, p_parm03, p_parm04, p_parm05, p_parm06, p_parm07, p_parm08, p_parm09, p_parm10, p_parm_json1, p_parm_json2);
 END;
 $$ LANGUAGE plpgsql;

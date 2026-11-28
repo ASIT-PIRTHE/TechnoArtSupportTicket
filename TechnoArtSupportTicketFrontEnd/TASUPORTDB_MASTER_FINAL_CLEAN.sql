@@ -97,7 +97,7 @@ IF OBJECT_ID('dbo.sp_attendance_checkout', 'P') IS NOT NULL DROP PROCEDURE dbo.s
 IF OBJECT_ID('dbo.sp_ticket_files', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_ticket_files;
 IF OBJECT_ID('dbo.sp_user_operations', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_user_operations;
 IF OBJECT_ID('dbo.sp_ticket_operations', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_ticket_operations;
-IF OBJECT_ID('dbo.sp_attendance_operations', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_attendance_operations;
+IF OBJECT_ID('dbo.sp_ticket_operations', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_ticket_operations;
 IF OBJECT_ID('dbo.sp_permission_operations', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_permission_operations;
 
 IF OBJECT_ID('support.sp_admin_approve_attendance', 'P') IS NOT NULL DROP PROCEDURE support.sp_admin_approve_attendance;
@@ -107,7 +107,7 @@ IF OBJECT_ID('support.sp_ticket_files', 'P') IS NOT NULL DROP PROCEDURE support.
 IF OBJECT_ID('support.sp_user_operations', 'P') IS NOT NULL DROP PROCEDURE support.sp_user_operations;
 IF OBJECT_ID('support.SP_TICKET_OPERATIONS', 'P') IS NOT NULL DROP PROCEDURE support.SP_TICKET_OPERATIONS;
 IF OBJECT_ID('support.sp_ticket_operations', 'P') IS NOT NULL DROP PROCEDURE support.sp_ticket_operations;
-IF OBJECT_ID('support.sp_attendance_operations', 'P') IS NOT NULL DROP PROCEDURE support.sp_attendance_operations;
+IF OBJECT_ID('support.sp_ticket_operations', 'P') IS NOT NULL DROP PROCEDURE support.sp_ticket_operations;
 IF OBJECT_ID('support.sp_permission_operations', 'P') IS NOT NULL DROP PROCEDURE support.sp_permission_operations;
 
 IF OBJECT_ID('auth.sp_ticket_operations', 'P') IS NOT NULL DROP PROCEDURE auth.sp_ticket_operations;
@@ -381,90 +381,95 @@ INSERT INTO dbo.Tenants (TenantId, Code, Name, LogoUrl, CompanyCode, IsActive) V
 ('T002', 'SQUARE', 'Square Pharmaceuticals Ltd', 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=100', 'SQUARE', 1),
 ('T003', 'BEXIMCO', 'Beximco Group', 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=100', 'BEXIMCO', 1);
 
--- 3. Projects
+-- 3. Projects (Standard 12-char ID: P26110000001)
 INSERT INTO dbo.Projects (ProjectId, TenantId, Code, Name, Description, IsActive) VALUES
-('P001', 'T001', 'TSOM', 'TAS Support Operations Manager', 'Central ticketing, internal workflows and workforce intelligence engine.', 1),
-('P002', 'T002', 'SPH-ERP', 'Square Enterprise Resource Planning', 'Pharmaceutical logistics, supply chain and warehouse automation system.', 1),
-('P003', 'T003', 'BEX-HRMS', 'Beximco Human Capital System', 'Enterprise HRMS, compliance, payroll and shifts tracking portal.', 1);
+('P26110000001', 'T001', 'TSOM', 'TAS Support Operations Manager', 'Central ticketing, internal workflows and workforce intelligence engine.', 1),
+('P26110000002', 'T002', 'SPH-ERP', 'Square Enterprise Resource Planning', 'Pharmaceutical logistics, supply chain and warehouse automation system.', 1),
+('P26110000003', 'T003', 'BEX-HRMS', 'Beximco Human Capital System', 'Enterprise HRMS, compliance, payroll and shifts tracking portal.', 1);
 
--- 4. Project Modules
+-- 4. Project Modules (Standard 12-char ID: M26110000001)
 INSERT INTO dbo.ProjectModules (ModuleId, ProjectId, Code, Name, ModuleName, Description, IsActive) VALUES
-('MOD-01', 'P001', 'TICKETING', 'Ticketing Engine', 'Ticketing Engine', 'Core customer support lifecycle', 1),
-('MOD-02', 'P001', 'ATTENDANCE', 'Attendance & Leaves', 'Attendance & Leaves', 'Geofenced punch and leave approvals', 1),
-('MOD-03', 'P001', 'SECURITY', 'User Access Control', 'User Access Control', 'Multi-tenant RBAC and permissions', 1),
-('MOD-04', 'P002', 'INVENTORY', 'Inventory & Supply', 'Inventory & Supply', 'Warehouse drug batch tracking', 1),
-('MOD-05', 'P002', 'BILLING', 'Financials & Billing', 'Financials & Billing', 'Sales, invoicing and revenue ledger', 1),
-('MOD-06', 'P003', 'PAYROLL', 'Payroll & Compensation', 'Payroll & Compensation', 'Automated salary and deduction engine', 1),
-('MOD-07', 'P003', 'PORTAL', 'Self-Service Portal', 'Self-Service Portal', 'Employee portal and claims processing', 1);
+('M26110000001', 'P26110000001', 'TICKETING', 'Ticketing Engine', 'Ticketing Engine', 'Core customer support lifecycle', 1),
+('M26110000002', 'P26110000001', 'ATTENDANCE', 'Attendance & Leaves', 'Attendance & Leaves', 'Geofenced punch and leave approvals', 1),
+('M26110000003', 'P26110000001', 'SECURITY', 'User Access Control', 'User Access Control', 'Multi-tenant RBAC and permissions', 1),
+('M26110000004', 'P26110000002', 'INVENTORY', 'Inventory & Supply', 'Inventory & Supply', 'Warehouse drug batch tracking', 1),
+('M26110000005', 'P26110000002', 'BILLING', 'Financials & Billing', 'Financials & Billing', 'Sales, invoicing and revenue ledger', 1),
+('M26110000006', 'P26110000003', 'PAYROLL', 'Payroll & Compensation', 'Payroll & Compensation', 'Automated salary and deduction engine', 1),
+('M26110000007', 'P26110000003', 'PORTAL', 'Self-Service Portal', 'Self-Service Portal', 'Employee portal and claims processing', 1);
 
--- 5. Branches
+-- 5. Branches (Standard 12-char ID: B26110000001)
 INSERT INTO dbo.Branches (Id, Name, Latitude, Longitude, RadiusMeters, Radius, Address, IsActive) VALUES
-('B001', 'Head Office - Gulshan, Dhaka', 23.7925, 90.4078, 150, 150, 'Road 11, Block D, Gulshan-1, Dhaka-1212', 1),
-('B002', 'Operations Center - Banani, Dhaka', 23.7937, 90.4066, 150, 150, 'Plot 45, Kemal Ataturk Avenue, Banani, Dhaka', 1),
-('B003', 'Chittagong Regional Hub', 22.3255, 91.8155, 200, 200, 'Agrabad Commercial Area, Chittagong', 1);
+('B26110000001', 'Head Office - Gulshan, Dhaka', 23.7925, 90.4078, 150, 150, 'Road 11, Block D, Gulshan-1, Dhaka-1212', 1),
+('B26110000002', 'Operations Center - Banani, Dhaka', 23.7937, 90.4066, 150, 150, 'Plot 45, Kemal Ataturk Avenue, Banani, Dhaka', 1),
+('B26110000003', 'Chittagong Regional Hub', 22.3255, 91.8155, 200, 200, 'Agrabad Commercial Area, Chittagong', 1);
 
--- 6. Users (All initial accounts have password 'admin123')
-INSERT INTO dbo.Users (Id, Username, Email, Password, PasswordHash, Name, Phone, Role, TenantId, ProjectId, ModuleId, BloodGroup, NationalId, Status, IsActive) VALUES
-('U001', 'admin', 'admin@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Super Administrator', '+8801711000001', 'SuperAdmin', 'T001', 'P001', 'MOD-01', 'O+', '19902692010001', 'ACTIVE', 1),
-('U002', 'md', 'md@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Managing Director (MD)', '+8801711000002', 'MD', 'T001', 'P001', 'MOD-01', 'A+', '19852692010002', 'ACTIVE', 1),
-('U003', 'hr', 'hr@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Farhana Yasmin (HR Lead)', '+8801711000003', 'HRManager', 'T001', 'P001', 'MOD-02', 'B+', '19922692010003', 'ACTIVE', 1),
-('U004', 'support', 'support@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Kamrul Islam (Support Lead)', '+8801711000004', 'SupportManager', 'T001', 'P001', 'MOD-01', 'AB+', '19932692010004', 'ACTIVE', 1),
-('U005', 'pm', 'pm@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Tanvir Ahmed (Project Manager)', '+8801711000005', 'ProjectManager', 'T001', 'P001', 'MOD-01', 'B+', '19912692010005', 'ACTIVE', 1),
-('U006', 'engineer', 'engineer@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Rakib Hassan (Lead Dev)', '+8801711000006', 'TeamMember', 'T001', 'P001', 'MOD-01', 'O+', '19952692010006', 'ACTIVE', 1),
-('U007', 'qa', 'qa@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Sadia Sultana (QA Lead)', '+8801711000007', 'TeamMember', 'T001', 'P001', 'MOD-01', 'A+', '19962692010007', 'ACTIVE', 1),
-('U008', 'clientadmin', 'clientadmin@square.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Square IT Administrator', '+8801711000008', 'ClientAdmin', 'T002', 'P002', 'MOD-04', 'B+', '19882692010008', 'ACTIVE', 1),
-('U009', 'clientuser', 'operator@square.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Square Operations User', '+8801711000009', 'ClientUser', 'T002', 'P002', 'MOD-04', 'O+', '19942692010009', 'ACTIVE', 1);
+-- 6. Users (Standard 12-char ID: U26110000001, All initial accounts have password 'admin123')
+INSERT INTO dbo.Users (Id, UserId, UserCode, Username, Email, Password, PasswordHash, Name, Phone, Role, TenantId, ProjectId, ModuleId, BloodGroup, NationalId, Status, IsActive) VALUES
+('U26110000001', 'U26110000001', 'admin', 'admin', 'admin@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Super Administrator', '+8801711000001', 'SuperAdmin', 'T001', 'P26110000001', 'M26110000001', 'O+', '19902692010001', 'ACTIVE', 1),
+('U26110000002', 'U26110000002', 'md', 'md', 'md@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Managing Director (MD)', '+8801711000002', 'MD', 'T001', 'P26110000001', 'M26110000001', 'A+', '19852692010002', 'ACTIVE', 1),
+('U26110000003', 'U26110000003', 'hr', 'hr', 'hr@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Farhana Yasmin (HR Lead)', '+8801711000003', 'HRManager', 'T001', 'P26110000001', 'M26110000002', 'B+', '19922692010003', 'ACTIVE', 1),
+('U26110000004', 'U26110000004', 'support', 'support', 'support@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Kamrul Islam (Support Lead)', '+8801711000004', 'SupportManager', 'T001', 'P26110000001', 'M26110000001', 'AB+', '19932692010004', 'ACTIVE', 1),
+('U26110000005', 'U26110000005', 'pm', 'pm', 'pm@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Tanvir Ahmed (Project Manager)', '+8801711000005', 'ProjectManager', 'T001', 'P26110000001', 'M26110000001', 'B+', '19912692010005', 'ACTIVE', 1),
+('U26110000006', 'U26110000006', 'engineer', 'engineer', 'engineer@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Rakib Hassan (Lead Dev)', '+8801711000006', 'TeamMember', 'T001', 'P26110000001', 'M26110000001', 'O+', '19952692010006', 'ACTIVE', 1),
+('U26110000007', 'U26110000007', 'qa', 'qa', 'qa@technoartsoft.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Sadia Sultana (QA Lead)', '+8801711000007', 'TeamMember', 'T001', 'P26110000001', 'M26110000001', 'A+', '19962692010007', 'ACTIVE', 1),
+('U26110000008', 'U26110000008', 'clientadmin', 'clientadmin', 'clientadmin@square.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Square IT Administrator', '+8801711000008', 'ClientAdmin', 'T002', 'P26110000002', 'M26110000004', 'B+', '19882692010008', 'ACTIVE', 1),
+('U26110000009', 'U26110000009', 'clientuser', 'clientuser', 'operator@square.com', 'admin123', 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', 'Square Operations User', '+8801711000009', 'ClientUser', 'T002', 'P26110000002', 'M26110000004', 'O+', '19942692010009', 'ACTIVE', 1);
 
--- 7. Employees (Metadata matching Users)
+-- 7. Employees (Standard 12-char ID: E26110000001)
 INSERT INTO dbo.Employees (Id, UserId, BranchId, Designation, Department, JoiningDate, CustomStartTime, CustomEndTime, GrossSalary, Salary, IsWfhAllowed, BloodGroup, Phone, NationalId) VALUES
-('E001', 'U001', 'B001', 'Chief Technology Officer (CTO)', 'Executive', '2020-01-01', '09:30', '18:30', 120000.00, 120000.00, 1, 'O+', '+8801711000001', '19902692010001'),
-('E002', 'U002', 'B001', 'Managing Director (MD)', 'Executive', '2020-01-01', '09:30', '18:30', 150000.00, 150000.00, 1, 'A+', '+8801711000002', '19852692010002'),
-('E003', 'U003', 'B001', 'HR & Admin Lead', 'Human Resources', '2021-03-15', '09:30', '18:30', 80000.00, 80000.00, 1, 'B+', '+8801711000003', '19922692010003'),
-('E004', 'U004', 'B001', 'Support Manager', 'Customer Support', '2021-06-01', '09:30', '18:30', 75000.00, 75000.00, 1, 'AB+', '+8801711000004', '19932692010004'),
-('E005', 'U005', 'B001', 'Project Manager', 'Engineering', '2021-08-10', '09:30', '18:30', 95000.00, 95000.00, 1, 'B+', '+8801711000005', '19912692010005'),
-('E006', 'U006', 'B001', 'Senior Full Stack Developer', 'Engineering', '2022-02-01', '09:30', '18:30', 85000.00, 85000.00, 1, 'O+', '+8801711000006', '19952692010006'),
-('E007', 'U007', 'B001', 'QA & Test Automation Lead', 'Quality Assurance', '2022-05-15', '09:30', '18:30', 70000.00, 70000.00, 1, 'A+', '+8801711000007', '19962692010007'),
-('E008', 'U008', 'B001', 'Client Administrator', 'Client Operations', '2023-01-01', '09:30', '18:30', 60000.00, 60000.00, 0, 'B+', '+8801711000008', '19882692010008'),
-('E009', 'U009', 'B001', 'Client Representative', 'Client Operations', '2023-03-01', '09:30', '18:30', 45000.00, 45000.00, 0, 'O+', '+8801711000009', '19942692010009');
+('E26110000001', 'U26110000001', 'B26110000001', 'Chief Technology Officer (CTO)', 'Executive', '2020-01-01', '09:30', '18:30', 120000.00, 120000.00, 1, 'O+', '+8801711000001', '19902692010001'),
+('E26110000002', 'U26110000002', 'B26110000001', 'Managing Director (MD)', 'Executive', '2020-01-01', '09:30', '18:30', 150000.00, 150000.00, 1, 'A+', '+8801711000002', '19852692010002'),
+('E26110000003', 'U26110000003', 'B26110000001', 'HR & Admin Lead', 'Human Resources', '2021-03-15', '09:30', '18:30', 80000.00, 80000.00, 1, 'B+', '+8801711000003', '19922692010003'),
+('E26110000004', 'U26110000004', 'B26110000001', 'Support Manager', 'Customer Support', '2021-06-01', '09:30', '18:30', 75000.00, 75000.00, 1, 'AB+', '+8801711000004', '19932692010004'),
+('E26110000005', 'U26110000005', 'B26110000001', 'Project Manager', 'Engineering', '2021-08-10', '09:30', '18:30', 95000.00, 95000.00, 1, 'B+', '+8801711000005', '19912692010005'),
+('E26110000006', 'U26110000006', 'B26110000001', 'Senior Full Stack Developer', 'Engineering', '2022-02-01', '09:30', '18:30', 85000.00, 85000.00, 1, 'O+', '+8801711000006', '19952692010006'),
+('E26110000007', 'U26110000007', 'B26110000001', 'QA & Test Automation Lead', 'Quality Assurance', '2022-05-15', '09:30', '18:30', 70000.00, 70000.00, 1, 'A+', '+8801711000007', '19962692010007'),
+('E26110000008', 'U26110000008', 'B26110000001', 'Client Administrator', 'Client Operations', '2023-01-01', '09:30', '18:30', 60000.00, 60000.00, 0, 'B+', '+8801711000008', '19882692010008'),
+('E26110000009', 'U26110000009', 'B26110000001', 'Client Representative', 'Client Operations', '2023-03-01', '09:30', '18:30', 45000.00, 45000.00, 0, 'O+', '+8801711000009', '19942692010009');
 
--- 8. Project Members (Assign PM and Engineers)
+-- 8. Project Members (Standard 12-char ID: R26110000001)
 INSERT INTO dbo.ProjectMembers (Id, ProjectId, UserId, ModuleId, IsProjectManager) VALUES
-('PM001', 'P001', 'U005', 'MOD-01', 1), -- Tanvir Ahmed is PM of TSOM
-('PM002', 'P001', 'U006', 'MOD-01', 0), -- Rakib Hassan is Engineer on TSOM
-('PM003', 'P001', 'U007', 'MOD-01', 0), -- Sadia Sultana is QA on TSOM
-('PM004', 'P002', 'U005', 'MOD-04', 1), -- Tanvir Ahmed is Designated PM on Square ERP
-('PM005', 'P002', 'U006', 'MOD-04', 0), -- Rakib Hassan is Support Engineer on Square ERP
-('PM006', 'P002', 'U008', 'MOD-04', 0), -- Square IT Admin (Client Admin)
-('PM007', 'P002', 'U009', 'MOD-04', 0), -- Square Operations User (Client Operator)
-('PM008', 'P003', 'U005', 'MOD-06', 1), -- Tanvir Ahmed is PM on BEX-HRMS
-('PM009', 'P003', 'U006', 'MOD-06', 0); -- Rakib Hassan is Engineer on BEX-HRMS
+('R26110000001', 'P26110000001', 'U26110000005', 'M26110000001', 1), -- Tanvir Ahmed is PM of TSOM
+('R26110000002', 'P26110000001', 'U26110000006', 'M26110000001', 0), -- Rakib Hassan is Engineer on TSOM
+('R26110000003', 'P26110000001', 'U26110000007', 'M26110000001', 0), -- Sadia Sultana is QA on TSOM
+('R26110000004', 'P26110000002', 'U26110000005', 'M26110000004', 1), -- Tanvir Ahmed is Designated PM on Square ERP
+('R26110000005', 'P26110000002', 'U26110000006', 'M26110000004', 0), -- Rakib Hassan is Support Engineer on Square ERP
+('R26110000006', 'P26110000002', 'U26110000008', 'M26110000004', 0), -- Square IT Admin (Client Admin)
+('R26110000007', 'P26110000002', 'U26110000009', 'M26110000004', 0), -- Square Operations User (Client Operator)
+('R26110000008', 'P26110000003', 'U26110000005', 'M26110000006', 1), -- Tanvir Ahmed is PM on BEX-HRMS
+('R26110000009', 'P26110000003', 'U26110000006', 'M26110000006', 0); -- Rakib Hassan is Engineer on BEX-HRMS
 
--- 9. Sample Leave Requests
+-- 9. Sample Leave Requests (Standard 12-char ID: L26110000001)
 INSERT INTO dbo.LeaveRequests (Id, EmployeeId, LeaveType, FromDate, ToDate, Reason, Status, ApprovedBy, Remarks) VALUES
-('L001', 'U006', 'Casual Leave', CAST(GETDATE() AS DATE), CAST(DATEADD(DAY, 1, GETDATE()) AS DATE), 'Family urgent matter.', 'PENDING', NULL, NULL),
-('L002', 'U007', 'Sick Leave', CAST(DATEADD(DAY, -5, GETDATE()) AS DATE), CAST(DATEADD(DAY, -4, GETDATE()) AS DATE), 'Severe fever.', 'APPROVED', 'U003', 'Approved as per medical certificate.');
+('L26110000001', 'U26110000006', 'Casual Leave', CAST(GETDATE() AS DATE), CAST(DATEADD(DAY, 1, GETDATE()) AS DATE), 'Family urgent matter.', 'PENDING', NULL, NULL),
+('L26110000002', 'U26110000007', 'Sick Leave', CAST(DATEADD(DAY, -5, GETDATE()) AS DATE), CAST(DATEADD(DAY, -4, GETDATE()) AS DATE), 'Severe fever.', 'APPROVED', 'U26110000003', 'Approved as per medical certificate.');
 
--- 10. Sample Notices
+-- 10. Sample Notices (Standard 12-char ID: N26110000001)
 INSERT INTO dbo.Notices (Id, Title, Content, IsActive) VALUES
-('N001', 'Annual Performance & Appraisal Cycle 2026', 'All engineering, support, and administrative personnel are requested to submit self-appraisal goals by end of this week.', 1),
-('N002', 'TAS Support Hub 2.0 Deployment Notice', 'The updated ticketing engine and geofence attendance system is live across all branches. Please verify your profiles in the User Directory.', 1);
+('N26110000001', 'Annual Performance & Appraisal Cycle 2026', 'All engineering, support, and administrative personnel are requested to submit self-appraisal goals by end of this week.', 1),
+('N26110000002', 'TAS Support Hub 2.0 Deployment Notice', 'The updated ticketing engine and geofence attendance system is live across all branches. Please verify your profiles in the User Directory.', 1);
 
--- 11. Sample Tickets (Instant Live Data)
+-- 11. Sample Tickets (Standard 12-char ID: T26110000001)
 INSERT INTO dbo.Tickets (Id, TicketNumber, TenantId, ProjectId, ModuleId, Title, Description, Status, Priority, Category, CreatedBy, AssignedTo) VALUES
-('TK001', 'TK-2026-0001', 'T002', 'P002', 'MOD-04', 'Warehouse inventory sync timeout during peak hours', 'Inventory sync fails with socket timeout when processing batch transactions above 5,000 units.', 'NEW', 'CRITICAL', 'Bug / Defect', 'U008', 'U005'),
-('TK002', 'TK-2026-0002', 'T001', 'P001', 'MOD-02', 'Geofence accuracy adjustment for Banani Office', 'Staff reporting 10-meter drift during cloudy weather punch attempts.', 'IN_PROGRESS', 'MEDIUM', 'Configuration', 'U003', 'U006'),
-('TK003', 'TK-2026-0003', 'T003', 'P003', 'MOD-06', 'Tax calculation formula update for Fiscal Year 2026', 'New government tax exemption slab needs to be reflected in payroll module.', 'RESOLVED', 'HIGH', 'Feature Request', 'U005', 'U006');
+('T26110000001', 'TK-2026-0001', 'T002', 'P26110000002', 'M26110000004', 'Warehouse inventory sync timeout during peak hours', 'Inventory sync fails with socket timeout when processing batch transactions above 5,000 units.', 'NEW', 'CRITICAL', 'Bug / Defect', 'U26110000008', 'U26110000005'),
+('T26110000002', 'TK-2026-0002', 'T001', 'P26110000001', 'M26110000002', 'Geofence accuracy adjustment for Banani Office', 'Staff reporting 10-meter drift during cloudy weather punch attempts.', 'IN_PROGRESS', 'MEDIUM', 'Configuration', 'U26110000003', 'U26110000006'),
+('T26110000003', 'TK-2026-0003', 'T003', 'P26110000003', 'M26110000006', 'Tax calculation formula update for Fiscal Year 2026', 'New government tax exemption slab needs to be reflected in payroll module.', 'RESOLVED', 'HIGH', 'Feature Request', 'U26110000005', 'U26110000006');
 
--- 12. Ticket Tasks
+-- 12. Ticket Tasks (Standard 12-char ID: K26110000001)
 INSERT INTO dbo.TicketTasks (TaskId, TicketNumber, Name, AssignedTo, Status) VALUES
-('TSK001', 'TK-2026-0001', 'Analyze SQL deadlock and lock timeout logs', 'U006', 'IN_PROGRESS'),
-('TSK002', 'TK-2026-0001', 'Increase connection pool timeout threshold in appsettings', 'U006', 'TODO'),
-('TSK003', 'TK-2026-0002', 'Update branch radius from 100m to 150m in database', 'U006', 'COMPLETED');
+('K26110000001', 'TK-2026-0001', 'Analyze SQL deadlock and lock timeout logs', 'U26110000006', 'IN_PROGRESS'),
+('K26110000002', 'TK-2026-0001', 'Increase connection pool timeout threshold in appsettings', 'U26110000006', 'TODO'),
+('K26110000003', 'TK-2026-0002', 'Update branch radius from 100m to 150m in database', 'U26110000006', 'COMPLETED');
 
--- 13. Ticket Comments
+-- 13. Ticket Comments (Standard 12-char ID: C26110000001)
 INSERT INTO dbo.TicketComments (Id, TicketNumber, UserId, Comment) VALUES
-('CM001', 'TK-2026-0001', 'U008', 'This is blocking our morning dispatch schedule. Please treat as high urgency.'),
-('CM002', 'TK-2026-0001', 'U005', 'We have assigned Rakib to inspect the batch sync procedure. Working on a fix.');
+('C26110000001', 'TK-2026-0001', 'U26110000008', 'This is blocking our morning dispatch schedule. Please treat as high urgency.'),
+('C26110000002', 'TK-2026-0001', 'U26110000005', 'We have assigned Rakib to inspect the batch sync procedure. Working on a fix.');
+
+-- 14. Sample Attendance (Standard 12-char ID: A26110000001)
+INSERT INTO dbo.Attendances (Id, EmployeeId, BranchId, AttendanceDate, InTime, OutTime, Punctuality, InApprovalStatus, OutApprovalStatus, IsWfh, CreatedAt)
+VALUES
+('A26110000001', 'E26110000006', 'B26110000001', CAST(GETDATE() AS DATE), SYSDATETIMEOFFSET(), NULL, 'ON_TIME', 'APPROVED', 'NOT_PUNCHED', 0, SYSDATETIMEOFFSET());
 
 -- 14. Office Timing Default Configuration
 INSERT INTO dbo.OfficeTimes (Id, StartTime, EndTime, GraceMinutes, HalfDayCutoffMinutes)
@@ -478,7 +483,7 @@ GO
 -- ============================================================================
 -- 1. PROCEDURE: dbo.sp_ticket_operations (MASTER ROUTINE)
 -- ============================================================================
-CREATE PROCEDURE dbo.sp_ticket_operations
+CREATE OR ALTER PROCEDURE dbo.sp_ticket_operations
     @p_ComCod NVARCHAR(100) = '', @p_ProcID NVARCHAR(100) = '', @p_ProcName NVARCHAR(100) = '',
     @p_UserId NVARCHAR(100) = '', @p_UserCode NVARCHAR(100) = '', @p_UserName NVARCHAR(100) = '',
     @p_Action NVARCHAR(100) = '', @p_parm00 NVARCHAR(MAX) = '', @p_parm01 NVARCHAR(MAX) = '',
@@ -802,13 +807,17 @@ BEGIN
         -- Lookup user's role, tenant, and project if not fully supplied
         DECLARE @v_UserTenant NVARCHAR(50) = '';
         DECLARE @v_UserProject NVARCHAR(50) = '';
+        DECLARE @v_ResolvedUserId NVARCHAR(50) = @v_PUser;
+
         IF @v_PUser <> ''
         BEGIN
-            SELECT @v_UserTenant = COALESCE(CONVERT(NVARCHAR(50), TenantId), ''),
-                   @v_UserProject = COALESCE(CONVERT(NVARCHAR(50), ProjectId), ''),
-                   @v_PRole = CASE WHEN @v_PRole = '' THEN COALESCE(Role, '') ELSE @v_PRole END
+            SELECT TOP 1
+                @v_ResolvedUserId = CONVERT(NVARCHAR(50), Id),
+                @v_UserTenant = COALESCE(CONVERT(NVARCHAR(50), TenantId), ''),
+                @v_UserProject = COALESCE(CONVERT(NVARCHAR(50), ProjectId), ''),
+                @v_PRole = CASE WHEN @v_PRole = '' THEN COALESCE(Role, '') ELSE @v_PRole END
             FROM dbo.Users 
-            WHERE CONVERT(NVARCHAR(50), Id) = @v_PUser OR Username = @v_PUser;
+            WHERE CONVERT(NVARCHAR(50), Id) = @v_PUser OR Username = @v_PUser OR Email = @v_PUser;
 
             IF LOWER(@v_PRole) IN ('clientadmin', 'clientuser')
             BEGIN
@@ -852,25 +861,33 @@ BEGIN
             WHERE (
                 -- 1. SuperAdmin / MD / Support / HR: see all projects, or filter by tenant if tenant specified
                 (LOWER(@v_PRole) IN ('superadmin', 'md', 'hrmanager', 'supportmanager', 'admin') AND (@v_PTenant = '' OR CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant))
-                -- 2. Project Manager: see projects they are assigned to or manage
+                -- 2. Project Manager: see projects they are assigned to
                 OR (LOWER(@v_PRole) = 'projectmanager' AND (
-                    CONVERT(NVARCHAR(50), p.ProjectId) IN (SELECT CONVERT(NVARCHAR(50), ProjectId) FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_PUser)
+                    CONVERT(NVARCHAR(50), p.ProjectId) IN (SELECT CONVERT(NVARCHAR(50), ProjectId) FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
                     OR CONVERT(NVARCHAR(50), p.ProjectId) = @v_UserProject
-                    OR (@v_PTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant)
                 ))
-                -- 3. Team Member: see projects they are assigned to
+                -- 3. Team Member: strictly see projects they are assigned to
                 OR (LOWER(@v_PRole) = 'teammember' AND (
-                    CONVERT(NVARCHAR(50), p.ProjectId) IN (SELECT CONVERT(NVARCHAR(50), ProjectId) FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_PUser)
+                    CONVERT(NVARCHAR(50), p.ProjectId) IN (SELECT CONVERT(NVARCHAR(50), ProjectId) FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
                     OR CONVERT(NVARCHAR(50), p.ProjectId) = @v_UserProject
                 ))
-                -- 4. Client Admin & Client User: see all projects belonging to their company/tenant!
-                OR (LOWER(@v_PRole) IN ('clientadmin', 'clientuser') AND (
+                -- 4. Client Admin: see all projects belonging to their company/tenant!
+                OR (LOWER(@v_PRole) = 'clientadmin' AND (
                     (@v_PTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant)
                     OR (@v_UserTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_UserTenant)
-                    OR (CONVERT(NVARCHAR(50), p.ProjectId) = @v_UserProject AND @v_UserProject <> '')
                 ))
-                -- 5. Universal internal fallback (SuperAdmin, MD, HR, Support, or unauthenticated/unscoped internal queries)
-                OR (LOWER(@v_PRole) NOT IN ('clientadmin', 'clientuser', 'projectmanager', 'teammember'))
+                -- 5. Client User: ONLY see their assigned project! (Not every project of the tenant)
+                OR (LOWER(@v_PRole) = 'clientuser' AND (
+                    CONVERT(NVARCHAR(50), p.ProjectId) IN (SELECT CONVERT(NVARCHAR(50), ProjectId) FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
+                    OR CONVERT(NVARCHAR(50), p.ProjectId) = @v_UserProject
+                    OR (
+                        (@v_UserProject = '' OR @v_UserProject IS NULL)
+                        AND NOT EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), UserId) = @v_ResolvedUserId)
+                        AND (@v_UserTenant <> '' AND CONVERT(NVARCHAR(50), p.TenantId) = @v_UserTenant)
+                    )
+                ))
+                -- 6. Universal fallback for unauthenticated / unscoped internal
+                OR (LOWER(@v_PRole) NOT IN ('clientadmin', 'clientuser', 'projectmanager', 'teammember') AND (@v_PTenant = '' OR CONVERT(NVARCHAR(50), p.TenantId) = @v_PTenant))
             )
             ORDER BY p.Name ASC
             FOR JSON PATH
@@ -916,7 +933,13 @@ BEGIN
             SELECT TOP 1 @v_CP_Tenant = CONVERT(NVARCHAR(50), TenantId) FROM dbo.Tenants ORDER BY TenantId ASC;
         END
 
-        SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+        -- Standard 12-char ID: P + YYMM + 7 digits (e.g. P26110000001)
+        DECLARE @v_PrjYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+        DECLARE @v_NextPrjSeq BIGINT = 1;
+        SELECT @v_NextPrjSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(ProjectId, 6, 7) AS BIGINT)), 0) + 1
+        FROM dbo.Projects WHERE ProjectId LIKE 'P' + @v_PrjYYMM + '%';
+        SET @v_GenKey = 'P' + @v_PrjYYMM + RIGHT('0000000' + CAST(@v_NextPrjSeq AS VARCHAR(10)), 7);
+
         INSERT INTO dbo.Projects (ProjectId, TenantId, Code, Name, Description, IsActive, CreatedAt)
         VALUES (@v_GenKey, NULLIF(@v_CP_Tenant, ''), @v_CP_Code, @v_CP_Name, @v_CP_Desc, 1, SYSDATETIMEOFFSET());
 
@@ -994,7 +1017,13 @@ BEGIN
     -- ========================================================================
     ELSE IF @ProcID IN ('CREATE_PROJECT_MODULE', 'CREATE_MODULE')
     BEGIN
-        SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+        -- Standard 12-char ID: M + YYMM + 7 digits (e.g. M26110000001)
+        DECLARE @v_ModYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+        DECLARE @v_NextModSeq BIGINT = 1;
+        SELECT @v_NextModSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(ModuleId, 6, 7) AS BIGINT)), 0) + 1
+        FROM dbo.ProjectModules WHERE ModuleId LIKE 'M' + @v_ModYYMM + '%';
+        SET @v_GenKey = 'M' + @v_ModYYMM + RIGHT('0000000' + CAST(@v_NextModSeq AS VARCHAR(10)), 7);
+
         DECLARE @v_ModCode NVARCHAR(100) = TRIM(@parm02);
         DECLARE @v_ModName NVARCHAR(150) = TRIM(@parm03);
         DECLARE @v_ModDesc NVARCHAR(MAX) = COALESCE(NULLIF(TRIM(@parm04), ''), NULLIF(TRIM(@parm06), ''), '');
@@ -1122,8 +1151,15 @@ BEGIN
 
         IF NOT EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), ProjectId) = @v_TargetPrj AND CONVERT(NVARCHAR(50), UserId) = @v_TargetUser)
         BEGIN
+            -- Standard 12-char ID: R + YYMM + 7 digits (e.g. R26110000001)
+            DECLARE @v_PmYYMM1 VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextPmSeq1 BIGINT = 1;
+            SELECT @v_NextPmSeq1 = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1
+            FROM dbo.ProjectMembers WHERE Id LIKE 'R' + @v_PmYYMM1 + '%';
+            DECLARE @v_PmKey1 NVARCHAR(50) = 'R' + @v_PmYYMM1 + RIGHT('0000000' + CAST(@v_NextPmSeq1 AS VARCHAR(10)), 7);
+
             INSERT INTO dbo.ProjectMembers (Id, ProjectId, UserId, IsProjectManager)
-            VALUES (CONVERT(NVARCHAR(50), NEWID()), @v_TargetPrj, @v_TargetUser, CASE WHEN @parm03 = 'ProjectManager' THEN 1 ELSE 0 END);
+            VALUES (@v_PmKey1, @v_TargetPrj, @v_TargetUser, CASE WHEN @parm03 = 'ProjectManager' THEN 1 ELSE 0 END);
         END
 
         SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
@@ -1145,8 +1181,15 @@ BEGIN
         END
         ELSE
         BEGIN
+            -- Standard 12-char ID: R + YYMM + 7 digits (e.g. R26110000001)
+            DECLARE @v_PmYYMM2 VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextPmSeq2 BIGINT = 1;
+            SELECT @v_NextPmSeq2 = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1
+            FROM dbo.ProjectMembers WHERE Id LIKE 'R' + @v_PmYYMM2 + '%';
+            DECLARE @v_PmKey2 NVARCHAR(50) = 'R' + @v_PmYYMM2 + RIGHT('0000000' + CAST(@v_NextPmSeq2 AS VARCHAR(10)), 7);
+
             INSERT INTO dbo.ProjectMembers (Id, ProjectId, UserId, IsProjectManager)
-            VALUES (CONVERT(NVARCHAR(50), NEWID()), @v_PmPrj, @v_PmUser, 1);
+            VALUES (@v_PmKey2, @v_PmPrj, @v_PmUser, 1);
         END
 
         SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
@@ -1407,17 +1450,12 @@ BEGIN
         END
         ELSE
         BEGIN
-            -- Generate unique Key: if U-series key already exists, fallback to NEWID()
-            DECLARE @v_UserNum BIGINT = 1;
-            SELECT @v_UserNum = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 2, 11) AS BIGINT)), 0) + 1 
-            FROM dbo.Users WHERE Id LIKE 'U[0-9]%';
-            IF @v_UserNum IS NULL OR @v_UserNum <= 0 SET @v_UserNum = 10;
-            SET @v_GenKey = 'U' + RIGHT('00000000000' + CAST(@v_UserNum AS VARCHAR(11)), 11);
-
-            IF EXISTS (SELECT 1 FROM dbo.Users WHERE Id = @v_GenKey)
-            BEGIN
-                SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
-            END
+            -- Standard 12-char ID: U + YYMM + 7 digits (e.g. U26110000001)
+            DECLARE @v_UsrYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextUsrSeq BIGINT = 1;
+            SELECT @v_NextUsrSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+            FROM dbo.Users WHERE Id LIKE 'U' + @v_UsrYYMM + '%';
+            SET @v_GenKey = 'U' + @v_UsrYYMM + RIGHT('0000000' + CAST(@v_NextUsrSeq AS VARCHAR(10)), 7);
 
             INSERT INTO dbo.Users (Id, UserId, UserCode, Username, Email, Name, Role, TenantId, ProjectId, ModuleId, Password, PasswordHash, Phone, NationalId, BloodGroup, IsActive, Status, CreatedAt)
             VALUES (@v_GenKey, @v_GenKey, @v_U_Username, @v_U_Username, @v_U_Username, @v_U_FullName, @v_U_Role, NULLIF(@v_U_TenantId, ''), NULLIF(@v_U_ProjectId, ''), NULLIF(@v_U_ModuleId, ''), @v_U_Password, 'AQAAAAIAAYagAAAAENK5wLg0wYQvX8O9v9mKq1xJzP3rL4uY5tS6vW7x8Z9==', @v_U_Phone, @v_U_Nid, @v_U_Blood, 1, 'ACTIVE', SYSDATETIMEOFFSET());
@@ -1442,8 +1480,15 @@ BEGIN
         END
         ELSE
         BEGIN
+            -- Standard 12-char ID: E + YYMM + 7 digits (e.g. E26110000001)
+            DECLARE @v_EmpYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextEmpSeq BIGINT = 1;
+            SELECT @v_NextEmpSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+            FROM dbo.Employees WHERE Id LIKE 'E' + @v_EmpYYMM + '%';
+            DECLARE @v_EmpGenKey NVARCHAR(50) = 'E' + @v_EmpYYMM + RIGHT('0000000' + CAST(@v_NextEmpSeq AS VARCHAR(10)), 7);
+
             INSERT INTO dbo.Employees (Id, UserId, BranchId, Designation, Department, GrossSalary, Salary, IsWfhAllowed, BloodGroup, Phone, NationalId, CustomStartTime, CustomEndTime, CreatedAt)
-            VALUES (CONVERT(NVARCHAR(50), NEWID()), @v_GenKey, NULLIF(@v_U_BranchId, ''), @v_U_Desig, @v_U_Dept, @v_U_Salary, @v_U_Salary, 1, @v_U_Blood, @v_U_Phone, @v_U_Nid, @v_U_ShiftIn, @v_U_ShiftOut, SYSDATETIMEOFFSET());
+            VALUES (@v_EmpGenKey, @v_GenKey, NULLIF(@v_U_BranchId, ''), @v_U_Desig, @v_U_Dept, @v_U_Salary, @v_U_Salary, 1, @v_U_Blood, @v_U_Phone, @v_U_Nid, @v_U_ShiftIn, @v_U_ShiftOut, SYSDATETIMEOFFSET());
         END
 
         -- Primary Project Member assignment
@@ -1451,8 +1496,22 @@ BEGIN
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), ProjectId) = @v_U_ProjectId AND CONVERT(NVARCHAR(50), UserId) = @v_GenKey)
             BEGIN
+                -- Standard 12-char ID: R + YYMM + 7 digits (e.g. R26110000001)
+                DECLARE @v_PmYYMM3 VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+                DECLARE @v_NextPmSeq3 BIGINT = 1;
+                SELECT @v_NextPmSeq3 = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+                FROM dbo.ProjectMembers WHERE Id LIKE 'R' + @v_PmYYMM3 + '%';
+                DECLARE @v_PmGenKey NVARCHAR(50) = 'R' + @v_PmYYMM3 + RIGHT('0000000' + CAST(@v_NextPmSeq3 AS VARCHAR(10)), 7);
+
                 INSERT INTO dbo.ProjectMembers (Id, ProjectId, UserId, ModuleId, IsProjectManager)
-                VALUES (CONVERT(NVARCHAR(50), NEWID()), @v_U_ProjectId, @v_GenKey, NULLIF(@v_U_ModuleId, ''), CASE WHEN @v_U_Role = 'ProjectManager' THEN 1 ELSE 0 END);
+                VALUES (@v_PmGenKey, @v_U_ProjectId, @v_GenKey, NULLIF(@v_U_ModuleId, ''), CASE WHEN @v_U_Role = 'ProjectManager' THEN 1 ELSE 0 END);
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.ProjectMembers
+                SET ModuleId = COALESCE(NULLIF(@v_U_ModuleId, ''), ModuleId),
+                    IsProjectManager = CASE WHEN @v_U_Role = 'ProjectManager' THEN 1 ELSE IsProjectManager END
+                WHERE CONVERT(NVARCHAR(50), ProjectId) = @v_U_ProjectId AND CONVERT(NVARCHAR(50), UserId) = @v_GenKey;
             END
         END
 
@@ -1460,7 +1519,9 @@ BEGIN
         IF @parmJson1 <> '' AND ISJSON(@parmJson1) = 1 AND JSON_QUERY(@parmJson1, '$.projects') IS NOT NULL
         BEGIN
             INSERT INTO dbo.ProjectMembers (Id, ProjectId, UserId, IsProjectManager)
-            SELECT CONVERT(NVARCHAR(50), NEWID()), [value], @v_GenKey, CASE WHEN @v_U_Role = 'ProjectManager' THEN 1 ELSE 0 END
+            SELECT 
+                'R' + RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2) + RIGHT('0000000' + CAST(ISNULL((SELECT MAX(TRY_CAST(SUBSTRING(pmMax.Id, 6, 7) AS BIGINT)) FROM dbo.ProjectMembers pmMax WHERE pmMax.Id LIKE 'R%'), 0) + ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS VARCHAR(10)), 7),
+                [value], @v_GenKey, CASE WHEN @v_U_Role = 'ProjectManager' THEN 1 ELSE 0 END
             FROM OPENJSON(@parmJson1, '$.projects')
             WHERE [value] IS NOT NULL AND [value] <> ''
               AND NOT EXISTS (
@@ -1562,8 +1623,15 @@ BEGIN
             DECLARE @v_MatchedUid NVARCHAR(50) = @v_UpdUserId;
             SELECT TOP 1 @v_MatchedUid = CONVERT(NVARCHAR(50), Id) FROM dbo.Users WHERE CONVERT(NVARCHAR(50), Id) = @v_UpdUserId OR Username = @v_UpdUserId;
 
+            -- Standard 12-char ID: E + YYMM + 7 digits (e.g. E26110000001)
+            DECLARE @v_EmpYYMM_Upd VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextEmpSeq_Upd BIGINT = 1;
+            SELECT @v_NextEmpSeq_Upd = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+            FROM dbo.Employees WHERE Id LIKE 'E' + @v_EmpYYMM_Upd + '%';
+            DECLARE @v_EmpGenKey_Upd NVARCHAR(50) = 'E' + @v_EmpYYMM_Upd + RIGHT('0000000' + CAST(@v_NextEmpSeq_Upd AS VARCHAR(10)), 7);
+
             INSERT INTO dbo.Employees (Id, UserId, BranchId, Designation, Department, GrossSalary, Salary, IsWfhAllowed, BloodGroup, Phone, NationalId, CustomStartTime, CustomEndTime, CreatedAt)
-            VALUES (CONVERT(NVARCHAR(50), NEWID()), @v_MatchedUid, NULLIF(@v_UpdBranchId, ''), COALESCE(@v_UpdDesig, @v_UpdRole, 'Employee'), COALESCE(@v_UpdDept, 'Engineering'), COALESCE(@v_UpdSalary, 65000), COALESCE(@v_UpdSalary, 65000), 1, COALESCE(@v_UpdBlood, 'B+'), @v_UpdPhone, @v_UpdNid, COALESCE(@v_UpdShiftIn, '09:30'), COALESCE(@v_UpdShiftOut, '18:30'), SYSDATETIMEOFFSET());
+            VALUES (@v_EmpGenKey_Upd, @v_MatchedUid, NULLIF(@v_U_BranchId, ''), COALESCE(@v_UpdDesig, @v_UpdRole, 'Employee'), COALESCE(@v_UpdDept, 'Engineering'), COALESCE(@v_UpdSalary, 65000), COALESCE(@v_UpdSalary, 65000), 1, COALESCE(@v_UpdBlood, 'B+'), @v_UpdPhone, @v_UpdNid, COALESCE(@v_UpdShiftIn, '09:30'), COALESCE(@v_UpdShiftOut, '18:30'), SYSDATETIMEOFFSET());
         END
 
         -- Multi-Project Sync from JSON $.projects
@@ -1579,9 +1647,11 @@ BEGIN
                   SELECT [value] FROM OPENJSON(@parmJson1, '$.projects') WHERE [value] IS NOT NULL AND [value] <> ''
               );
 
-            -- Insert newly selected projects
+            -- Insert newly selected projects with standard 12-char ID
             INSERT INTO dbo.ProjectMembers (Id, ProjectId, UserId, IsProjectManager)
-            SELECT CONVERT(NVARCHAR(50), NEWID()), [value], @v_SyncUid, CASE WHEN @v_UpdRole = 'ProjectManager' THEN 1 ELSE 0 END
+            SELECT 
+                'R' + RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2) + RIGHT('0000000' + CAST(ISNULL((SELECT MAX(TRY_CAST(SUBSTRING(pmMax.Id, 6, 7) AS BIGINT)) FROM dbo.ProjectMembers pmMax WHERE pmMax.Id LIKE 'R%'), 0) + ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS VARCHAR(10)), 7),
+                [value], @v_SyncUid, CASE WHEN @v_UpdRole = 'ProjectManager' THEN 1 ELSE 0 END
             FROM OPENJSON(@parmJson1, '$.projects')
             WHERE [value] IS NOT NULL AND [value] <> ''
               AND NOT EXISTS (
@@ -1589,6 +1659,45 @@ BEGIN
                   WHERE CONVERT(NVARCHAR(50), pm2.ProjectId) = [value] 
                     AND CONVERT(NVARCHAR(50), pm2.UserId) = @v_SyncUid
               );
+        END
+
+        -- Primary Project / Module Assignment sync
+        IF @v_UpdProjectId IS NOT NULL AND @v_UpdProjectId <> ''
+        BEGIN
+            DECLARE @v_SyncUid2 NVARCHAR(50) = @v_UpdUserId;
+            SELECT TOP 1 @v_SyncUid2 = CONVERT(NVARCHAR(50), Id) FROM dbo.Users WHERE CONVERT(NVARCHAR(50), Id) = @v_UpdUserId OR Username = @v_UpdUserId;
+
+            IF NOT EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE CONVERT(NVARCHAR(50), ProjectId) = @v_UpdProjectId AND CONVERT(NVARCHAR(50), UserId) = @v_SyncUid2)
+            BEGIN
+                DECLARE @v_PmYYMM_Upd2 VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+                DECLARE @v_NextPmSeq_Upd2 BIGINT = 1;
+                SELECT @v_NextPmSeq_Upd2 = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+                FROM dbo.ProjectMembers WHERE Id LIKE 'R' + @v_PmYYMM_Upd2 + '%';
+                DECLARE @v_PmGenKey_Upd2 NVARCHAR(50) = 'R' + @v_PmYYMM_Upd2 + RIGHT('0000000' + CAST(@v_NextPmSeq_Upd2 AS VARCHAR(10)), 7);
+
+                INSERT INTO dbo.ProjectMembers (Id, ProjectId, UserId, ModuleId, IsProjectManager)
+                VALUES (@v_PmGenKey_Upd2, @v_UpdProjectId, @v_SyncUid2, NULLIF(@v_UpdModuleId, ''), CASE WHEN @v_UpdRole = 'ProjectManager' THEN 1 ELSE 0 END);
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.ProjectMembers
+                SET ModuleId = COALESCE(NULLIF(@v_UpdModuleId, ''), ModuleId),
+                    IsProjectManager = CASE WHEN @v_UpdRole = 'ProjectManager' THEN 1 ELSE IsProjectManager END
+                WHERE CONVERT(NVARCHAR(50), ProjectId) = @v_UpdProjectId AND CONVERT(NVARCHAR(50), UserId) = @v_SyncUid2;
+            END
+        END
+
+        -- Multi-Module Assignment sync from JSON $.modules
+        IF @parmJson1 <> '' AND ISJSON(@parmJson1) = 1 AND JSON_QUERY(@parmJson1, '$.modules') IS NOT NULL
+        BEGIN
+            DECLARE @v_SyncUid3 NVARCHAR(50) = @v_UpdUserId;
+            SELECT TOP 1 @v_SyncUid3 = CONVERT(NVARCHAR(50), Id) FROM dbo.Users WHERE CONVERT(NVARCHAR(50), Id) = @v_UpdUserId OR Username = @v_UpdUserId;
+
+            UPDATE pm
+            SET ModuleId = m.[value]
+            FROM dbo.ProjectMembers pm
+            CROSS JOIN (SELECT TOP 1 [value] FROM OPENJSON(@parmJson1, '$.modules') WHERE [value] IS NOT NULL AND [value] <> '') m
+            WHERE CONVERT(NVARCHAR(50), pm.UserId) = @v_SyncUid3 AND (pm.ModuleId IS NULL OR pm.ModuleId = '');
         END
 
         SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
@@ -1763,7 +1872,13 @@ BEGIN
     -- ========================================================================
     ELSE IF @ProcID = 'CREATE_TICKET'
     BEGIN
-        SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+        -- Standard 12-char ID: T + YYMM + 7 digits (e.g. T26110000001)
+        DECLARE @v_TkYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+        DECLARE @v_NextTkSeq BIGINT = 1;
+        SELECT @v_NextTkSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1
+        FROM dbo.Tickets WHERE Id LIKE 'T' + @v_TkYYMM + '%';
+        SET @v_GenKey = 'T' + @v_TkYYMM + RIGHT('0000000' + CAST(@v_NextTkSeq AS VARCHAR(10)), 7);
+
         DECLARE @v_NextTNum NVARCHAR(50) = 'TK-' + CONVERT(VARCHAR(4), YEAR(GETDATE())) + '-' + RIGHT('00000000' + CONVERT(VARCHAR(10), (SELECT COUNT(*) + 1 FROM dbo.Tickets)), 8);
 
         DECLARE @v_Title NVARCHAR(255) = COALESCE(NULLIF(@parm02, ''), NULLIF(@parm03, ''), 'Support Ticket');
@@ -1845,7 +1960,13 @@ BEGIN
     -- ========================================================================
     ELSE IF @ProcID = 'CREATE_TASK'
     BEGIN
-        SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+        -- Standard 12-char ID: K + YYMM + 7 digits (e.g. K26110000001)
+        DECLARE @v_TskYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+        DECLARE @v_NextTskSeq BIGINT = 1;
+        SELECT @v_NextTskSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(TaskId, 6, 7) AS BIGINT)), 0) + 1
+        FROM dbo.TicketTasks WHERE TaskId LIKE 'K' + @v_TskYYMM + '%';
+        SET @v_GenKey = 'K' + @v_TskYYMM + RIGHT('0000000' + CAST(@v_NextTskSeq AS VARCHAR(10)), 7);
+
         INSERT INTO dbo.TicketTasks (TaskId, TicketNumber, Name, AssignedTo, Status)
         VALUES (@v_GenKey, @parm01, @parm02, NULLIF(@parm03, ''), 'TODO');
 
@@ -1857,7 +1978,13 @@ BEGIN
     -- ========================================================================
     ELSE IF @ProcID = 'ADD_COMMENT'
     BEGIN
-        SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+        -- Standard 12-char ID: C + YYMM + 7 digits (e.g. C26110000001)
+        DECLARE @v_CmtYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+        DECLARE @v_NextCmtSeq BIGINT = 1;
+        SELECT @v_NextCmtSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1
+        FROM dbo.TicketComments WHERE Id LIKE 'C' + @v_CmtYYMM + '%';
+        SET @v_GenKey = 'C' + @v_CmtYYMM + RIGHT('0000000' + CAST(@v_NextCmtSeq AS VARCHAR(10)), 7);
+
         INSERT INTO dbo.TicketComments (Id, TicketNumber, UserId, Comment)
         VALUES (@v_GenKey, @parm01, @UserId, COALESCE(@parm06, @parm02));
 
@@ -1995,7 +2122,13 @@ BEGIN
             END
             ELSE
             BEGIN
-                SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+                -- Standard 12-char ID: B + YYMM + 7 digits (e.g. B26110000001)
+                DECLARE @v_BrYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+                DECLARE @v_NextBrSeq BIGINT = 1;
+                SELECT @v_NextBrSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1
+                FROM dbo.Branches WHERE Id LIKE 'B' + @v_BrYYMM + '%';
+                SET @v_GenKey = 'B' + @v_BrYYMM + RIGHT('0000000' + CAST(@v_NextBrSeq AS VARCHAR(10)), 7);
+
                 DECLARE @v_NewLat FLOAT = COALESCE(TRY_CAST(REPLACE(TRIM(@parm03), ',', '.') AS FLOAT), 23.7925);
                 DECLARE @v_NewLon FLOAT = COALESCE(TRY_CAST(REPLACE(TRIM(@parm04), ',', '.') AS FLOAT), 90.4078);
                 DECLARE @v_NewRadius INT = COALESCE(TRY_CAST(TRIM(@parm05) AS INT), 150);
@@ -2052,14 +2185,19 @@ BEGIN
     END
 
     -- ========================================================================
-    -- 30. APPLY_LEAVE
+    -- 30. APPLY_LEAVE (Supports Full Day & Short Leave / Late Pass / Early Exit)
     -- ========================================================================
     ELSE IF @ProcID = 'APPLY_LEAVE'
     BEGIN
-        SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+        -- Standard 12-char ID: L + YYMM + 7 digits (e.g. L26110000001)
+        DECLARE @v_LvYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+        DECLARE @v_NextLvSeq BIGINT = 1;
+        SELECT @v_NextLvSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1
+        FROM dbo.LeaveRequests WHERE Id LIKE 'L' + @v_LvYYMM + '%';
+        SET @v_GenKey = 'L' + @v_LvYYMM + RIGHT('0000000' + CAST(@v_NextLvSeq AS VARCHAR(10)), 7);
 
-        INSERT INTO dbo.LeaveRequests (Id, EmployeeId, LeaveType, FromDate, ToDate, Reason, Status, CreatedAt)
-        VALUES (@v_GenKey, @parm01, @parm02, CAST(@parm03 AS DATE), CAST(@parm04 AS DATE), @parm06, 'PENDING', SYSDATETIMEOFFSET());
+        INSERT INTO dbo.LeaveRequests (Id, EmployeeId, LeaveType, FromDate, ToDate, Reason, Status, Remarks, CreatedAt)
+        VALUES (@v_GenKey, @parm01, @parm02, CAST(@parm03 AS DATE), CAST(@parm04 AS DATE), @parm06, 'PENDING', NULLIF(@parm05, ''), SYSDATETIMEOFFSET());
 
         SELECT CAST(1 AS BIT) AS success, @v_GenKey AS leave_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
     END
@@ -2120,7 +2258,12 @@ BEGIN
         END
         ELSE
         BEGIN
-            SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+            -- Standard 12-char ID: N + YYMM + 7 digits (e.g. N26110000001)
+            DECLARE @v_NotYYMM VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextNotSeq BIGINT = 1;
+            SELECT @v_NextNotSeq = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1
+            FROM dbo.Notices WHERE Id LIKE 'N' + @v_NotYYMM + '%';
+            SET @v_GenKey = 'N' + @v_NotYYMM + RIGHT('0000000' + CAST(@v_NextNotSeq AS VARCHAR(10)), 7);
 
             INSERT INTO dbo.Notices (Id, Title, Content, IsActive, CreatedAt)
             VALUES (@v_GenKey, @parm02, @parm06, 1, SYSDATETIMEOFFSET());
@@ -2130,16 +2273,171 @@ BEGIN
     END
 
     -- ========================================================================
-    -- 34. PUNCH_ATTENDANCE / PUNCH_IN / PUNCH_OUT
+    -- 34. PUNCH_ATTENDANCE / PUNCH_IN / CHECK_IN / PUNCH_OUT / CHECK_OUT
     -- ========================================================================
-    ELSE IF @ProcID IN ('PUNCH_ATTENDANCE', 'PUNCH_IN', 'PUNCH_OUT')
+    ELSE IF @ProcID IN ('PUNCH_ATTENDANCE', 'PUNCH_IN', 'CHECK_IN', 'PUNCH_OUT', 'CHECK_OUT')
     BEGIN
-        SET @v_GenKey = CONVERT(NVARCHAR(50), NEWID());
+        -- Resolve EmployeeId, UserId, and BranchId
+        DECLARE @v_AttEmpId NVARCHAR(50) = NULL;
+        DECLARE @v_AttUserId NVARCHAR(50) = NULL;
+        DECLARE @v_AttBranchId NVARCHAR(50) = NULL;
 
-        INSERT INTO dbo.Attendances (Id, EmployeeId, BranchId, AttendanceDate, InTime, IsWfh, InLatitude, InLongitude, Punctuality, CreatedAt)
-        VALUES (@v_GenKey, @parm01, NULLIF(@parm02, ''), CAST(GETDATE() AS DATE), SYSDATETIMEOFFSET(), CASE WHEN @parm05 = '1' THEN 1 ELSE 0 END, CAST(NULLIF(@parm03, '') AS FLOAT), CAST(NULLIF(@parm04, '') AS FLOAT), 'ON_TIME', SYSDATETIMEOFFSET());
+        SELECT TOP 1 
+            @v_AttEmpId = CONVERT(NVARCHAR(50), e.Id),
+            @v_AttUserId = CONVERT(NVARCHAR(50), e.UserId),
+            @v_AttBranchId = CONVERT(NVARCHAR(50), e.BranchId)
+        FROM dbo.Employees e
+        WHERE CONVERT(NVARCHAR(50), e.Id) = @parm01;
 
-        SELECT CAST(1 AS BIT) AS success, @v_GenKey AS attendance_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+        IF @v_AttEmpId IS NULL
+        BEGIN
+            SELECT TOP 1 
+                @v_AttEmpId = CONVERT(NVARCHAR(50), e.Id),
+                @v_AttUserId = CONVERT(NVARCHAR(50), u.Id),
+                @v_AttBranchId = CONVERT(NVARCHAR(50), e.BranchId)
+            FROM dbo.Users u
+            LEFT JOIN dbo.Employees e ON CONVERT(NVARCHAR(50), e.UserId) = CONVERT(NVARCHAR(50), u.Id)
+            WHERE CONVERT(NVARCHAR(50), u.Id) = @parm01 
+               OR u.Username = @parm01 
+               OR u.Email = @parm01;
+        END
+
+        IF @v_AttEmpId IS NULL AND @v_AttUserId IS NOT NULL
+        BEGIN
+            -- Standard 12-char ID: E + YYMM + 7 digits (e.g. E26110000001)
+            DECLARE @v_EmpYYMM_Att VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextEmpSeq_Att BIGINT = 1;
+            SELECT @v_NextEmpSeq_Att = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+            FROM dbo.Employees WHERE Id LIKE 'E' + @v_EmpYYMM_Att + '%';
+            SET @v_AttEmpId = 'E' + @v_EmpYYMM_Att + RIGHT('0000000' + CAST(@v_NextEmpSeq_Att AS VARCHAR(10)), 7);
+
+            INSERT INTO dbo.Employees (Id, UserId, Designation, Department, GrossSalary, Salary, IsWfhAllowed, CreatedAt)
+            VALUES (@v_AttEmpId, @v_AttUserId, 'Employee', 'Operations', 65000, 65000, 1, SYSDATETIMEOFFSET());
+        END
+        ELSE IF @v_AttEmpId IS NULL
+        BEGIN
+            SET @v_AttEmpId = @parm01;
+        END
+
+        -- Determine branch
+        DECLARE @v_BranchRef NVARCHAR(50) = NULL;
+        IF @parm06 <> '' SET @v_BranchRef = @parm06;
+        ELSE IF @parm02 <> '' AND EXISTS (SELECT 1 FROM dbo.Branches WHERE CONVERT(NVARCHAR(50), Id) = @parm02) SET @v_BranchRef = @parm02;
+        ELSE SET @v_BranchRef = @v_AttBranchId;
+
+        -- Short Leave Waiver Check: If approved Short Leave exists for today, waive late penalties
+        DECLARE @v_HasShortLeave BIT = 0;
+        IF EXISTS (
+            SELECT 1 FROM dbo.LeaveRequests lr
+            WHERE (CONVERT(NVARCHAR(50), lr.EmployeeId) = @v_AttEmpId OR CONVERT(NVARCHAR(50), lr.EmployeeId) = @v_AttUserId OR CONVERT(NVARCHAR(50), lr.EmployeeId) = @parm01)
+              AND lr.FromDate <= CAST(GETDATE() AS DATE) AND lr.ToDate >= CAST(GETDATE() AS DATE)
+              AND lr.Status = 'APPROVED'
+              AND lr.LeaveType LIKE '%Short%'
+        )
+        BEGIN
+            SET @v_HasShortLeave = 1;
+        END
+
+        -- Check if today's attendance record already exists
+        DECLARE @v_ExistAtt NVARCHAR(50) = NULL;
+        SELECT TOP 1 @v_ExistAtt = CONVERT(NVARCHAR(50), Id)
+        FROM dbo.Attendances
+        WHERE AttendanceDate = CAST(GETDATE() AS DATE)
+          AND (EmployeeId = @v_AttEmpId OR EmployeeId = @v_AttUserId OR EmployeeId = @parm01);
+
+        -- If today's record exists but has legacy/old format ID, upgrade its ID to standard 12-char ID
+        IF @v_ExistAtt IS NOT NULL AND (@v_ExistAtt NOT LIKE 'A[0-9][0-9][0-9][0-9]%' OR LEN(@v_ExistAtt) <> 12)
+        BEGIN
+            DECLARE @v_AttYYMM_Mig VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+            DECLARE @v_NextAttSeq_Mig BIGINT = 1;
+            SELECT @v_NextAttSeq_Mig = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+            FROM dbo.Attendances WHERE Id LIKE 'A' + @v_AttYYMM_Mig + '%';
+            DECLARE @v_MigratedAttId NVARCHAR(50) = 'A' + @v_AttYYMM_Mig + RIGHT('0000000' + CAST(@v_NextAttSeq_Mig AS VARCHAR(10)), 7);
+
+            UPDATE dbo.Attendances SET Id = @v_MigratedAttId WHERE Id = @v_ExistAtt;
+            SET @v_ExistAtt = @v_MigratedAttId;
+        END
+
+        -- CHECK_OUT / PUNCH_OUT Logic
+        IF @ProcID IN ('CHECK_OUT', 'PUNCH_OUT')
+        BEGIN
+            IF @v_ExistAtt IS NOT NULL
+            BEGIN
+                UPDATE dbo.Attendances
+                SET OutTime = SYSDATETIMEOFFSET(),
+                    OutLatitude = TRY_CAST(REPLACE(TRIM(@parm03), ',', '.') AS FLOAT),
+                    OutLongitude = TRY_CAST(REPLACE(TRIM(@parm04), ',', '.') AS FLOAT),
+                    OutApprovalStatus = 'PENDING',
+                    UpdatedAt = SYSDATETIMEOFFSET()
+                WHERE Id = @v_ExistAtt;
+
+                SET @v_GenKey = @v_ExistAtt;
+            END
+            ELSE
+            BEGIN
+                -- Standard 12-char ID: A + YYMM + 7 digits (e.g. A26110000001)
+                DECLARE @v_AttYYMM1 VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+                DECLARE @v_NextAttSeq1 BIGINT = 1;
+                SELECT @v_NextAttSeq1 = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+                FROM dbo.Attendances WHERE Id LIKE 'A' + @v_AttYYMM1 + '%';
+                SET @v_GenKey = 'A' + @v_AttYYMM1 + RIGHT('0000000' + CAST(@v_NextAttSeq1 AS VARCHAR(10)), 7);
+
+                INSERT INTO dbo.Attendances (
+                    Id, EmployeeId, BranchId, AttendanceDate, OutTime, IsWfh,
+                    OutLatitude, OutLongitude, Punctuality, InApprovalStatus, OutApprovalStatus, CreatedAt
+                )
+                VALUES (
+                    @v_GenKey, @v_AttEmpId, @v_BranchRef, CAST(GETDATE() AS DATE), SYSDATETIMEOFFSET(),
+                    CASE WHEN @parm05 = '1' THEN 1 ELSE 0 END,
+                    TRY_CAST(REPLACE(TRIM(@parm03), ',', '.') AS FLOAT),
+                    TRY_CAST(REPLACE(TRIM(@parm04), ',', '.') AS FLOAT),
+                    CASE WHEN @v_HasShortLeave = 1 THEN 'SHORT_LEAVE' ELSE 'ON_TIME' END,
+                    'NOT_PUNCHED', 'PENDING', SYSDATETIMEOFFSET()
+                );
+            END
+        END
+        -- CHECK_IN / PUNCH_IN / PUNCH_ATTENDANCE Logic
+        ELSE
+        BEGIN
+            IF @v_ExistAtt IS NOT NULL
+            BEGIN
+                UPDATE dbo.Attendances
+                SET InTime = COALESCE(InTime, SYSDATETIMEOFFSET()),
+                    InLatitude = COALESCE(InLatitude, TRY_CAST(REPLACE(TRIM(@parm03), ',', '.') AS FLOAT)),
+                    InLongitude = COALESCE(InLongitude, TRY_CAST(REPLACE(TRIM(@parm04), ',', '.') AS FLOAT)),
+                    BranchId = COALESCE(@v_BranchRef, BranchId),
+                    IsWfh = CASE WHEN @parm05 = '1' THEN 1 ELSE IsWfh END,
+                    InApprovalStatus = CASE WHEN InApprovalStatus = 'APPROVED' THEN 'APPROVED' ELSE 'PENDING' END,
+                    UpdatedAt = SYSDATETIMEOFFSET()
+                WHERE Id = @v_ExistAtt;
+
+                SET @v_GenKey = @v_ExistAtt;
+            END
+            ELSE
+            BEGIN
+                -- Standard 12-char ID: A + YYMM + 7 digits (e.g. A26110000001)
+                DECLARE @v_AttYYMM2 VARCHAR(4) = RIGHT(CONVERT(VARCHAR(4), YEAR(GETDATE())), 2) + RIGHT('0' + CONVERT(VARCHAR(2), MONTH(GETDATE())), 2);
+                DECLARE @v_NextAttSeq2 BIGINT = 1;
+                SELECT @v_NextAttSeq2 = ISNULL(MAX(TRY_CAST(SUBSTRING(Id, 6, 7) AS BIGINT)), 0) + 1 
+                FROM dbo.Attendances WHERE Id LIKE 'A' + @v_AttYYMM2 + '%';
+                SET @v_GenKey = 'A' + @v_AttYYMM2 + RIGHT('0000000' + CAST(@v_NextAttSeq2 AS VARCHAR(10)), 7);
+
+                INSERT INTO dbo.Attendances (
+                    Id, EmployeeId, BranchId, AttendanceDate, InTime, IsWfh,
+                    InLatitude, InLongitude, Punctuality, InApprovalStatus, OutApprovalStatus, CreatedAt
+                )
+                VALUES (
+                    @v_GenKey, @v_AttEmpId, @v_BranchRef, CAST(GETDATE() AS DATE), SYSDATETIMEOFFSET(),
+                    CASE WHEN @parm05 = '1' THEN 1 ELSE 0 END,
+                    TRY_CAST(REPLACE(TRIM(@parm03), ',', '.') AS FLOAT),
+                    TRY_CAST(REPLACE(TRIM(@parm04), ',', '.') AS FLOAT),
+                    CASE WHEN @v_HasShortLeave = 1 THEN 'SHORT_LEAVE' ELSE 'ON_TIME' END,
+                    'PENDING', 'NOT_PUNCHED', SYSDATETIMEOFFSET()
+                );
+            END
+        END
+
+        SELECT CAST(1 AS BIT) AS success, @v_GenKey AS attendance_id, CASE WHEN @v_HasShortLeave = 1 THEN 1 ELSE 0 END AS short_leave_approved FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
     END
 
     -- ========================================================================
@@ -2175,13 +2473,185 @@ BEGIN
         END
         ELSE
         BEGIN
-            -- Update all rows in OfficeTimes so whatever row is queried gets the new schedule
             UPDATE dbo.OfficeTimes
             SET StartTime = COALESCE(@v_StartTime, StartTime),
                 EndTime = COALESCE(@v_EndTime, EndTime),
                 GraceMinutes = COALESCE(@v_Grace, GraceMinutes),
                 HalfDayCutoffMinutes = COALESCE(@v_Cutoff, HalfDayCutoffMinutes),
                 UpdatedAt = SYSDATETIMEOFFSET();
+        END
+
+        SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+    END
+
+    -- ========================================================================
+    -- 37. GET_TODAY_ATTENDANCE
+    -- ========================================================================
+    ELSE IF @ProcID = 'GET_TODAY_ATTENDANCE'
+    BEGIN
+        DECLARE @v_QDate DATE = COALESCE(TRY_CAST(@parm02 AS DATE), CAST(GETDATE() AS DATE));
+
+        DECLARE @v_QEmpId NVARCHAR(50) = NULL;
+        DECLARE @v_QUid NVARCHAR(50) = NULL;
+
+        SELECT TOP 1 
+            @v_QEmpId = CONVERT(NVARCHAR(50), e.Id),
+            @v_QUid = CONVERT(NVARCHAR(50), e.UserId)
+        FROM dbo.Employees e
+        WHERE CONVERT(NVARCHAR(50), e.Id) = @parm01;
+
+        IF @v_QEmpId IS NULL
+        BEGIN
+            SELECT TOP 1 
+                @v_QEmpId = CONVERT(NVARCHAR(50), e.Id),
+                @v_QUid = CONVERT(NVARCHAR(50), u.Id)
+            FROM dbo.Users u
+            LEFT JOIN dbo.Employees e ON CONVERT(NVARCHAR(50), e.UserId) = CONVERT(NVARCHAR(50), u.Id)
+            WHERE CONVERT(NVARCHAR(50), u.Id) = @parm01 
+               OR u.Username = @parm01 
+               OR u.Email = @parm01;
+        END
+
+        SELECT TOP 1
+            CONVERT(NVARCHAR(50), a.Id) AS id,
+            CONVERT(NVARCHAR(50), a.EmployeeId) AS employee_id,
+            CONVERT(VARCHAR(10), a.AttendanceDate, 120) AS [date],
+            CONVERT(VARCHAR(5), a.InTime, 108) AS in_time,
+            CONVERT(VARCHAR(5), a.OutTime, 108) AS out_time,
+            COALESCE(a.InApprovalStatus, 'PENDING') AS in_approval_status,
+            COALESCE(a.OutApprovalStatus, 'NOT_PUNCHED') AS out_approval_status,
+            COALESCE(a.Punctuality, 'ON_TIME') AS punctuality,
+            CAST(COALESCE(a.IsWfh, 0) AS BIT) AS is_wfh,
+            COALESCE(CONVERT(NVARCHAR(50), a.BranchId), '') AS branch_id,
+            COALESCE(b.Name, 'Main Office') AS branch_name
+        FROM dbo.Attendances a
+        LEFT JOIN dbo.Branches b ON CONVERT(NVARCHAR(50), a.BranchId) = CONVERT(NVARCHAR(50), b.Id)
+        WHERE a.AttendanceDate = @v_QDate
+          AND (a.EmployeeId = @v_QEmpId OR a.EmployeeId = @v_QUid OR a.EmployeeId = @parm01)
+        ORDER BY a.CreatedAt DESC
+        FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+    END
+
+    -- ========================================================================
+    -- 38. GET_ATTENDANCE_LOGS / GET_ATTENDANCES
+    -- ========================================================================
+    ELSE IF @ProcID IN ('GET_ATTENDANCE_LOGS', 'GET_ATTENDANCES')
+    BEGIN
+        DECLARE @v_LMon INT = COALESCE(TRY_CAST(@parm02 AS INT), MONTH(GETDATE()));
+        DECLARE @v_LYr INT = COALESCE(TRY_CAST(@parm03 AS INT), YEAR(GETDATE()));
+
+        DECLARE @v_LogEmpId NVARCHAR(50) = NULL;
+        DECLARE @v_LogUid NVARCHAR(50) = NULL;
+
+        SELECT TOP 1 
+            @v_LogEmpId = CONVERT(NVARCHAR(50), e.Id),
+            @v_LogUid = CONVERT(NVARCHAR(50), e.UserId)
+        FROM dbo.Employees e
+        WHERE CONVERT(NVARCHAR(50), e.Id) = @parm01;
+
+        IF @v_LogEmpId IS NULL
+        BEGIN
+            SELECT TOP 1 
+                @v_LogEmpId = CONVERT(NVARCHAR(50), e.Id),
+                @v_LogUid = CONVERT(NVARCHAR(50), u.Id)
+            FROM dbo.Users u
+            LEFT JOIN dbo.Employees e ON CONVERT(NVARCHAR(50), e.UserId) = CONVERT(NVARCHAR(50), u.Id)
+            WHERE CONVERT(NVARCHAR(50), u.Id) = @parm01 
+               OR u.Username = @parm01 
+               OR u.Email = @parm01;
+        END
+
+        SET @v_JsonOut = (
+            SELECT 
+                CONVERT(NVARCHAR(50), a.Id) AS id,
+                CONVERT(VARCHAR(10), a.AttendanceDate, 120) AS [date],
+                CONVERT(VARCHAR(5), a.InTime, 108) AS in_time,
+                CONVERT(VARCHAR(5), a.OutTime, 108) AS out_time,
+                COALESCE(a.Punctuality, 'ON_TIME') AS status,
+                COALESCE(a.InApprovalStatus, 'APPROVED') AS in_approval_status,
+                COALESCE(a.OutApprovalStatus, 'APPROVED') AS out_approval_status,
+                CAST(COALESCE(a.IsWfh, 0) AS BIT) AS is_wfh,
+                COALESCE(b.Name, 'Main Office') AS branch_name
+            FROM dbo.Attendances a
+            LEFT JOIN dbo.Branches b ON CONVERT(NVARCHAR(50), a.BranchId) = CONVERT(NVARCHAR(50), b.Id)
+            WHERE MONTH(a.AttendanceDate) = @v_LMon
+              AND YEAR(a.AttendanceDate) = @v_LYr
+              AND (a.EmployeeId = @v_LogEmpId OR a.EmployeeId = @v_LogUid OR a.EmployeeId = @parm01)
+            ORDER BY a.AttendanceDate DESC, a.CreatedAt DESC
+            FOR JSON PATH
+        );
+        SELECT COALESCE(@v_JsonOut, '[]') AS result_json;
+    END
+
+    -- ========================================================================
+    -- 39. GET_APPROVAL_QUEUE
+    -- ========================================================================
+    ELSE IF @ProcID = 'GET_APPROVAL_QUEUE'
+    BEGIN
+        DECLARE @v_QueueDate DATE = COALESCE(TRY_CAST(@parm01 AS DATE), CAST(GETDATE() AS DATE));
+
+        SET @v_JsonOut = (
+            SELECT 
+                CONVERT(NVARCHAR(50), a.Id) AS id,
+                COALESCE(u.Name, u.Username, 'Employee') AS employee_name,
+                COALESCE(u.UserCode, u.UserId, u.Username, 'EMP') AS employee_code,
+                COALESCE(e.Designation, u.Role, 'Staff') AS designation,
+                COALESCE(b.Name, 'Main Office') AS branch_name,
+                CONVERT(VARCHAR(10), a.AttendanceDate, 120) AS [date],
+                CONVERT(VARCHAR(5), a.InTime, 108) AS in_time,
+                CONVERT(VARCHAR(5), a.OutTime, 108) AS out_time,
+                CAST(COALESCE(a.IsWfh, 0) AS BIT) AS is_wfh,
+                CASE 
+                    WHEN COALESCE(a.IsWfh, 0) = 1 THEN 'Remote / WFH'
+                    ELSE 'On-Site'
+                END AS distance_desc,
+                COALESCE(a.InApprovalStatus, 'PENDING') AS in_status,
+                COALESCE(a.OutApprovalStatus, 'NOT_PUNCHED') AS out_status
+            FROM dbo.Attendances a
+            LEFT JOIN dbo.Employees e ON CONVERT(NVARCHAR(50), a.EmployeeId) = CONVERT(NVARCHAR(50), e.Id) 
+                                     OR CONVERT(NVARCHAR(50), a.EmployeeId) = CONVERT(NVARCHAR(50), e.UserId)
+            LEFT JOIN dbo.Users u ON CONVERT(NVARCHAR(50), a.EmployeeId) = CONVERT(NVARCHAR(50), u.Id) 
+                                  OR CONVERT(NVARCHAR(50), e.UserId) = CONVERT(NVARCHAR(50), u.Id)
+                                  OR a.EmployeeId = u.Username
+                                  OR a.EmployeeId = u.Email
+            LEFT JOIN dbo.Branches b ON CONVERT(NVARCHAR(50), a.BranchId) = CONVERT(NVARCHAR(50), b.Id)
+            WHERE a.AttendanceDate = @v_QueueDate
+            ORDER BY a.CreatedAt DESC
+            FOR JSON PATH
+        );
+        SELECT COALESCE(@v_JsonOut, '[]') AS result_json;
+    END
+
+    -- ========================================================================
+    -- 40. APPROVE_IN / APPROVE_OUT / APPROVE_BULK
+    -- ========================================================================
+    ELSE IF @ProcID IN ('APPROVE_IN', 'APPROVE_OUT', 'APPROVE_BULK')
+    BEGIN
+        IF @ProcID = 'APPROVE_IN'
+        BEGIN
+            UPDATE dbo.Attendances
+            SET InApprovalStatus = COALESCE(NULLIF(@parm02, ''), 'APPROVED'),
+                InApprovedBy = @UserId,
+                ApprovalRemarks = NULLIF(@parm03, ''),
+                UpdatedAt = SYSDATETIMEOFFSET()
+            WHERE CONVERT(NVARCHAR(50), Id) = @parm01;
+        END
+        ELSE IF @ProcID = 'APPROVE_OUT'
+        BEGIN
+            UPDATE dbo.Attendances
+            SET OutApprovalStatus = COALESCE(NULLIF(@parm02, ''), 'APPROVED'),
+                OutApprovedBy = @UserId,
+                ApprovalRemarks = NULLIF(@parm03, ''),
+                UpdatedAt = SYSDATETIMEOFFSET()
+            WHERE CONVERT(NVARCHAR(50), Id) = @parm01;
+        END
+        ELSE IF @ProcID = 'APPROVE_BULK'
+        BEGIN
+            UPDATE dbo.Attendances
+            SET InApprovalStatus = CASE WHEN InApprovalStatus = 'PENDING' THEN 'APPROVED' ELSE InApprovalStatus END,
+                OutApprovalStatus = CASE WHEN OutApprovalStatus = 'PENDING' THEN 'APPROVED' ELSE OutApprovalStatus END,
+                UpdatedAt = SYSDATETIMEOFFSET()
+            WHERE CONVERT(NVARCHAR(50), Id) IN (SELECT [value] FROM STRING_SPLIT(@parm01, ','));
         END
 
         SELECT CAST(1 AS BIT) AS success FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
@@ -2195,9 +2665,9 @@ END;
 GO
 
 -- ============================================================================
--- 2. PROCEDURE: dbo.sp_attendance_operations
+-- 2. PROCEDURE: dbo.sp_ticket_operations
 -- ============================================================================
-CREATE PROCEDURE dbo.sp_attendance_operations
+CREATE OR ALTER PROCEDURE dbo.sp_ticket_operations
     @p_ComCod NVARCHAR(100) = '', @p_ProcID NVARCHAR(100) = '', @p_ProcName NVARCHAR(100) = '',
     @p_UserId NVARCHAR(100) = '', @p_UserCode NVARCHAR(100) = '', @p_UserName NVARCHAR(100) = '',
     @p_Action NVARCHAR(100) = '', @p_parm00 NVARCHAR(MAX) = '', @p_parm01 NVARCHAR(MAX) = '',
@@ -2297,7 +2767,7 @@ GO
 -- ============================================================================
 -- 3. PROCEDURE: dbo.sp_permission_operations
 -- ============================================================================
-CREATE PROCEDURE dbo.sp_permission_operations
+CREATE OR ALTER PROCEDURE dbo.sp_permission_operations
     @p_ComCod NVARCHAR(100) = '', @p_ProcID NVARCHAR(100) = '', @p_ProcName NVARCHAR(100) = '',
     @p_UserId NVARCHAR(100) = '', @p_UserCode NVARCHAR(100) = '', @p_UserName NVARCHAR(100) = '',
     @p_Action NVARCHAR(100) = '', @p_parm00 NVARCHAR(MAX) = '', @p_parm01 NVARCHAR(MAX) = '',
@@ -2574,7 +3044,7 @@ BEGIN
 END;
 GO
 
-CREATE OR ALTER PROCEDURE support.sp_attendance_operations
+CREATE OR ALTER PROCEDURE support.sp_ticket_operations
     @p_ComCod NVARCHAR(100) = '', @p_ProcID NVARCHAR(100) = '', @p_ProcName NVARCHAR(100) = '',
     @p_UserId NVARCHAR(100) = '', @p_UserCode NVARCHAR(100) = '', @p_UserName NVARCHAR(100) = '',
     @p_Action NVARCHAR(100) = '', @p_parm00 NVARCHAR(MAX) = '', @p_parm01 NVARCHAR(MAX) = '',
@@ -2626,7 +3096,7 @@ CREATE OR ALTER PROCEDURE support.sp_attendance_operations
 AS
 BEGIN
     SET NOCOUNT ON;
-    EXEC dbo.sp_attendance_operations 
+    EXEC dbo.sp_ticket_operations 
         @p_ComCod=@p_ComCod, @p_ProcID=@p_ProcID, @p_ProcName=@p_ProcName,
         @p_UserId=@p_UserId, @p_UserCode=@p_UserCode, @p_UserName=@p_UserName,
         @p_Action=@p_Action, @p_parm00=@p_parm00,

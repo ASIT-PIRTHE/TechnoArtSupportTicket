@@ -1,4 +1,5 @@
 @page "/attendance/notices"
+@attribute [Authorize(Roles = "SuperAdmin,Admin,MD,HRManager,SupportManager,ProjectManager,AccountsOfficer,TeamMember")]
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
 @using System.Text.Json
@@ -214,7 +215,7 @@
         {
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "GET_NOTICES"
             };
 
@@ -370,7 +371,7 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "SAVE_NOTICE",
                 parm01 = string.IsNullOrEmpty(editingId) ? Guid.NewGuid().ToString() : editingId,
                 parm02 = formTitle,
@@ -402,7 +403,7 @@
             {
                 var req = new APIDataAccParms
                 {
-                    ProcName = "sp_attendance_operations",
+                    ProcName = "sp_ticket_operations",
                     ProcID = "SAVE_NOTICE",
                     parm01 = n.Id,
                     parm02 = n.Title,

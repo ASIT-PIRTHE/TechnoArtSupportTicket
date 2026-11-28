@@ -7,14 +7,18 @@ namespace TechnoArtSupportTicketFrontEnd.Auth
 {
     public class CustomAuthStateProvider : AuthenticationStateProvider
     {
-        private readonly ProtectedLocalStorage _localStorage;
+        private readonly ProtectedSessionStorage _sessionStorage;
+        private readonly ProtectedLocalStorage? _localStorage;
         private ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
         private ClaimsPrincipal? _cachedPrincipal;
+        private DateTime? _lastActivityTimeUtc;
+        private static readonly TimeSpan InactivityTimeout = TimeSpan.FromMinutes(25);
 
         public string? CurrentToken { get; private set; }
 
-        public CustomAuthStateProvider(ProtectedLocalStorage localStorage)
+        public CustomAuthStateProvider(ProtectedSessionStorage sessionStorage, ProtectedLocalStorage? localStorage = null)
         {
+            _sessionStorage = sessionStorage;
             _localStorage = localStorage;
         }
 
@@ -22,16 +26,43 @@ namespace TechnoArtSupportTicketFrontEnd.Auth
         {
             try
             {
+                // Inactivity check if cached principal exists
                 if (_cachedPrincipal != null && _cachedPrincipal.Identity?.IsAuthenticated == true)
                 {
+                    if (_lastActivityTimeUtc.HasValue && (DateTime.UtcNow - _lastActivityTimeUtc.Value) > InactivityTimeout)
+                    {
+                        await MarkUserAsLoggedOut();
+                        return new AuthenticationState(_anonymous);
+                    }
+                    _lastActivityTimeUtc = DateTime.UtcNow;
                     return new AuthenticationState(_cachedPrincipal);
                 }
 
                 string? userToken = null;
                 try
                 {
-                    var userSessionResult = await _localStorage.GetAsync<string>("userToken");
-                    userToken = userSessionResult.Success ? userSessionResult.Value : null;
+                    var sessionResult = await _sessionStorage.GetAsync<string>("userToken");
+                    userToken = sessionResult.Success ? sessionResult.Value : null;
+
+                    // Also check session last activity timestamp (20-30 min idle timeout check)
+                    if (!string.IsNullOrEmpty(userToken))
+                    {
+                        var timeResult = await _sessionStorage.GetAsync<string>("lastActivityUtc");
+                        if (timeResult.Success && DateTime.TryParse(timeResult.Value, null, System.Globalization.DateTimeStyles.RoundtripKind, out var lastAct))
+                        {
+                            if ((DateTime.UtcNow - lastAct) > InactivityTimeout)
+                            {
+                                await MarkUserAsLoggedOut();
+                                return new AuthenticationState(_anonymous);
+                            }
+                        }
+                    }
+
+                    // OWASP & Fixation Defense: Clean up any old persistent token remaining in browser localStorage
+                    if (_localStorage != null)
+                    {
+                        try { await _localStorage.DeleteAsync("userToken"); } catch { }
+                    }
                 }
                 catch
                 {
@@ -43,6 +74,12 @@ namespace TechnoArtSupportTicketFrontEnd.Auth
                     return new AuthenticationState(_anonymous);
 
                 CurrentToken = userToken;
+                _lastActivityTimeUtc = DateTime.UtcNow;
+                try
+                {
+                    await _sessionStorage.SetAsync("lastActivityUtc", _lastActivityTimeUtc.Value.ToString("O"));
+                }
+                catch { }
 
                 var claims = ParseClaimsFromJwt(userToken);
                 var claimsIdentity = new ClaimsIdentity(claims, "jwtAuth", ClaimTypes.Name, ClaimTypes.Role);
@@ -58,9 +95,18 @@ namespace TechnoArtSupportTicketFrontEnd.Auth
         public async Task MarkUserAsAuthenticated(string token)
         {
             CurrentToken = token;
+            _lastActivityTimeUtc = DateTime.UtcNow;
             try
             {
-                await _localStorage.SetAsync("userToken", token);
+                // Store in sessionStorage so it is destroyed immediately on browser close
+                await _sessionStorage.SetAsync("userToken", token);
+                await _sessionStorage.SetAsync("lastActivityUtc", _lastActivityTimeUtc.Value.ToString("O"));
+
+                // Clear persistent localStorage to eliminate cross-session retention
+                if (_localStorage != null)
+                {
+                    await _localStorage.DeleteAsync("userToken");
+                }
             }
             catch { }
 
@@ -74,9 +120,15 @@ namespace TechnoArtSupportTicketFrontEnd.Auth
         {
             _cachedPrincipal = null;
             CurrentToken = null;
+            _lastActivityTimeUtc = null;
             try
             {
-                await _localStorage.DeleteAsync("userToken");
+                await _sessionStorage.DeleteAsync("userToken");
+                await _sessionStorage.DeleteAsync("lastActivityUtc");
+                if (_localStorage != null)
+                {
+                    await _localStorage.DeleteAsync("userToken");
+                }
             }
             catch { }
             NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_anonymous)));

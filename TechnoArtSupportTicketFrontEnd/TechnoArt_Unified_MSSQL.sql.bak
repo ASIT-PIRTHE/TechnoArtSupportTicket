@@ -699,15 +699,15 @@ END;
 GO
 
 -- ============================================================================
--- 9. ATTENDANCE & HRM STORED PROCEDURE: sp_attendance_operations (MSSQL)
+-- 9. ATTENDANCE & HRM STORED PROCEDURE: sp_ticket_operations (MSSQL)
 -- ----------------------------------------------------------------------------
-IF OBJECT_ID('dbo.sp_attendance_operations', 'P') IS NULL
+IF OBJECT_ID('dbo.sp_ticket_operations', 'P') IS NULL
 BEGIN
-    EXEC('CREATE PROCEDURE dbo.sp_attendance_operations AS RETURN 0;');
+    EXEC('CREATE PROCEDURE dbo.sp_ticket_operations AS RETURN 0;');
 END
 GO
 
-ALTER PROCEDURE dbo.sp_attendance_operations
+ALTER PROCEDURE dbo.sp_ticket_operations
     @ComCod NVARCHAR(50) = '',
     @ProcID NVARCHAR(50) = '',
     @parm01 NVARCHAR(255) = '',

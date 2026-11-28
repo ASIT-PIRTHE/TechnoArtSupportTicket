@@ -35,14 +35,16 @@ namespace TechnoArtSupportTicketFrontEnd.Services
     public class ApiService
     {
         private readonly HttpClient _http;
-        private readonly ProtectedLocalStorage _localStorage;
+        private readonly ProtectedSessionStorage _sessionStorage;
+        private readonly ProtectedLocalStorage? _localStorage;
 
         private string? _cachedToken;
         private bool _tokenLoaded = false;
 
-        public ApiService(HttpClient http, ProtectedLocalStorage localStorage)
+        public ApiService(HttpClient http, ProtectedSessionStorage sessionStorage, ProtectedLocalStorage? localStorage = null)
         {
             _http = http;
+            _sessionStorage = sessionStorage;
             _localStorage = localStorage;
         }
 
@@ -56,19 +58,22 @@ namespace TechnoArtSupportTicketFrontEnd.Services
             _cachedToken = null;
         }
 
-        public async Task<JsonElement?> FetchDataAsync(APIDataAccParms requestParams)
+        public async Task<JsonElement?> FetchDataAsync(APIDataAccParms requestParams, string? bearerToken = null)
         {
             try
             {
                 // 1. JWT Implementation - attach token to header
-                if (string.IsNullOrWhiteSpace(_cachedToken))
+                var effectiveToken = !string.IsNullOrWhiteSpace(bearerToken) ? bearerToken : _cachedToken;
+
+                if (string.IsNullOrWhiteSpace(effectiveToken))
                 {
                     try
                     {
-                        var tokenResult = await _localStorage.GetAsync<string>("userToken");
-                        if (tokenResult.Success && !string.IsNullOrWhiteSpace(tokenResult.Value))
+                        var sessionResult = await _sessionStorage.GetAsync<string>("userToken");
+                        if (sessionResult.Success && !string.IsNullOrWhiteSpace(sessionResult.Value))
                         {
-                            _cachedToken = tokenResult.Value;
+                            effectiveToken = sessionResult.Value;
+                            _cachedToken = effectiveToken;
                         }
                     }
                     catch { }
@@ -84,9 +89,9 @@ namespace TechnoArtSupportTicketFrontEnd.Services
                     Content = JsonContent.Create(base64Request)
                 };
 
-                if (!string.IsNullOrWhiteSpace(_cachedToken))
+                if (!string.IsNullOrWhiteSpace(effectiveToken))
                 {
-                    requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken);
+                    requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", effectiveToken);
                 }
 
                 var response = await _http.SendAsync(requestMessage);

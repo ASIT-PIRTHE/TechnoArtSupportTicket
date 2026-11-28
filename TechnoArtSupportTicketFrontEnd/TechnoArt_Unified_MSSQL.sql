@@ -974,15 +974,15 @@ BEGIN
 END;
 GO
 
--- 4. Clean recreate support.sp_attendance_operations
-IF OBJECT_ID('support.sp_attendance_operations', 'P') IS NOT NULL
-    DROP PROCEDURE support.sp_attendance_operations;
+-- 4. Clean recreate support.sp_ticket_operations
+IF OBJECT_ID('support.sp_ticket_operations', 'P') IS NOT NULL
+    DROP PROCEDURE support.sp_ticket_operations;
 GO
-IF OBJECT_ID('dbo.sp_attendance_operations', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.sp_attendance_operations;
+IF OBJECT_ID('dbo.sp_ticket_operations', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_ticket_operations;
 GO
 
-CREATE PROCEDURE support.sp_attendance_operations
+CREATE PROCEDURE support.sp_ticket_operations
     @p_ComCod NVARCHAR(50) = '',
     @p_ProcID NVARCHAR(50) = '',
     @p_ProcName NVARCHAR(100) = '',
@@ -1335,12 +1335,12 @@ BEGIN
 END;
 GO
 
--- 5. Create dbo.sp_attendance_operations proxy
-IF OBJECT_ID('dbo.sp_attendance_operations', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.sp_attendance_operations;
+-- 5. Create dbo.sp_ticket_operations proxy
+IF OBJECT_ID('dbo.sp_ticket_operations', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_ticket_operations;
 GO
 
-CREATE PROCEDURE dbo.sp_attendance_operations
+CREATE PROCEDURE dbo.sp_ticket_operations
     @p_ComCod NVARCHAR(50) = '',
     @p_ProcID NVARCHAR(50) = '',
     @p_ProcName NVARCHAR(100) = '',
@@ -1415,7 +1415,7 @@ CREATE PROCEDURE dbo.sp_attendance_operations
     @SessionId NVARCHAR(100) = ''
 AS
 BEGIN
-    EXEC support.sp_attendance_operations
+    EXEC support.sp_ticket_operations
         @p_ComCod=@p_ComCod, @p_ProcID=@p_ProcID, @p_ProcName=@p_ProcName,
         @p_parm01=@p_parm01, @p_parm02=@p_parm02, @p_parm03=@p_parm03, @p_parm04=@p_parm04, @p_parm05=@p_parm05,
         @p_parm06=@p_parm06, @p_parm07=@p_parm07, @p_parm08=@p_parm08, @p_parm09=@p_parm09, @p_parm10=@p_parm10,

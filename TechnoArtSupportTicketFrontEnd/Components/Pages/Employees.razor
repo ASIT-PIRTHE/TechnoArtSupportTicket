@@ -1196,6 +1196,10 @@
     protected override async Task OnInitializedAsync()
     {
         await ResolveUserAuthContext();
+        if (string.IsNullOrEmpty(CurrentUserRole) || (!IsInternalUser && !IsClientAdmin))
+        {
+            return;
+        }
         try { await LoadDynamicRoles(); } catch {}
         try { await LoadTenants(); } catch {}
         try { await LoadProjects(); } catch {}
@@ -1209,6 +1213,10 @@
         if (firstRender && (string.IsNullOrEmpty(CurrentUserRole) || userList.Count == 0))
         {
             await ResolveUserAuthContext();
+            if (string.IsNullOrEmpty(CurrentUserRole) || (!IsInternalUser && !IsClientAdmin))
+            {
+                return;
+            }
             await LoadUsers();
             StateHasChanged();
         }
@@ -1306,7 +1314,7 @@
     private async Task LoadBranches()
     {
         branchList.Clear();
-        var payload = new APIDataAccParms { ProcName = "sp_attendance_operations", ProcID = "GET_BRANCHES" };
+        var payload = new APIDataAccParms { ProcName = "sp_ticket_operations", ProcID = "GET_BRANCHES" };
         var result = await BackendApi.FetchDataAsync(payload);
         if (result.HasValue)
         {

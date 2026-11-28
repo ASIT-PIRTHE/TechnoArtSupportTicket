@@ -1,1 +1,523 @@
-[]
+[
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "Ping",
+    "RelativePath": "api/mobile",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetAttendanceHistory",
+    "RelativePath": "api/mobile/attendance/history",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "month",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "year",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetOfficeTime",
+    "RelativePath": "api/mobile/attendance/office-time",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "PunchIn",
+    "RelativePath": "api/mobile/attendance/punch-in",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.AttendancePunchRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "PunchOut",
+    "RelativePath": "api/mobile/attendance/punch-out",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.AttendancePunchRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetTodayAttendance",
+    "RelativePath": "api/mobile/attendance/today",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "date",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "VerifyGeofence",
+    "RelativePath": "api/mobile/attendance/verify-geofence",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.GeofenceCheckRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "LoginGetInstruction",
+    "RelativePath": "api/mobile/auth/login",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "Login",
+    "RelativePath": "api/mobile/auth/login",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.MobileLoginRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetProfile",
+    "RelativePath": "api/mobile/auth/profile",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetBranches",
+    "RelativePath": "api/mobile/branches",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetLeaves",
+    "RelativePath": "api/mobile/leaves",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "ApplyLeave",
+    "RelativePath": "api/mobile/leaves/apply",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.ApplyLeaveRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "UpdateLeaveStatus",
+    "RelativePath": "api/mobile/leaves/update-status",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.UpdateLeaveStatusRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "LoginGetInstruction",
+    "RelativePath": "api/mobile/login",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "Login",
+    "RelativePath": "api/mobile/login",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.MobileLoginRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetNotices",
+    "RelativePath": "api/mobile/notices",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetNotifications",
+    "RelativePath": "api/mobile/notifications",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "RegisterFcmToken",
+    "RelativePath": "api/mobile/notifications/register-token",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.RegisterFcmTokenRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "Ping",
+    "RelativePath": "api/mobile/ping",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.QrAuthController",
+    "Method": "ApproveSession",
+    "RelativePath": "api/mobile/qr/approve",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.QrApproveRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetTasks",
+    "RelativePath": "api/mobile/tasks",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "UpdateTaskStatus",
+    "RelativePath": "api/mobile/tasks/{taskId}/status",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "taskId",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.UpdateTaskStatusRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "Ping",
+    "RelativePath": "api/mobile/test",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetTickets",
+    "RelativePath": "api/mobile/tickets",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "status",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "priority",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "GetTicketDetails",
+    "RelativePath": "api/mobile/tickets/{ticketNumber}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ticketNumber",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "AddTicketComment",
+    "RelativePath": "api/mobile/tickets/{ticketNumber}/comments",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ticketNumber",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.AddCommentRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "CreateTicket",
+    "RelativePath": "api/mobile/tickets/create",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.CreateTicketRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController",
+    "Method": "UploadTicketAttachment",
+    "RelativePath": "api/mobile/tickets/upload",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ContentType",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "ContentDisposition",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "Headers",
+        "Type": "Microsoft.AspNetCore.Http.IHeaderDictionary",
+        "IsRequired": false
+      },
+      {
+        "Name": "Length",
+        "Type": "System.Int64",
+        "IsRequired": false
+      },
+      {
+        "Name": "Name",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "FileName",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.QrAuthController",
+    "Method": "ApproveSession",
+    "RelativePath": "api/qr/approve",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.QrApproveRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.QrAuthController",
+    "Method": "GenerateQrSession",
+    "RelativePath": "api/qr/generate",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.QrAuthController",
+    "Method": "PollSession",
+    "RelativePath": "api/qr/poll/{sessionId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.QrAuthController",
+    "Method": "ApproveSession",
+    "RelativePath": "api/QrAuth/approve",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "TechnoArtSupportTicketFrontEnd.Controllers.QrApproveRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.QrAuthController",
+    "Method": "GenerateQrSession",
+    "RelativePath": "api/QrAuth/generate",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TechnoArtSupportTicketFrontEnd.Controllers.QrAuthController",
+    "Method": "PollSession",
+    "RelativePath": "api/QrAuth/poll/{sessionId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  }
+]

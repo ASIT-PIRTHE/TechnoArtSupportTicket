@@ -13,6 +13,7 @@
 @inject IHttpClientFactory ClientFactory
 @inject IConfiguration Config
 @inject TechnoArtSupportTicketFrontEnd.Services.ApiService BackendApi
+@inject TechnoArtSupportTicketFrontEnd.Services.IQrAuthService QrAuthService
 
 <PageTitle>Sign In &middot; @(Config["Branding:SiteName"] ?? "SupportHub")</PageTitle>
 
@@ -321,6 +322,20 @@
     private bool isLoggingIn = false;
     [SupplyParameterFromQuery]
     private string? returnUrl { get; set; }
+    [SupplyParameterFromQuery]
+    private string? reason { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (reason == "idle_timeout")
+        {
+            errorMessage = "Your session expired due to 25 minutes of inactivity. Please sign in again.";
+        }
+        else if (reason == "session_expired")
+        {
+            errorMessage = "Your session has ended. Please sign in again.";
+        }
+    }
 
     private void SwitchToPasswordMode()
     {
@@ -459,15 +474,15 @@
 
         try
         {
-            var response = await Http.GetFromJsonAsync<JsonElement>("api/qr/generate");
-            QrSessionId = response.GetProperty("sessionId").GetString() ?? "";
+            var session = QrAuthService.CreateSession();
+            QrSessionId = session.SessionId;
             StateHasChanged();
             IsPolling = true;
             _ = PollQrSession();
         }
         catch (Exception ex)
         {
-            qrStatusText = $"Network Error: {ex.Message}";
+            qrStatusText = $"Session Error: {ex.Message}";
             StateHasChanged();
         }
     }
@@ -479,12 +494,12 @@
             await Task.Delay(1500);
             try
             {
-                var check = await Http.GetFromJsonAsync<JsonElement>($"api/qr/poll/{QrSessionId}");
-                var status = check.GetProperty("status").GetString();
+                var check = QrAuthService.CheckSession(QrSessionId);
+                var status = check?.Status ?? "EXPIRED_OR_INVALID";
 
-                if (status == "APPROVED")
+                if (status == "APPROVED" && !string.IsNullOrEmpty(check?.Token))
                 {
-                    var token = check.GetProperty("token").GetString();
+                    var token = check.Token;
                     var customAuth = (CustomAuthStateProvider)AuthStateProvider;
                     await customAuth.MarkUserAsAuthenticated(token!);
                     BackendApi.SetToken(token!);

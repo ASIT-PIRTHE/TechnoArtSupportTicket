@@ -1,10 +1,11 @@
 @page "/attendance/leaves"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "SuperAdmin,Admin,MD,HRManager,SupportManager,AccountsOfficer,TeamMember,ProjectManager")]
 @using Microsoft.AspNetCore.Components.Authorization
 @using TechnoArtSupportTicketFrontEnd.Services
 @using System.Text.Json
 @inject ApiService BackendApi
 @inject AuthenticationStateProvider AuthStateProvider
+@inject TechnoArtSupportTicketFrontEnd.Services.IEmailService EmailService
 
 <PageTitle>Leave Management - TechnoArt</PageTitle>
 
@@ -177,6 +178,8 @@
                             <select class="form-select" @bind="formLeaveType">
                                 <option value="Casual Leave">Casual Leave (Personal / Urgent)</option>
                                 <option value="Sick Leave">Sick Leave (Medical / Illness)</option>
+                                <option value="Short Leave (Late Arrival)">Short Leave (Late Arrival - অফিস দেরিতে প্রবেশ)</option>
+                                <option value="Short Leave (Early Departure)">Short Leave (Early Departure - অফিস আগে প্রস্থান)</option>
                                 <option value="Annual Leave">Annual Leave</option>
                                 <option value="Maternity / Paternity">Maternity / Paternity</option>
                                 <option value="Unpaid Leave">Unpaid Leave</option>
@@ -461,7 +464,7 @@
         {
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "GET_LEAVES",
                 parm04 = currentUserId,
                 parm05 = currentUserRole
@@ -579,7 +582,7 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "APPLY_LEAVE",
                 parm01 = newLeave.Id,
                 parm02 = username,
@@ -625,7 +628,7 @@
 
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "UPDATE_LEAVE_STATUS",
                 parm01 = id.ToString(),
                 parm02 = newStatus,
@@ -638,6 +641,52 @@
             pendingLeavesCount = leaves.Count(x => x.Status == "PENDING");
             statusMessage = $"Leave request has been {newStatus.ToLower()} by {approverTitle}!";
             isSuccess = true;
+
+            // Send SMTP notification email to the employee
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    string toEmail = target.EmployeeName;
+                    if (!toEmail.Contains("@"))
+                    {
+                        var uReq = new APIDataAccParms
+                        {
+                            ProcName = "sp_ticket_operations",
+                            ProcID = "GET_USERS",
+                            parm04 = !string.IsNullOrEmpty(target.ApplicantUserId) ? target.ApplicantUserId : target.EmployeeName
+                        };
+                        var uRes = await BackendApi.FetchDataAsync(uReq);
+                        if (uRes.HasValue)
+                        {
+                            var el = uRes.Value;
+                            if (el.ValueKind == JsonValueKind.Array && el.GetArrayLength() > 0)
+                            {
+                                var first = el[0];
+                                if (first.TryGetProperty("email", out var emP) && !string.IsNullOrWhiteSpace(emP.GetString()))
+                                {
+                                    toEmail = emP.GetString()!;
+                                }
+                            }
+                        }
+                    }
+
+                    if (toEmail.Contains("@"))
+                    {
+                        await EmailService.SendLeaveStatusEmailAsync(
+                            toEmail,
+                            target.EmployeeName,
+                            target.LeaveType,
+                            target.FromDate.ToString("yyyy-MM-dd"),
+                            target.ToDate.ToString("yyyy-MM-dd"),
+                            newStatus,
+                            target.Remarks ?? "",
+                            approverTitle
+                        );
+                    }
+                }
+                catch { /* Non-blocking */ }
+            });
         }
     }
 

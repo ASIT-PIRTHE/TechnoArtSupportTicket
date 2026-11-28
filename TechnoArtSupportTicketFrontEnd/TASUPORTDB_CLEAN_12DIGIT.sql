@@ -953,12 +953,12 @@ END;
 GO
 
 -- ============================================================================
--- 2. UNIFIED STORED PROCEDURE: dbo.sp_attendance_operations
+-- 2. UNIFIED STORED PROCEDURE: dbo.sp_ticket_operations
 -- ============================================================================
-IF OBJECT_ID('dbo.sp_attendance_operations', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_attendance_operations;
+IF OBJECT_ID('dbo.sp_ticket_operations', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_ticket_operations;
 GO
 
-CREATE PROCEDURE dbo.sp_attendance_operations
+CREATE PROCEDURE dbo.sp_ticket_operations
     @p_ComCod NVARCHAR(100) = '', @p_ProcID NVARCHAR(100) = '', @p_ProcName NVARCHAR(100) = '',
     @p_UserId NVARCHAR(100) = '', @p_UserCode NVARCHAR(100) = '', @p_UserName NVARCHAR(100) = '',
     @p_parm01 NVARCHAR(255) = '', @p_parm02 NVARCHAR(255) = '', @p_parm03 NVARCHAR(255) = '',
@@ -1044,7 +1044,7 @@ BEGIN
 END;
 GO
 
-CREATE OR ALTER PROCEDURE support.sp_attendance_operations
+CREATE OR ALTER PROCEDURE support.sp_ticket_operations
     @p_ComCod NVARCHAR(100) = '', @p_ProcID NVARCHAR(100) = '', @p_ProcName NVARCHAR(100) = '',
     @p_UserId NVARCHAR(100) = '', @p_parm01 NVARCHAR(255) = '', @p_parm02 NVARCHAR(255) = '',
     @p_parm03 NVARCHAR(255) = '', @p_parm04 NVARCHAR(255) = '', @p_parm05 NVARCHAR(255) = '',
@@ -1053,7 +1053,7 @@ CREATE OR ALTER PROCEDURE support.sp_attendance_operations
 AS
 BEGIN
     SET NOCOUNT ON;
-    EXEC dbo.sp_attendance_operations 
+    EXEC dbo.sp_ticket_operations 
         @p_ComCod=@p_ComCod, @p_ProcID=@p_ProcID, @p_UserId=@p_UserId,
         @p_parm01=@p_parm01, @p_parm02=@p_parm02, @p_parm03=@p_parm03, @p_parm04=@p_parm04,
         @p_parm05=@p_parm05, @p_parm06=@p_parm06, @p_parm07=@p_parm07, @p_parm08=@p_parm08,

@@ -339,7 +339,7 @@
         {
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = "GET_APPROVAL_QUEUE",
                 parm01 = selectedDate.ToString("yyyy-MM-dd"),
                 parm05 = currentUser
@@ -424,7 +424,7 @@
         {
             var req = new APIDataAccParms
             {
-                ProcName = "sp_attendance_operations",
+                ProcName = "sp_ticket_operations",
                 ProcID = procId,
                 parm01 = p1,
                 parm02 = p2,

@@ -21,7 +21,24 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = true);
 
+builder.Services.AddControllers()
+    .AddApplicationPart(typeof(TechnoArtSupportTicketFrontEnd.Controllers.MobileApiController).Assembly);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MobileCorsPolicy", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 builder.Services.AddMudServices();
+
+// QR Auth & SMTP Email Services
+builder.Services.AddSingleton<TechnoArtSupportTicketFrontEnd.Services.IQrAuthService, TechnoArtSupportTicketFrontEnd.Services.QrAuthService>();
+builder.Services.AddScoped<TechnoArtSupportTicketFrontEnd.Services.IEmailService, TechnoArtSupportTicketFrontEnd.Services.EmailService>();
 
 // FIX FOR BLAZOR LOGOUT ON REFRESH & APP RESTART: Persist Encryption Keys
 builder.Services.AddDataProtection()
@@ -36,8 +53,9 @@ builder.Services.AddHttpClient("SupportAPI", client => { client.BaseAddress = ne
 builder.Services.AddScoped<TechnoArtSupportTicketFrontEnd.Services.ApiService>(sp => 
 {
     var factory = sp.GetRequiredService<IHttpClientFactory>();
-    var localStorage = sp.GetRequiredService<Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedLocalStorage>();
-    return new TechnoArtSupportTicketFrontEnd.Services.ApiService(factory.CreateClient("SupportAPI"), localStorage);
+    var sessionStorage = sp.GetRequiredService<Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedSessionStorage>();
+    var localStorage = sp.GetService<Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedLocalStorage>();
+    return new TechnoArtSupportTicketFrontEnd.Services.ApiService(factory.CreateClient("SupportAPI"), sessionStorage, localStorage);
 });
 
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme)
@@ -46,6 +64,7 @@ builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.C
     });
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<ProtectedLocalStorage>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 
@@ -64,8 +83,12 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+app.UseCors("MobileCorsPolicy");
 app.UseStaticFiles();
 app.UseAntiforgery();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
